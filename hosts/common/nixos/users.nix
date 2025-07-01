@@ -4,6 +4,7 @@
   pkgs,
   ...
 }: {
+  users.defaultUserShell = pkgs.fish;
   users.users = {
     z-247 = {
       isNormalUser = true;

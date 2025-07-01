@@ -1,5 +1,8 @@
 # Custom home-manager modules
 {
-  # Add custom home-manager modules here
-  # example = import ./example.nix;
+  zsh = import ./zsh.nix;
+  tmux = import ./tmux.nix;
+  git = import ./git.nix;
+  fish = import ./fish.nix;
+  zellij = import ./zellij.nix;
 }

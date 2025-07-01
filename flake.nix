@@ -15,6 +15,13 @@
     
     # Darwin support for macOS
     nix-darwin.url = "github:LnL7/nix-darwin";
+    
+    # Secrets management
+    sops-nix.url = "github:Mic92/sops-nix";
+    sops-nix.inputs.nixpkgs.follows = "nixpkgs";
+
+    # Airspy ADS-B source
+    airspy-adsb-src.url = "github:fejiso/airspy_adsb/master";
 
     };
 
@@ -25,6 +32,8 @@
     home-manager,
     nixos-hardware,
     nix-darwin,
+    sops-nix,
+    airspy-adsb-src,
     ...
   } @ inputs: let
     inherit (self) outputs;
@@ -45,6 +54,7 @@
       nixos = [
         ./modules/nixos
         ./hosts/common/nixos
+        sops-nix.nixosModules.sops
       ];
       home = [
         ./modules/home-manager

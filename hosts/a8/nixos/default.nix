@@ -9,6 +9,7 @@
 }: {
   imports = [
     ./hardware-configuration.nix
+    (inputs.airspy-adsb-src + "/modules/module.nix")
   ];
 
   # Server-specific configuration (no GUI)
@@ -21,6 +22,7 @@
     nginx
     postgresql
     redis
+    airspy-adsb
   ];
 
   # Server-specific services
@@ -33,5 +35,9 @@
   services.redis.servers."" = {
     enable = true;
     port = 6379;
+  };
+
+  services.airspy-adsb = {
+    enable = true;
   };
 }

@@ -13,29 +13,29 @@
   ];
 
   # Boot configuration - adjust for your system
-  boot.initrd.availableKernelModules = ["xhci_pci" "ahci" "usb_storage" "sd_mod" "rtsx_pci_sdmmc"];
-  boot.initrd.kernelModules = [];
-  boot.kernelModules = ["kvm-intel"];
-  boot.extraModulePackages = [];
+  boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "ehci_pci" "nvme" "usbhid" "sd_mod" ];
+  boot.initrd.kernelModules = [ ];
+  boot.kernelModules = [ "kvm-amd" ];
+  boot.extraModulePackages = [ ];
 
-  # Filesystems - adjust for your system
-  fileSystems."/" = {
-    device = "/dev/disk/by-uuid/REPLACE-WITH-YOUR-ROOT-UUID";
-    fsType = "ext4";
+  fileSystems."/" =
+    { device = "/dev/disk/by-uuid/22b4dc6a-3db6-401c-9721-b2c7f721bec8";
+      fsType = "btrfs";
+      options = [ "subvol=@" ];
   };
 
-  fileSystems."/boot" = {
-    device = "/dev/disk/by-uuid/REPLACE-WITH-YOUR-BOOT-UUID";
+  fileSystems."/boot" =
+    { device = "/dev/disk/by-uuid/55CC-E173";
     fsType = "vfat";
   };
 
-  swapDevices = [
-    {device = "/dev/disk/by-uuid/REPLACE-WITH-YOUR-SWAP-UUID";}
+  swapDevices =
+    [ { device = "/dev/disk/by-uuid/889e5162-e925-47b6-b560-e188fabb02e6"; }
   ];
 
   # Enables DHCP on each ethernet and wireless interface
   networking.useDHCP = lib.mkDefault true;
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-  hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
+  hardware.cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 }

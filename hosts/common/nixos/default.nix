@@ -14,6 +14,7 @@
     ./security.nix
     ./networking.nix
     ./services.nix
+    ./netbird.nix
   ];
 
   nixpkgs = {
@@ -33,15 +34,31 @@
   # Bootloader configuration
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
+  system.autoUpgrade.enable = true;
 
   # Locale and timezone
-  time.timeZone = "UTC";
-  i18n.defaultLocale = "en_US.UTF-8";
+  time.timeZone = "Europe/Dublin";
+  i18n.defaultLocale = "en_IE.UTF-8";
+  i18n.extraLocaleSettings = {
+    LC_ADDRESS = "en_IE.UTF-8";
+    LC_IDENTIFICATION = "en_IE.UTF-8";
+    LC_MEASUREMENT = "en_IE.UTF-8";
+    LC_MONETARY = "en_IE.UTF-8";
+    LC_NAME = "en_IE.UTF-8";
+    LC_NUMERIC = "en_IE.UTF-8";
+    LC_PAPER = "en_IE.UTF-8";
+    LC_TELEPHONE = "en_IE.UTF-8";
+    LC_TIME = "en_IE.UTF-8";
+  };
 
   # Console configuration
   console = {
     font = "Lat2-Terminus16";
     keyMap = "us";
+  };
+  services.xserver.xkb = {
+    layout = "us";
+    variant = "alt-intl";
   };
 
   # System packages available to all users
@@ -55,10 +72,43 @@
     unzip
     zip
     sops
+    nix-index
+    helix
+    fish
+    zellij
+    zoxide
+    python3Full
+    mpv
   ];
 
   # Enable documentation
   documentation.nixos.enable = true;
+
+  # Hardware
+  hardware.enableRedistributableFirmware = true;
+  hardware.graphics.enable = true;
+  hardware.enableAllFirmware = true;
+  hardware.graphics.enable32Bit = true;
+  hardware.graphics.extraPackages = with pkgs; [
+    intel-media-driver
+    libva
+  ];
+  hardware.bluetooth.enable = true;
+  services.blueman.enable = true;
+
+  # Services
+  services.dbus.enable = true;
+  services.openssh.enable = true;
+
+  # Fonts
+  fonts.packages = with pkgs; [
+    noto-fonts
+    noto-fonts-cjk-sans
+    noto-fonts-emoji
+  ];
+
+  # Users
+  programs.fish.enable = true;
 
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   system.stateVersion = "25.05";
