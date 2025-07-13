@@ -14,11 +14,6 @@
   # Server-specific packages (CLI only)
   home.packages = with pkgs; [
     # Server administration tools
-    docker-compose
-    kubectl
-    helm
-    terraform
-    ansible
     
     # Monitoring tools
     htop
@@ -28,7 +23,6 @@
     # Network tools
     nmap
     tcpdump
-    wireshark-cli
   ];
 
   # Disable GUI-related services

@@ -14,18 +14,10 @@
     cargo
     
     # Development tools
-    docker
-    docker-compose
-    kubectl
-    terraform
-    ansible
     
     # AWS tools
-    awscli2
-    aws-vault
     
     # Text editors and IDEs
-    vscode
   ];
   
   # Direnv for environment management

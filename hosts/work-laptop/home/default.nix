@@ -21,16 +21,10 @@
   # macOS specific packages
   home.packages = with pkgs; [
     # macOS development tools
-    darwin.iproute2mac
     
     # Work-specific tools
-    awscli2
-    kubectl
-    terraform
     
     # macOS utilities
-    mas # Mac App Store CLI
-    rectangle # Window management
   ];
 
   # macOS specific shell configuration
@@ -47,7 +41,7 @@
   # Git configuration for work
   programs.git = {
     userName = lib.mkForce "superfer";
-    userEmail = lib.mkForce "superfer@company.com"; # Adjust as needed
+    userEmail = lib.mkForce "superfer@amazon.com"; # Adjust as needed
   };
 
   # macOS specific programs
