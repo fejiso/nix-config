@@ -56,6 +56,7 @@
         ./modules/nixos
         ./hosts/common/nixos
         sops-nix.nixosModules.sops
+        airspy-adsb-bin.nixosModules.airspy-adsb
       ];
       home = [
         ./modules/home-manager
@@ -109,20 +110,6 @@
     };
     
   in {
-    # Custom packages
-    packages = forAllSystems (system:
-      let 
-        pkgs = nixpkgs.legacyPackages.${system};
-        tracedInput = builtins.trace airspy-adsb-bin "DEBUG";
-      in 
-        (import ./pkgs pkgs)
-        // {
-          #airspy-adsb = airspy-adsb.packages.${system}.default;
-          #airspy-adsb = airspy-adsb-bin.defaultPackage.${system};
-          airspy-adsb = airspy-adsb-bin.packages.${system}.airspy-adsb;
-
-        }
-    );
     
     # Formatter
     formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.alejandra);
