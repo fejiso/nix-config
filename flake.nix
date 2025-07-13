@@ -22,7 +22,7 @@
 
     # Airspy ADS-B source
     airspy-adsb-bin.url = "github:fejiso/airspy_adsb/master";
-    airspy-adsb-bin.follows = "nixpkgs";
+    #airspy-adsb-bin.follows = "nixpkgs";
 
     };
 
@@ -118,7 +118,8 @@
         (import ./pkgs pkgs)
         // {
           #airspy-adsb = airspy-adsb.packages.${system}.default;
-          airspy-adsb = tracedInput.defaultPackage.${system}; #airspy-adsb-bin.defaultPackage.${system};
+          #airspy-adsb = airspy-adsb-bin.defaultPackage.${system};
+          airspy-adsb = airspy-adsb-bin.packages.${system}.airspy-adsb;
 
         }
     );

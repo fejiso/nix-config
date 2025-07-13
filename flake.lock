@@ -1,5 +1,24 @@
 {
   "nodes": {
+    "airspy-adsb-bin": {
+      "inputs": {
+        "nixpkgs": "nixpkgs"
+      },
+      "locked": {
+        "lastModified": 1752420315,
+        "narHash": "sha256-LRm8nOGnwa5f918PWCZH3RDsDDpxOEfbIsNvC1S6yv4=",
+        "owner": "fejiso",
+        "repo": "airspy_adsb",
+        "rev": "2a19bbf10d2417e766fea018a5448ef1e4b160c6",
+        "type": "github"
+      },
+      "original": {
+        "owner": "fejiso",
+        "ref": "master",
+        "repo": "airspy_adsb",
+        "type": "github"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -23,7 +42,7 @@
     },
     "nix-darwin": {
       "inputs": {
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs_2"
       },
       "locked": {
         "lastModified": 1751313918,
@@ -57,16 +76,16 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1747728033,
-        "narHash": "sha256-NnXFQu7g4LnvPIPfJmBuZF7LFy/fey2g2+LCzjQhTUk=",
+        "lastModified": 1751637120,
+        "narHash": "sha256-xVNy/XopSfIG9c46nRmPaKfH1Gn/56vQ8++xWA8itO4=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "2f9173bde1d3fbf1ad26ff6d52f952f9e9da52ea",
+        "rev": "5c724ed1388e53cc231ed98330a60eb2f7be4be3",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
-        "ref": "nixpkgs-unstable",
+        "ref": "nixos-unstable",
         "repo": "nixpkgs",
         "type": "github"
       }
@@ -89,6 +108,22 @@
     },
     "nixpkgs_2": {
       "locked": {
+        "lastModified": 1747728033,
+        "narHash": "sha256-NnXFQu7g4LnvPIPfJmBuZF7LFy/fey2g2+LCzjQhTUk=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "2f9173bde1d3fbf1ad26ff6d52f952f9e9da52ea",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixpkgs-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
+    "nixpkgs_3": {
+      "locked": {
         "lastModified": 1752162966,
         "narHash": "sha256-3MxxkU8ZXMHXcbFz7UE4M6qnIPTYGcE/7EMqlZNnVDE=",
         "owner": "nixos",
@@ -105,13 +140,11 @@
     },
     "root": {
       "inputs": {
-        "airspy-adsb-bin": [
-          "nixpkgs"
-        ],
+        "airspy-adsb-bin": "airspy-adsb-bin",
         "home-manager": "home-manager",
         "nix-darwin": "nix-darwin",
         "nixos-hardware": "nixos-hardware",
-        "nixpkgs": "nixpkgs_2",
+        "nixpkgs": "nixpkgs_3",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "sops-nix": "sops-nix"
       }
