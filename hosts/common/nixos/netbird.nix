@@ -1,10 +1,10 @@
 {
-  config, ...
+  config, pkgs, ...
 }:
 
 {
   sops.secrets.netbird_setup_key = { 
-    sopsFile = ../../secrets/common.yaml;
+    sopsFile = ../../secrets/netbird.env;
     neededForUsers = true;
   };
 
