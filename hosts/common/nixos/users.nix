@@ -12,7 +12,7 @@
       extraGroups = ["wheel" "networkmanager" "audio" "video" "docker"];
       shell = pkgs.fish;  # Changed default shell to fish
       openssh.authorizedKeys.keys = [
-        # Add your SSH public keys here
+        ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICQ5a7p+8LrnKTch/UUAJ3YpAYT6PS8fM+0FKtSspZ5U
       ];
     };
   };
