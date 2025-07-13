@@ -5,11 +5,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1752420315,
-        "narHash": "sha256-LRm8nOGnwa5f918PWCZH3RDsDDpxOEfbIsNvC1S6yv4=",
+        "lastModified": 1752436820,
+        "narHash": "sha256-lw4P94bWcVtnfz7ccGJRvO1Jl5/eS1prSbaw2RV9v80=",
         "owner": "fejiso",
         "repo": "airspy_adsb",
-        "rev": "2a19bbf10d2417e766fea018a5448ef1e4b160c6",
+        "rev": "acac9385a4f3359378f6a8ca7e9934abcdc67566",
         "type": "github"
       },
       "original": {
@@ -124,11 +124,11 @@
     },
     "nixpkgs_3": {
       "locked": {
-        "lastModified": 1752162966,
-        "narHash": "sha256-3MxxkU8ZXMHXcbFz7UE4M6qnIPTYGcE/7EMqlZNnVDE=",
+        "lastModified": 1752308619,
+        "narHash": "sha256-pzrVLKRQNPrii06Rm09Q0i0dq3wt2t2pciT/GNq5EZQ=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "10e687235226880ed5e9f33f1ffa71fe60f2638a",
+        "rev": "650e572363c091045cdbc5b36b0f4c1f614d3058",
         "type": "github"
       },
       "original": {

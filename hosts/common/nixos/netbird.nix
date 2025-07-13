@@ -5,6 +5,7 @@
 {
   sops.secrets.netbird-env = { 
     sopsFile = ../../../secrets/netbird.env;
+    format = "dotenv";
     neededForUsers = true;
   };
 
