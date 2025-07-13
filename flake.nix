@@ -21,7 +21,8 @@
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
 
     # Airspy ADS-B source
-    airspy-adsb-src.url = "github:fejiso/airspy_adsb/master";
+    airspy-adsb-bin.url = "github:fejiso/airspy_adsb/master";
+    airspy-adsb-bin.follows = "nixpkgs";
 
     };
 
@@ -33,7 +34,7 @@
     nixos-hardware,
     nix-darwin,
     sops-nix,
-    airspy-adsb-src,
+    airspy-adsb-bin,
     ...
   } @ inputs: let
     inherit (self) outputs;
@@ -109,7 +110,18 @@
     
   in {
     # Custom packages
-    packages = forAllSystems (system: import ./pkgs nixpkgs.legacyPackages.${system});
+    packages = forAllSystems (system:
+      let 
+        pkgs = nixpkgs.legacyPackages.${system};
+        tracedInput = builtins.trace airspy-adsb-bin "DEBUG";
+      in 
+        (import ./pkgs pkgs)
+        // {
+          #airspy-adsb = airspy-adsb.packages.${system}.default;
+          airspy-adsb = tracedInput.defaultPackage.${system}; #airspy-adsb-bin.defaultPackage.${system};
+
+        }
+    );
     
     # Formatter
     formatter = forAllSystems (system: nixpkgs.legacyPackages.${system}.alejandra);

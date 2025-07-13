@@ -9,7 +9,7 @@
 }: {
   imports = [
     ./hardware-configuration.nix
-    (inputs.airspy-adsb-src + "/modules/module.nix")
+    (inputs.airspy-adsb-bin + "/modules/module.nix")
   ];
 
   # Server-specific configuration (no GUI)
