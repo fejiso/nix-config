@@ -7,8 +7,9 @@ pkgs.stdenv.mkDerivation rec {
   src = pkgs.fetchFromGitHub {
     owner = "fejiso";
     repo = "airspy_adsb";
-    rev = "2.2-RC31"; # Tag for the desired version
-    sha256 = "AHa9xLn08PJJNAjWdK0KhVyff6mHCLC2h0eh2qpVumg="; # Correct hash for 2.2-RC31
+    rev = "master"; # Tag for the desired version
+    sha256 = "LRm8nOGnwa5f918PWCZH3RDsDDpxOEfbIsNvC1S6yv4="; # Correct hash for 2.2-RC31
+    #sha256 = "";
   };
 
   buildInputs = with pkgs; [
