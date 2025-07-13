@@ -4,7 +4,7 @@
 
 {
   sops.secrets.netbird_setup_key = { 
-    sopsFile = ../../secrets/netbird.env;
+    sopsFile = ../../../secrets/netbird.env;
     neededForUsers = true;
   };
 
