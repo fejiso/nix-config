@@ -1,112 +1,100 @@
-> [!IMPORTANT]  
-> This repo is a little out of date at the moment, and is pending a refactor. Please check official documentation for NixOS and home-manager to make sure you're doing things right. See https://github.com/Misterio77/nix-starter-configs/issues/86 for more info.
+# Multi-Platform Nix Configuration
 
-# Nix Starter Config
+This repository contains a comprehensive Nix configuration for managing multiple systems across different platforms:
+- NixOS (Linux)
+- macOS (via nix-darwin)
+- Non-NixOS Linux systems (via standalone home-manager)
 
-This repo contains a few a simple nix flake templates for getting started with
-NixOS + home-manager.
+## What this provides
 
-# What this provides
+This flake-based configuration supports:
 
-- [Minimal version](./minimal):
-    - NixOS configuration on `nixos/configuration.nix`, accessible via
-      `nixos-rebuild --flake .`
-    - Home-manager configuration on `home-manager/home.nix`, accessible via
-      `home-manager --flake .`
-- [Standard version](./standard):
-    - Basic boilerplate for adding custom packages (under `pkgs`) and overlays
-      (under `overlay`). Accessible on your system, home config, as well as `nix
-      build .#package-name`.
-    - Boilerplate for custom NixOS (`modules/nixos`) and home-manager
-      (`modules/home-manager`) modules
-    - NixOS and home-manager configurations from minimal, and they should
-      also use your overlays and custom packages right out of the box.
+- **Multiple NixOS systems**: `elitedex`, `lenovix`, and `a8` (x86_64-linux)
+- **macOS system**: `work-laptop` (aarch64-darwin)
+- **Standalone home-manager configurations**: for non-NixOS Linux systems (`devdesktop` and `blacktop`)
+- **Cross-platform support**: for aarch64/x86_64 on both Linux and Darwin
 
-# Getting started
+# Repository Structure
 
-Assuming you have a basic NixOS booted up (either live or installed, anything
-works). [Here's a link to the latest NixOS downloads, just for
-you](https://nixos.org/download#download-nixos).
+This configuration is organized as follows:
 
-Alternatively, you can totally use `nix` and `home-manager` on your existing
-distro (or even on Darwin). [Install nix](https://nixos.org/download.html#nix)
-and follow along (just ignore the `nixos-*` commands).
+- **hosts/**: Contains system-specific configurations
+  - **common/**: Shared configurations for all systems
+    - **nixos/**: Common NixOS configurations
+    - **home/**: Common home-manager configurations
+  - **elitedex/**, **lenovix/**, **a8/**: NixOS system configurations
+  - **work-laptop/**: macOS (Darwin) configuration
+  - **devdesktop/**, **blacktop/**: Standalone home-manager configurations
 
-## What template to chose?
+- **modules/**: Custom modules
+  - **nixos/**: NixOS modules
+  - **home-manager/**: Home-manager modules
+  - **darwin/**: Darwin modules
 
-If this is your first trying flakes, or you're attempting to migrate your
-(simple) config to it; you should use the minimal version.
+- **overlays/**: Custom package overlays
 
-If you're here looking for inspiration/tips/good practices (and you already use
-flakes), or you're migrating a config that already has overlays and custom
-packages; try the standard version.
+- **secrets/**: Encrypted secrets managed by sops-nix
 
-## I like your funny words, magic man
+## Key Features
 
-Not sure what this all means?
+This configuration includes:
 
-Take a look at [the learn hub on the NixOS
-website](https://nixos.org/learn.html) (scroll down to guides, the manuals, and
-the other awesome learning resources).
-
-Learning the basics of what Nix (the package manager) is, how the Nix language
-works, and a bit of NixOS basics should get you up and running. Don't worry if
-it seems a little confusing at first. Get confortable with the basic concepts
-and come back here to get your feet wet, it's the best way to learn!
-
-## The repo
-
-- [Install git](https://nixos.wiki/wiki/git), if you haven't already.
-- Create a repository for your config, for example:
-```bash
-cd ~/Documents
-git init nix-config
-cd nix-config
-```
-- Make sure you're running Nix 2.4+, and opt into the experimental `flakes` and `nix-command` features:
-```bash
-# Should be 2.4+
-nix --version
-export NIX_CONFIG="experimental-features = nix-command flakes"
-```
-- Get the template:
-```bash
-# For minimal version
-nix flake init -t github:misterio77/nix-starter-config#minimal
-
-# For standard version
-nix flake init -t github:misterio77/nix-starter-config#standard
-```
-- If you want to use NixOS: add stuff you currently have on `/etc/nixos/` to
-  `nixos` (usually `configuration.nix` and `hardware-configuration.nix`, when
-  you're starting out).
-    - The included file has some options you might want, specially if you don't
-      have a configuration ready. Make sure you have generated your own
-      `hardware-configuration.nix`; if not, just mount your partitions to
-      `/mnt` and run: `nixos-generate-config --root /mnt`.
-- If you want to use home-manager: add your stuff from `~/.config/nixpkgs`
-  to `home-manager` (probably `home.nix`).
-  - The included file is also a good starting point if you don't have a config
-    yet.
-- Take a look at `flake.nix`, making sure to fill out anything marked with
-  FIXME (required) or TODO (usually tips or optional stuff you might want)
-- Update your flake lock with `nix flake update`, so you get the latest
-  packages and modules
-- `git add` and `git push` your changes! Or at least copy them somewhere if
-  you're on a live medium.
+1. **Multi-platform support**: Works across NixOS, macOS, and non-NixOS Linux systems
+2. **Nixpkgs channels**: Uses nixos-25.05 stable with access to unstable when needed
+3. **Secrets management**: Integrated with sops-nix for secure secrets handling
+4. **Hardware support**: Leverages nixos-hardware for optimized hardware configurations
+5. **Custom modules**: Organized modular configuration for both NixOS and home-manager
+6. **Custom overlays**: Package modifications and additions
+7. **Special packages**: Integration with airspy-adsb-bin for ADS-B tracking
 
 ## Usage
 
-- Run `sudo nixos-rebuild switch --flake .#hostname` to apply your system
-  configuration.
-    - If you're still on a live installation medium, run `nixos-install --flake
-      .#hostname` instead, and reboot.
-- Run `home-manager switch --flake .#username@hostname` to apply your home
-  configuration.
-  - If you don't have home-manager installed, try `nix shell nixpkgs#home-manager`.
+### NixOS Systems
 
-And that's it, really! You're ready to have fun with your configurations using
-the latest and greatest nix3 flake-enabled command UX.
+For NixOS systems (`elitedex`, `lenovix`, `a8`):
+```bash
+# Apply configuration
+sudo nixos-rebuild switch --flake .#hostname
+
+# Example for elitedex
+sudo nixos-rebuild switch --flake .#elitedex
+```
+
+### macOS System
+
+For the macOS system (`work-laptop`):
+```bash
+# Apply configuration
+darwin-rebuild switch --flake .#work-laptop
+```
+
+### Standalone Home Manager
+
+For non-NixOS Linux systems (`devdesktop`, `blacktop`):
+```bash
+# For superfer user on devdesktop
+home-manager switch --flake .#superfer@devdesktop
+
+# For z-247 user on blacktop
+home-manager switch --flake .#z-247@blacktop
+```
+
+If you don't have home-manager installed, you can install it with:
+```bash
+nix shell nixpkgs#home-manager
+```
+
+### Updating Dependencies
+
+To update all flake inputs to their latest versions:
+```bash
+nix flake update
+```
+
+To update a specific input:
+```bash
+nix flake lock --update-input nixpkgs
+```
 
 # What next?
 
@@ -239,11 +227,14 @@ NixOS module, as described in the [previous section](#use-home-manager-as-a-nixo
 Something you want to use that's not in nixpkgs yet? You can easily build and
 iterate on a derivation (package) from this very repository.
 
-Create a folder with the desired name inside `pkgs`, and add a `default.nix`
-file containing a derivation. Be sure to also `callPackage` them on
-`pkgs/default.nix`.
+To add custom packages:
 
-You'll be able to refer to that package from anywhere on your
+1. Create a `pkgs` directory in the repository root
+2. Create a folder with the desired package name inside `pkgs`
+3. Add a `default.nix` file containing the derivation
+4. Create a `pkgs/default.nix` file to expose your packages
+
+You'll be able to refer to that package from anywhere in your
 home-manager/nixos configurations, build them with `nix build .#package-name`,
 or bring them into your shell with `nix shell .#package-name`.
 
@@ -277,10 +268,6 @@ See [the wiki article](https://nixos.wiki/wiki/Module) to learn more about
 them.
 
 # Troubleshooting / FAQ
-
-Please [let me know](https://github.com/Misterio77/nix-starter-config/issues)
-any questions or issues you face with these templates, so I can add more info
-here!
 
 ## Nix says my repo files don't exist, even though they do!
 
