@@ -71,6 +71,9 @@
     tree
     unzip
     zip
+    ripgrep
+    fd
+    gnupg
     sops
     nix-index
     helix
