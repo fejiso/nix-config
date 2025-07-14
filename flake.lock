@@ -5,11 +5,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1752436820,
-        "narHash": "sha256-lw4P94bWcVtnfz7ccGJRvO1Jl5/eS1prSbaw2RV9v80=",
+        "lastModified": 1752446494,
+        "narHash": "sha256-h3IaG9acQl5qNlHidwSyvzuBy7m9ux0SXU/X0WkLdPA=",
         "owner": "fejiso",
         "repo": "airspy_adsb",
-        "rev": "acac9385a4f3359378f6a8ca7e9934abcdc67566",
+        "rev": "55918ddbffefbd30bf466687678449454ddb18f8",
         "type": "github"
       },
       "original": {
