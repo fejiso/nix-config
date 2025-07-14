@@ -51,37 +51,102 @@ This configuration includes:
 
 ### NixOS Systems
 
-For NixOS systems (`elitedex`, `lenovix`, `a8`):
+This configuration supports three NixOS systems: `elitedex`, `lenovix`, and `a8` (all x86_64-linux).
+
+#### Building and Activating NixOS Configurations
+
 ```bash
-# Apply configuration
+# Apply configuration (replace hostname with elitedex, lenovix, or a8)
 sudo nixos-rebuild switch --flake .#hostname
 
-# Example for elitedex
+# Examples:
 sudo nixos-rebuild switch --flake .#elitedex
+sudo nixos-rebuild switch --flake .#lenovix
+sudo nixos-rebuild switch --flake .#a8
+
+# Build without activating
+sudo nixos-rebuild build --flake .#hostname
+
+# Test configuration (builds and activates temporarily for current boot only)
+sudo nixos-rebuild test --flake .#hostname
+
+# Build for a specific system remotely
+nixos-rebuild build --flake .#hostname --target-host user@hostname --use-remote-sudo
 ```
 
-### macOS System
+#### Checking NixOS Configuration
 
-For the macOS system (`work-laptop`):
+```bash
+# Show what would be built/changed
+sudo nixos-rebuild dry-activate --flake .#hostname
+
+# Show system generations
+sudo nix-env --list-generations --profile /nix/var/nix/profiles/system
+
+# Roll back to previous generation
+sudo nixos-rebuild switch --rollback
+```
+
+### macOS System (Darwin)
+
+For the macOS system (`work-laptop` on aarch64-darwin):
+
+#### Building and Activating Darwin Configuration
+
 ```bash
 # Apply configuration
 darwin-rebuild switch --flake .#work-laptop
+
+# Build without activating
+darwin-rebuild build --flake .#work-laptop
+
+# Check what would be built/changed
+darwin-rebuild check --flake .#work-laptop
+```
+
+#### Managing Darwin Generations
+
+```bash
+# List generations
+darwin-rebuild generations
+
+# Roll back to previous generation
+darwin-rebuild switch --rollback
 ```
 
 ### Standalone Home Manager
 
-For non-NixOS Linux systems (`devdesktop`, `blacktop`):
+For non-NixOS Linux systems, this configuration supports two hosts: `devdesktop` (for user `superfer`) and `blacktop` (for user `z-247`).
+
+#### Building and Activating Home Manager Configurations
+
 ```bash
 # For superfer user on devdesktop
 home-manager switch --flake .#superfer@devdesktop
 
 # For z-247 user on blacktop
 home-manager switch --flake .#z-247@blacktop
+
+# Build without activating
+home-manager build --flake .#username@hostname
+
+# Show what would be built/changed
+home-manager dry-run --flake .#username@hostname
 ```
 
 If you don't have home-manager installed, you can install it with:
 ```bash
 nix shell nixpkgs#home-manager
+```
+
+#### Managing Home Manager Generations
+
+```bash
+# List generations
+home-manager generations
+
+# Roll back to previous generation
+home-manager switch --rollback
 ```
 
 ### Updating Dependencies
@@ -94,7 +159,48 @@ nix flake update
 To update a specific input:
 ```bash
 nix flake lock --update-input nixpkgs
+nix flake lock --update-input home-manager
+nix flake lock --update-input nixos-hardware
+nix flake lock --update-input nix-darwin
+nix flake lock --update-input sops-nix
+nix flake lock --update-input airspy-adsb-bin
 ```
+
+To check the status of your inputs (what's available for update):
+```bash
+nix flake metadata
+nix flake info
+```
+
+### Building and Running Specific Packages
+
+You can build and run specific packages defined in your flake:
+
+```bash
+# Build a package
+nix build .#<package-name>
+
+# Run a package without installing
+nix run .#<package-name>
+
+# Enter a development shell with specific packages
+nix develop .#<devShell-name>
+```
+
+### Checking Flake Outputs
+
+To see all available outputs from your flake:
+```bash
+nix flake show
+```
+
+This will display all available:
+- NixOS configurations
+- Home Manager configurations
+- Darwin configurations
+- Packages
+- Development shells
+- And other outputs defined in your flake
 
 # What next?
 
