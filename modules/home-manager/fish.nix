@@ -21,24 +21,23 @@
       ec2-ssh = "/apollo/env/EC2SSHWrapper/bin/ec2-ssh";
       isengard = "/apollo/bin/env -e AmazonAwsCli isengard";
       aws = "/apollo/bin/env -e AmazonAwsCli aws";
+      sshenv = "/apollo/env/envImprovement/bin/sshenv";
+      vim = "/apollo/env/envImprovement/bin/vim";
     };
-    interactiveShellInit = ''
+    interactiveShellInit = '''
       if not set --query fish_private_mode
         history merge
       end
       zoxide init fish | source
-      set -U KEYZ (find ~/.ssh -type f -name "id_\*" ! -name "*.pub" | grep -v -e old -e backup -e bak| string collect)
-      if test -x (command -v keychain)
-        keychain --eval --quiet | source
-      end
+      keychain --eval --quiet id_rsa | source
       bind \ct __fzf_open_file
       bind alt-backspace backward-kill-word
       direnv hook fish | source
-    '';
+    ''';
     plugins = [
       { name = "zoxide"; src = pkgs.zoxide.src; }
     ];
-    userSettings = ''
+    userSettings = '''
       set -Ux FZF_DEFAULT_OPTS '-m -s --ansi -x -e --inline-info --history-size=1000000'
       set -Ux FZF_DEFAULT_COMMAND "rg --files -g '!.git'"
       set SHELL (which fish)
@@ -50,37 +49,40 @@
       set PATH $PATH /opt/homebrew/opt/libpq/bin
       set -Ua fish_user_paths $HOME/.local/share/flatpak/exports/bin
       set -Ua fish_user_paths /var/lib/flatpak/exports/bin
+      set -U fish_user_paths $HOME/.cargo/bin $fish_user_paths
+      set -U fish_user_paths $HOME/bin $fish_user_paths
+      set -U fish_user_paths $HOME/.toolbox/bin $fish_user_paths
       export ANT_ARGS='-logger org.apache.tools.ant.listener.AnsiColorLogger'
-    '';
+    ''';
     functions = {
       __fzf_open_file = {
-        body = ''
+        body = '''
           set file (fzf --height 40% --preview 'bat --style=numbers --color=always --line-range :500 {}' --query "$buffer" --select-1 --exit-0)
           if test -n "$file"
               commandline -i "$file"
           end
-        '';
+        ''';
       };
       zz = {
         body = "zi";
       };
       fish_user_key_bindings = {
-        body = ''
+        body = '''
           bind \e. history-token-search-backward
           bind \ek history-token-search-backward
           bind \ej history-token-search-forward
-        '';
+        ''';
       };
       mcurl = {
         body = "/usr/bin/curl $argv -L --cookie ~/.midway/cookie --cookie-jar ~/.midway/cookie";
       };
       set_variable_on_hostname = {
-        body = ''
+        body = '''
           set -l hn (hostname -s)
           if test "$hn" = "dev-dsk-superfer-1a-8fdeeca0"
              set -gx HELIX_RUNTIME $HOME/workplace/helix/runtime/
           end
-        '';
+        ''';
       };
     };
     completions = {

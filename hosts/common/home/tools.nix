@@ -9,8 +9,9 @@
   programs.helix = {
     enable = true;
     settings = {
-      theme = "dark_plus";
+      theme = "gruvbox_dark_hard";
       editor = {
+        true-color = true;
         line-number = "relative";
         mouse = true;
         cursor-shape = {
@@ -60,15 +61,42 @@
     };
   };
 
-  # Zellij configuration
   programs.zellij = {
     enable = true;
     settings = {
-      theme = "dark";
-      default_shell = "fish";
-      pane_frames = false;
-      simplified_ui = true;
-      default_layout = "compact";
+      scroll_buffer_size = 100000;
+      ui = {
+        pane_frames = {
+          rounded_corners = true;
+        };
+      };
+      keybinds = {
+        normal = {
+          unbind = ["Alt Left" "Alt Right" "Alt Up" "Alt Down"];
+        };
+        tab = {
+          unbind = ["Ctrl t"];
+          bind = {
+            "Ctrl y" = { SwitchToMode = "Normal"; };
+          };
+        };
+        shared_except = [
+          {
+            except = ["tab" "locked"];
+            unbind = ["Ctrl t"];
+            binds = {
+              "Ctrl y" = { SwitchToMode = "Tab"; };
+            };
+          }
+          {
+            except = ["move" "locked"];
+            unbind = ["Ctrl h"];
+            binds = {
+              "Ctrl j" = { SwitchToMode = "Move"; };
+            };
+          }
+        ];
+      };
     };
   };
 
@@ -104,10 +132,18 @@
     --max-columns-preview
     --smart-case
     --hidden
+    --no-ignore
+    --no-ignore-vcs
+    --follow
     --glob=!.git/*
     --glob=!node_modules/*
     --glob=!target/*
     --glob=!.direnv/*
+    --glob=!build/*
+    --glob=!z-env/*
+    --glob=!__pycache__/*
+    --glob=!*.pyc
+    --glob=!env/*
   '';
 
   # Set RIPGREP_CONFIG_PATH
