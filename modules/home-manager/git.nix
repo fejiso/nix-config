@@ -25,7 +25,7 @@
       noffmg = "merge --no-ff";
       mg = "merge --no-ff";
       rmc = "rm -r --cached";
-      squash-all = "!f(){ git reset $(git commit-tree HEAD^{tree} -m \"${1:-A new start}\");};f";
+      
     };
     extraConfig = {
       color = {

@@ -1,15 +1,17 @@
 # Custom home-manager modules
 {
-  zsh = import ./zsh.nix;
-  tmux = import ./tmux.nix;
-  git = import ./git.nix;
-  fish = import ./fish.nix;
-  zellij = import ./zellij.nix;
-  kanshi = import ./kanshi.nix;
-  sway = import ./sway.nix;
-  wezterm = import ./wezterm.nix;
-  beets = import ./beets.nix;
-  nethack = import ./nethack.nix;
-  ideavim = import ./ideavim.nix;
-  gpg = import ./gpg.nix;
+  imports = [
+    ./zsh.nix
+    ./tmux.nix
+    ./git.nix
+    ./fish.nix
+    ./zellij.nix
+    ./kanshi.nix
+    ./sway.nix
+    ./wezterm.nix
+    ./beets.nix
+    ./nethack.nix
+    ./ideavim.nix
+    ./gpg.nix
+  ];
 }
