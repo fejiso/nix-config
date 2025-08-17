@@ -76,7 +76,6 @@
     gnupg
     sops
     nix-index
-    helix
     fish
     zellij
     zoxide

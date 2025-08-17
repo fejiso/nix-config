@@ -85,25 +85,5 @@
         };
       };
     };
-    includes = [
-      { 
-        condition = "gitdir:/home/superfer/";
-        contents = {
-          path = "~/.gitconfig.amazon";
-        };
-      }
-      { 
-        condition = "gitdir:/home/fjimenez/";
-        contents = {
-          path = "~/.gitconfig.orange";
-        };
-      }
-      { 
-        condition = "gitdir:/home/z-247/";
-        contents = {
-          path = "~/.gitconfig.personal";
-        };
-      }
-    ];
   };
 }

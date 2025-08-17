@@ -10,7 +10,7 @@
     
     extraConfig = {
       init.defaultBranch = "main";
-      push.default = "simple";
+      push.default = lib.mkForce "simple";
       pull.rebase = false;
       core.editor = "vim";
     };

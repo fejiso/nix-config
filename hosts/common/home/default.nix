@@ -62,11 +62,21 @@
     git
     gh
     direnv
-    helix
-    
+
     # Text editors
     vim
     nano
+
+    # Added imperatively installed packages
+    git-filter-repo
+    localsend
+    nil
+    nix
+    nix-index
+    nixd
+    rmlint
+    sops
+    strawberry
   ];
 
   # Enable home-manager

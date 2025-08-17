@@ -6,51 +6,51 @@
   ...
 }: {
   # Helix editor configuration
-  programs.helix = {
-    enable = true;
-    settings = {
-      theme = "gruvbox_dark_hard";
-      editor = {
-        true-color = true;
-        line-number = "relative";
-        mouse = true;
-        cursor-shape = {
-          insert = "bar";
-          normal = "block";
-          select = "underline";
-        };
-        file-picker = {
-          hidden = false;
-        };
-        auto-save = true;
-        auto-format = true;
-        idle-timeout = 50;
-      };
-      keys.normal = {
-        space.space = "file_picker";
-        space.w = ":w";
-        space.q = ":q";
-        esc = ["collapse_selection" "keep_primary_selection"];
-      };
-    };
-    languages = {
-      language = [
-        {
-          name = "nix";
-          auto-format = true;
-          formatter.command = "${pkgs.alejandra}/bin/alejandra";
-        }
-        {
-          name = "rust";
-          auto-format = true;
-        }
-        {
-          name = "python";
-          auto-format = true;
-        }
-      ];
-    };
-  };
+  # programs.helix = {
+  #   enable = true;
+  #   settings = {
+  #     theme = "gruvbox_dark_hard";
+  #     editor = {
+  #       true-color = true;
+  #       line-number = "relative";
+  #       mouse = true;
+  #       cursor-shape = {
+  #         insert = "bar";
+  #         normal = "block";
+  #         select = "underline";
+  #       };
+  #       file-picker = {
+  #         hidden = false;
+  #       };
+  #       auto-save = true;
+  #       auto-format = true;
+  #       idle-timeout = 50;
+  #     };
+  #     keys.normal = {
+  #       space.space = "file_picker";
+  #       space.w = ":w";
+  #       space.q = ":q";
+  #       esc = ["collapse_selection" "keep_primary_selection"];
+  #     };
+  #   };
+  #   languages = {
+  #     language = [
+  #       {
+  #         name = "nix";
+  #         auto-format = true;
+  #         formatter.command = "${pkgs.alejandra}/bin/alejandra";
+  #       }
+  #       {
+  #         name = "rust";
+  #         auto-format = true;
+  #       }
+  #       {
+  #         name = "python";
+  #         auto-format = true;
+  #       }
+  #     ];
+  #   };
+  # };
 
   # Bat configuration
   programs.bat = {

@@ -9,7 +9,7 @@
       menu = "bemenu-run --fn $uifont -b -p \"▶\" --tf \"$prompt\" --hf \"$highlight\" --sf \"$highlight\" --scf \"$highlight\" | xargs swaymsg exec";
       output = {
         "*" = {
-          bg = "/usr/share/backgrounds/sway/Sway_Wallpaper_Blue_1920x1080.png fill";
+          bg = "${pkgs.sway}/share/backgrounds/sway/Sway_Wallpaper_Blue_1920x1080.png fill";
         };
         "eDP-1" = {
           pos = "1920 0";
@@ -98,16 +98,18 @@
           "Escape" = "mode default";
         };
       };
-      workspace "1" = { output = "DP-3"; };
-      workspace "2" = { output = "eDP-1"; };
-      workspace "3" = { output = "HDMI-A-1"; };
-      workspace "4" = { output = "DP-3"; };
-      workspace "5" = { output = "eDP-1"; };
-      workspace "6" = { output = "HDMI-A-1"; };
-      workspace "7" = { output = "DP-3"; };
-      workspace "8" = { output = "eDP-1"; };
-      workspace "9" = { output = "HDMI-A-1"; };
-      workspace "10" = { output = "DP-3"; };
+      workspaceOutputAssign = [
+        { workspace = "1"; output = "DP-3"; }
+        { workspace = "2"; output = "eDP-1"; }
+        { workspace = "3"; output = "HDMI-A-1"; }
+        { workspace = "4"; output = "DP-3"; }
+        { workspace = "5"; output = "eDP-1"; }
+        { workspace = "6"; output = "HDMI-A-1"; }
+        { workspace = "7"; output = "DP-3"; }
+        { workspace = "8"; output = "eDP-1"; }
+        { workspace = "9"; output = "HDMI-A-1"; }
+        { workspace = "10"; output = "DP-3"; }
+      ];
     };
     extraConfig = ''
       exec swayidle -w \
