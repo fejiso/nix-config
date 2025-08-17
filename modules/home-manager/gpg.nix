@@ -1,3 +1,5 @@
+{ pkgs, ... }:
+
 {
   programs.gpg = {
     enable = true;
@@ -11,6 +13,6 @@
     enable = true;
     enableSshSupport = true;
     # Use pinentry-gnome3 for GUI, or pkgs.pinentry-curses for CLI
-    pinentryPackage = pkgs.pinentry-gnome3;
+    pinentry.package = pkgs.pinentry-all;
   };
 }

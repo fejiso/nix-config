@@ -77,8 +77,6 @@
     rmlint
     sops
     strawberry
-    pinentry-gnome3
-    pinentry-curses
   ];
 
   # Enable home-manager

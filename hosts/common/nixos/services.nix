@@ -34,16 +34,4 @@
   # Enable location services
   services.geoclue2.enable = true;
 
-  # GPG Agent configuration
-  programs.gnupg.agent = {
-    enable = true;
-    # Use pinentry-gnome3 for GUI, or pkgs.pinentry-curses for CLI
-    pinentryPackage = pkgs.pinentry-gnome3;
-    settings = {
-      enable-ssh-support = true;
-    };
-  };
-  services.pcscd.enable = true;
-  # Enable automatic login for the user
-  # services.getty.autologinUser = "superfer";
 }
