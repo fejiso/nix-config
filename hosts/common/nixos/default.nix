@@ -15,6 +15,7 @@
     ./networking.nix
     ./services.nix
     ./netbird.nix
+    ./distributed-build.nix
   ];
 
   nixpkgs = {
@@ -81,6 +82,8 @@
     zoxide
     python3Full
     mpv
+    pinentry-gnome3
+    pinentry-curses
   ];
 
   # Enable documentation

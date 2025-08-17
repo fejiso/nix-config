@@ -34,11 +34,11 @@
   # Enable location services
   services.geoclue2.enable = true;
 
-  #gpg
-  # on your server's configuration.nix
+  # GPG Agent configuration
   programs.gnupg.agent = {
     enable = true;
-    pinentryPackage = pkgs.pinentry-curses;
+    # Use pinentry-gnome3 for GUI, or pkgs.pinentry-curses for CLI
+    pinentryPackage = pkgs.pinentry-gnome3;
     settings = {
       enable-ssh-support = true;
     };
