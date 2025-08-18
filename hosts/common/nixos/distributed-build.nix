@@ -2,7 +2,7 @@
 
 {
   # Enable the Nix daemon for multi-user builds
-  nix.daemon.enable = true;
+  nix.settings.daemon = true;
 
   # Allow unfree packages for builds
   nix.settings.allow-unfree = true;

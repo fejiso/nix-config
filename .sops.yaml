@@ -5,3 +5,6 @@ creation_rules:
 
   - path_regex: 'secrets/.*\.env$'
     pgp: '15CF922F9F0ABDA8F5A5E9668A32A41A4E0AD065'
+
+  - path_regex: 'secrets/.*\.enc$'
+    pgp: '15CF922F9F0ABDA8F5A5E9668A32A41A4E0AD065'

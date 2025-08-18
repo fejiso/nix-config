@@ -16,7 +16,13 @@
     ./services.nix
     ./netbird.nix
     ./distributed-build.nix
+    inputs.sops-nix.nixosModules.sops
   ];
+
+  sops = {
+    defaultSopsFile = ../../../.sops.yaml;
+    gnupg.home = "${config.users.users.z-247.home}/.gnupg";
+  };
 
   nixpkgs = {
     overlays = [
@@ -75,7 +81,6 @@
     ripgrep
     fd
     gnupg
-    sops
     nix-index
     fish
     zellij

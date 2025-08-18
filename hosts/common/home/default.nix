@@ -17,6 +17,7 @@
     ./tools.nix
     ./user-personal
     ./user-home
+    inputs.sops-nix.homeManagerModules.sops
   ];
 
   # Don't set nixpkgs when using useGlobalPkgs
@@ -87,4 +88,14 @@
 
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   home.stateVersion = "25.05";
+
+  sops = {
+    gnupg.home = "${config.home.homeDirectory}/.gnupg";
+    secrets.git-credentials = {
+      sopsFile = "${inputs.self}/secrets/git-credentials.enc";
+      path = "${config.home.homeDirectory}/.git-credentials";
+      mode = "0600"; # Recommended permissions for credentials
+      format = "binary";
+    };
+  };
 }

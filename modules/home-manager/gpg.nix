@@ -1,6 +1,6 @@
-{ pkgs, ... }:
-
 {
+  imports = [ ./gpg-agent.nix ];
+
   programs.gpg = {
     enable = true;
     scdaemonSettings = {
@@ -8,11 +8,5 @@
       "disable-ccid" = true;
       "pcsc-shared" = true;
     };
-  };
-  services.gpg-agent = {
-    enable = true;
-    enableSshSupport = true;
-    # Use pinentry-gnome3 for GUI, or pkgs.pinentry-curses for CLI
-    pinentry.package = pkgs.pinentry-all;
   };
 }
