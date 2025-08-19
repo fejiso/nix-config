@@ -22,7 +22,7 @@
       isengard = "/apollo/bin/env -e AmazonAwsCli isengard";
       aws = "/apollo/bin/env -e AmazonAwsCli aws";
       sshenv = "/apollo/env/envImprovement/bin/sshenv";
-      vim = "/apollo/env/envImprovement/bin/vim";
+
     };
     interactiveShellInit = ''
       if not set --query fish_private_mode

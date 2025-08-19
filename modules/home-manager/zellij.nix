@@ -10,32 +10,56 @@
           rounded_corners = true;
         };
       };
+      theme = "custom";
+      themes.custom.fg = "#ffffff";
       keybinds = {
+        
         normal = {
           unbind = ["Alt Left" "Alt Right" "Alt Up" "Alt Down"];
         };
         tab = {
           unbind = ["Ctrl t"];
           bind = {
-            "Ctrl y" = { SwitchToMode = "Normal"; };
+            "Ctrl y" = { action = { SwitchToMode._args = ["Normal"]; }; };
           };
         };
-        shared_except = [
+        pane._children = [
           {
-            except = ["tab" "locked"];
-            unbind = ["Ctrl t"];
-            binds = {
-              "Ctrl y" = { SwitchToMode = "Tab"; };
+            bind = {
+              _args = ["e"];
+              _children = [
+                { TogglePaneEmbedOrFloating = {}; }
+                { SwitchToMode._args = ["locked"]; }
+              ];
             };
           }
           {
-            except = ["move" "locked"];
-            unbind = ["Ctrl h"];
-            binds = {
-              "Ctrl j" = { SwitchToMode = "Move"; };
+            bind = {
+              _args = ["left"];
+              MoveFocus = ["left"];
             };
           }
         ];
+        # The original `shared_except` cannot be directly translated to the new format
+        # without changing its behavior, as the new `shared_except` structure is different.
+        # Please provide guidance on how you'd like to re-implement this logic.
+        # Original shared_except:
+        # shared_except = [
+        #   {
+        #     except = ["tab" "locked"];
+        #     unbind = ["Ctrl t"];
+        #     binds = {
+        #       "Ctrl y" = { SwitchToMode = "Tab"; };
+        #     };
+        #   }
+        #   {
+        #     except = ["move" "locked"];
+        #     unbind = ["Ctrl h"];
+        #     binds = {
+        #       "Ctrl j" = { SwitchToMode = "Move"; };
+        #     };
+        #   }
+        # ];
       };
     };
   };
