@@ -94,7 +94,7 @@
     secrets.git-credentials = {
       sopsFile = "${inputs.self}/secrets/git-credentials.enc";
       path = "${config.home.homeDirectory}/.git-credentials";
-      mode = "0600"; # Recommended permissions for credentials
+      mode = "0600";
       format = "binary";
     };
   };
