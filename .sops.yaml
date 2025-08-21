@@ -1,10 +1,39 @@
+keys:
+  # Age key for user-level secrets (same user across all systems)
+  - &user_age age1nrdk85qjp2l7hnj558txes2gznchucfs7w9jl4znp54swpa8499sc6j20j
+  
+  # SSH host keys for machine-dependent secrets (NixOS systems)
+  - &elitedx_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for elitedx
+  - &lenovix_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for lenovix  
+  - &a8_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for a8
+
 creation_rules:
-  - path_regex: 'secrets/.*\.yaml$'
-    encrypted_regex: ^(data|stringData)$
-    pgp: '15CF922F9F0ABDA8F5A5E9668A32A41A4E0AD065'
+  # User-level secrets (home-manager) - use age key
+  - path_regex: 'secrets/user/.*\.yaml$'
+    age: *user_age
+
+  # Machine-specific secrets for elitedx
+  - path_regex: 'secrets/hosts/elitedx/.*\.yaml$'
+    age: *user_age
+    ssh: *elitedx_ssh
+
+  # Machine-specific secrets for lenovix  
+  - path_regex: 'secrets/hosts/lenovix/.*\.yaml$'
+    age: *user_age
+    ssh: *lenovix_ssh
+
+  # Machine-specific secrets for a8
+  - path_regex: 'secrets/hosts/a8/.*\.yaml$'
+    age: *user_age
+    ssh: *a8_ssh
+
+  # Legacy files - convert these to the new structure
+  - path_regex: 'secrets/git-credentials\.enc$'
+    age: *user_age
 
   - path_regex: 'secrets/.*\.env$'
-    pgp: '15CF922F9F0ABDA8F5A5E9668A32A41A4E0AD065'
+    age: *user_age
 
-  - path_regex: 'secrets/.*\.enc$'
-    pgp: '15CF922F9F0ABDA8F5A5E9668A32A41A4E0AD065'
+  # General secrets file
+  - path_regex: 'secrets/secrets\.yaml$'
+    age: *user_age

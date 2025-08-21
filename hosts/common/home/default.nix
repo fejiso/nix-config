@@ -89,13 +89,24 @@
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   home.stateVersion = "25.05";
 
+  # Set environment variables for GPG
+  home.sessionVariables = {
+    GPG_TTY = "$(tty)";
+    GNUPGHOME = "${config.home.homeDirectory}/.gnupg";
+  };
+
   sops = {
-    gnupg.home = "${config.home.homeDirectory}/.gnupg";
-    secrets.git-credentials = {
-      sopsFile = "${inputs.self}/secrets/git-credentials.enc";
-      path = "${config.home.homeDirectory}/.git-credentials";
-      mode = "0600";
-      format = "binary";
+    age.keyFile = "${config.home.homeDirectory}/.config/sops/age/keys.txt";
+    defaultSopsFile = "${inputs.self}/secrets/secrets.yaml";
+    validateSopsFiles = false;
+    
+    secrets = {
+      git-credentials = {
+        sopsFile = "${inputs.self}/secrets/git-credentials.enc";
+        path = "${config.home.homeDirectory}/.git-credentials";
+        mode = "0600";
+        format = "binary";
+      };
     };
   };
 }

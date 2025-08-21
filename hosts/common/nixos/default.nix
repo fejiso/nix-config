@@ -14,6 +14,7 @@
     ./security.nix
     ./networking.nix
     ./services.nix
+    ./sops.nix
     ./netbird.nix
     ./distributed-build.nix
   ];

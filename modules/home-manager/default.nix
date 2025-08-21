@@ -7,7 +7,6 @@
     ./fish.nix
     ./zellij.nix
     ./kanshi.nix
-    ./sway.nix
     ./wezterm.nix
     ./beets.nix
     ./nethack.nix
