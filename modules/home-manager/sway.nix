@@ -2,7 +2,7 @@
 
 {
   wayland.windowManager.sway = {
-    enable = true;
+#    enable = true;
     config = {
       modifier = "Mod4";
       terminal = "$HOME/bin/myterm";

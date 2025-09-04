@@ -11,6 +11,8 @@
     ./beets.nix
     ./nethack.nix
     ./ideavim.nix
+    ./sway.nix
     ./gpg.nix
+    ./gpg-agent.nix
   ];
 }
