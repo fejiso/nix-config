@@ -110,6 +110,7 @@
     secrets = {
       git-credentials = {
         sopsFile = "${inputs.self}/secrets/git-credentials.yaml";
+        key = "git_credentials";
         path = "${config.home.homeDirectory}/.git-credentials";
         mode = "0600";
       };
