@@ -27,9 +27,13 @@ creation_rules:
     age: *user_age
     ssh: *a8_ssh
 
+  # Git credentials with all PGP subkeys
+  - path_regex: 'secrets/git-credentials\.yaml$'
+    pgp: '15CF922F9F0ABDA8F5A5E9668A32A41A4E0AD065,810D9395606AC6E5AE2FF1370949CEF53C00F8A4,84A59918B052B16AC85AAFFAE5A5BCDBFDD2A781,CFCC687C650D3137CD4D6FD69C7CF97B7FB4D5AE'
+
   # Legacy files - convert these to the new structure
   - path_regex: 'secrets/git-credentials\.enc$'
-    age: *user_age
+    pgp: '15CF922F9F0ABDA8F5A5E9668A32A41A4E0AD065,0949CEF53C00F8A4,48C067E32DA4D379,E5A5BCDBFDD2A781,61C1615F69DAA8BC,4F6CFDACAF998EE2,9C7CF97B7FB4D5AE,41D5A14D822B3E95'
 
   - path_regex: 'secrets/.*\.env$'
     age: *user_age

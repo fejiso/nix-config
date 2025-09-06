@@ -95,6 +95,13 @@
     GNUPGHOME = "${config.home.homeDirectory}/.gnupg";
   };
 
+  # GPG configuration
+  programs.gpg = {
+    enable = true;
+  };
+
+
+
   sops = {
     age.keyFile = "${config.home.homeDirectory}/.config/sops/age/keys.txt";
     defaultSopsFile = "${inputs.self}/secrets/secrets.yaml";
@@ -102,10 +109,9 @@
     
     secrets = {
       git-credentials = {
-        sopsFile = "${inputs.self}/secrets/git-credentials.enc";
+        sopsFile = "${inputs.self}/secrets/git-credentials.yaml";
         path = "${config.home.homeDirectory}/.git-credentials";
         mode = "0600";
-        format = "binary";
       };
     };
   };
