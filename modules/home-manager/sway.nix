@@ -103,12 +103,8 @@
         { workspace = "10"; output = "DP-3"; }
       ];
     };
-    bars = [
-      {
-        command = "waybar";
-      }
-    ];
     extraConfig = ''
+      bar swaybar_command waybar
       exec swayidle -w \
                timeout 600 'swaylock -f -c 000000' \
                timeout 900 'swaymsg "output * dpms off"' \
