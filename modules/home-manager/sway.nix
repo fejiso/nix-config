@@ -6,20 +6,11 @@
     package = null;
     config = {
       modifier = "Mod4";
-      terminal = "$HOME/bin/myterm";
+      terminal = "wezterm";
       menu = "bemenu-run --fn $uifont -b -p \"▶\" --tf \"$prompt\" --hf \"$highlight\" --sf \"$highlight\" --scf \"$highlight\" | xargs swaymsg exec";
       output = {
         "*" = {
           bg = "${pkgs.sway}/share/backgrounds/sway/Sway_Wallpaper_Blue_1920x1080.png fill";
-        };
-        "eDP-1" = {
-          pos = "1920 0";
-        };
-        "HDMI-A-1" = {
-          pos = "3840 0";
-        };
-        "DP-3" = {
-          pos = "0 0";
         };
       };
       input = {
@@ -112,6 +103,11 @@
         { workspace = "10"; output = "DP-3"; }
       ];
     };
+    bars = [
+      {
+        command = "waybar";
+      }
+    ];
     extraConfig = ''
       exec swayidle -w \
                timeout 600 'swaylock -f -c 000000' \
