@@ -1,9 +1,9 @@
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 
 {
   wayland.windowManager.sway = {
     enable = true;
-    package = null;
+    package = if (lib.hasAttr "nixos" config.targets) then pkgs.sway else null;
     config = {
       modifier = "Mod4";
       terminal = "wezterm";
