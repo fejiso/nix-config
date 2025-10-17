@@ -15,8 +15,8 @@
     ./networking.nix
     ./services.nix
     ./sops.nix
-    ./netbird.nix
     ./distributed-build.nix
+    ./home-manager.nix
   ];
 
   nixpkgs = {
@@ -82,6 +82,9 @@
     zoxide
     python3Full
     mpv
+    file
+    pinentry
+    inputs.home-manager.packages.${pkgs.system}.default
   ];
 
   # Enable documentation

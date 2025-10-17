@@ -21,8 +21,8 @@
       trusted-users = ["root" "@wheel"];
     };
     
-    # Opinionated: disable channels
-    channel.enable = false;
+    # Enable channels
+    channel.enable = true;
 
     # Opinionated: make flake registry and nix path match flake inputs
     registry = lib.mapAttrs (_: flake: {inherit flake;}) flakeInputs;
@@ -35,4 +35,7 @@
       options = "--delete-older-than 7d";
     };
   };
+
+  # Allow unfree packages
+  nixpkgs.config.allowUnfree = true;
 }

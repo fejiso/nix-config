@@ -1,12 +1,6 @@
 { config, lib, pkgs, ... }:
 
 {
-  # Enable the Nix daemon for multi-user builds
-  nix.settings.daemon = true;
-
-  # Allow unfree packages for builds
-  nix.settings.allow-unfree = true;
-
   # Enable experimental features for flakes and nix-command
   nix.extraOptions = ''
     experimental-features = nix-command flakes

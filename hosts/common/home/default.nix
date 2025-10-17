@@ -18,6 +18,7 @@
     ./user-personal
     ./user-home
     inputs.sops-nix.homeManagerModules.sops
+    ../../../modules/home-manager
   ];
 
   # Don't set nixpkgs when using useGlobalPkgs
@@ -95,11 +96,6 @@
     GNUPGHOME = "${config.home.homeDirectory}/.gnupg";
   };
 
-  # GPG configuration
-  programs.gpg = {
-    enable = true;
-  };
-
 
 
   sops = {
@@ -109,7 +105,7 @@
     
     secrets = {
       git-credentials = {
-        sopsFile = "${inputs.self}/secrets/git-credentials.yaml";
+        sopsFile = "${inputs.self}/secrets/git-credentials-age.yaml";
         key = "git_credentials";
         path = "${config.home.homeDirectory}/.git-credentials";
         mode = "0600";

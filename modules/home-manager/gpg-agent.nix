@@ -1,6 +1,8 @@
 {
   pkgs, ...
 }: {
+  home.packages = [ pkgs.pinentry-curses ];
+  
   services.gpg-agent = {
     enable = true;
     enableSshSupport = true;

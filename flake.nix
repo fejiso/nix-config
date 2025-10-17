@@ -57,6 +57,7 @@
         ./hosts/common/nixos
         sops-nix.nixosModules.sops
         airspy-adsb-bin.nixosModules.airspy-adsb
+        home-manager.nixosModules.home-manager
       ];
       home = [
         ./modules/home-manager
@@ -70,15 +71,6 @@
       specialArgs = {inherit inputs outputs hostname;};
       modules = commonModules.nixos ++ [
         ./hosts/${hostname}/nixos
-        home-manager.nixosModules.home-manager
-        {
-          home-manager = {
-            useGlobalPkgs = true;
-            useUserPackages = true;
-            extraSpecialArgs = {inherit inputs outputs hostname;};
-            users.z-247 = import ./hosts/${hostname}/home;
-          };
-        }
       ];
     };
     
@@ -126,12 +118,16 @@
       elitedex = mkNixosSystem "elitedex" "x86_64-linux";
       lenovix = mkNixosSystem "lenovix" "x86_64-linux";
       a8 = mkNixosSystem "a8" "x86_64-linux";
+      blacktop = mkNixosSystem "blacktop" "x86_64-linux";
     };
     
     # Standalone home-manager configurations (for non-NixOS systems)
     homeConfigurations = {
       "superfer@devdesktop" = mkHomeConfiguration "devdesktop" "superfer" "x86_64-linux";
       "z-247@blacktop" = mkHomeConfiguration "blacktop" "z-247" "x86_64-linux";
+      "z-247@elitedx" = mkHomeConfiguration "elitedx" "z-247" "x86_64-linux";
+      "z-247@lenovix" = mkHomeConfiguration "lenovix" "z-247" "x86_64-linux";
+      "z-247@a8" = mkHomeConfiguration "a8" "z-247" "x86_64-linux";
     };
     
     # Darwin configurations (macOS)
