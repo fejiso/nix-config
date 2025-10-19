@@ -3,22 +3,7 @@
 }:
 
 {
-  sops.secrets.netbird-env = { 
-    sopsFile = ../../../secrets/netbird.env;
-    format = "dotenv";
-    neededForUsers = true;
-  };
-
-  services.netbird = {
-    enable = true;
-    package = pkgs.netbird;
-    clients = {
-      home = {
-        port = 51820;
-        config = {
-          environment = config.sops.secrets.netbird-env.path; 
-        };
-      };
-    };
-  };
+  services.netbird.enable = true;
+  
+  systemd.services.netbird.serviceConfig.EnvironmentFile = config.sops.secrets.netbird-env.path;
 }

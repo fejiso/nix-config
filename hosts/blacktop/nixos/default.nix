@@ -16,7 +16,7 @@
     ../../common/nixos/services.nix
     ../../common/nixos/sops.nix
     ../../common/nixos/distributed-build.nix
-    # Excluding netbird.nix to avoid secret issues
+    ../../common/nixos/netbird.nix
   ];
 
   # Boot configuration

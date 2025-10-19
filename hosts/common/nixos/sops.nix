@@ -7,17 +7,14 @@
     defaultSopsFile = "${inputs.self}/secrets/secrets.yaml";
     validateSopsFiles = false;
     
-    # Use SSH host keys for system-level secrets
-    age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+    # Use age key for netbird secrets
+    age.keyFile = "/var/lib/sops-nix/key.txt";
     
     secrets = {
-      # System-level secrets go here
-      # Example for netbird:
-      # netbird-setup-key = {
-      #   sopsFile = "${inputs.self}/secrets/netbird.env";
-      #   format = "dotenv";
-      #   key = "NB_SETUP_KEY";
-      # };
+       netbird-env = {
+         sopsFile = "${inputs.self}/secrets/netbird-age.env";
+         format = "dotenv";
+       };
     };
   };
 }

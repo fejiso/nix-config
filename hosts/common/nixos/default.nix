@@ -17,6 +17,7 @@
     ./sops.nix
     ./distributed-build.nix
     ./home-manager.nix
+    ./netbird.nix
   ];
 
   nixpkgs = {

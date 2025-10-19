@@ -34,6 +34,14 @@ creation_rules:
   - path_regex: 'secrets/.*\.env$'
     age: *user_age
 
+  # NetBird setup key binary file
+  - path_regex: 'secrets/netbird-setup-key$'
+    age: *user_age
+
   # General secrets file
   - path_regex: 'secrets/secrets\.yaml$'
+    age: *user_age
+
+  # NetBird secrets
+  - path_regex: 'secrets/netbird\.yaml$'
     age: *user_age
