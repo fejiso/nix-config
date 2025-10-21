@@ -14,5 +14,6 @@
     ./sway.nix
     ./gpg.nix
     ./gpg-agent.nix
+    ./niri.nix
   ];
 }

@@ -18,6 +18,7 @@
     ./distributed-build.nix
     ./home-manager.nix
     ./netbird.nix
+    inputs.home-manager.nixosModules.home-manager
   ];
 
   nixpkgs = {
@@ -76,6 +77,8 @@
     zip
     ripgrep
     fd
+    fzf
+    firefox
     gnupg
     nix-index
     fish

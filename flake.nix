@@ -124,10 +124,6 @@
     # Standalone home-manager configurations (for non-NixOS systems)
     homeConfigurations = {
       "superfer@devdesktop" = mkHomeConfiguration "devdesktop" "superfer" "x86_64-linux";
-      "z-247@blacktop" = mkHomeConfiguration "blacktop" "z-247" "x86_64-linux";
-      "z-247@elitedx" = mkHomeConfiguration "elitedx" "z-247" "x86_64-linux";
-      "z-247@lenovix" = mkHomeConfiguration "lenovix" "z-247" "x86_64-linux";
-      "z-247@a8" = mkHomeConfiguration "a8" "z-247" "x86_64-linux";
     };
     
     # Darwin configurations (macOS)
