@@ -33,7 +33,6 @@
       ls = "eza";
       cat = "bat";
       grep = "rg";
-      find = "fd";
       cd = "z";  # Use zoxide for cd
     };
   };
@@ -51,7 +50,6 @@
       ls = "eza";
       cat = "bat";
       grep = "rg";
-      find = "fd";
       cd = "z";  # Use zoxide for cd
     };
     
@@ -84,7 +82,6 @@
       ls = "eza";
       cat = "bat";
       grep = "rg";
-      find = "fd";
       cd = "z";  # Use zoxide for cd
     };
     initExtra = ''
