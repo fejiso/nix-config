@@ -14,26 +14,9 @@ with lib;
       enable = true;
       timeouts = [
         { timeout = 900; command = "${pkgs.hyprlock}/bin/hyprlock"; }
+        { timeout = 1800; command = "${pkgs.niri}/bin/niri msg action power-off-monitors"; }
       ];
     };
-
-    xdg.configFile."variety/variety.conf".text = ''
-      [sources]
-      src1 = True|desktoppr|Desktoppr.co|https://api.desktoppr.co/1/wallpapers?safe_search=true&color=purple
-      src2 = True|unsplash|Unsplash.com|https://source.unsplash.com/5760x1080/?purple,violet,lavender
-      
-      [wallpaper]
-      wallpaper_mode = span
-      change_enabled = True
-      change_on_start = True
-      change_interval = 43200
-      
-      [effects]
-      blur_enabled = False
-      
-      [commands]
-      set_wallpaper_command = swww img %WP
-    '';
 
     xdg.configFile."niri/config.kdl".text = ''
       input {
@@ -51,20 +34,17 @@ with lib;
       }
 
       output "AU Optronics 0xA48F Unknown" {
-          enable
           position x=1920 y=0
           scale 1.0
           mode "1920x1080@60.049"
       }
 
       output "PNP(AOC) 24B2W1G5 UOWN41A000261" {
-          enable
           position x=3840 y=0
           mode "1920x1080@74.973"
       }
 
       output "PNP(AOC) 27G2G4 GYGM7HA433965" {
-          enable
           position x=0 y=0
           mode "1920x1080@144.000"
       }
@@ -73,22 +53,33 @@ with lib;
           match app-id="firefox"
           default-column-width { proportion 1.0; }
           open-on-output "PNP(AOC) 27G2G4 GYGM7HA433965"
+          open-maximized true
+      }
+
+      window-rule {
+          match app-id="strawberry"
+          default-column-width { proportion 1.0; }
+          open-on-output "PNP(AOC) 24B2W1G5 UOWN41A000261"
+          open-on-workspace 2
+          open-maximized true
       }
 
       binds {
           Mod+T { spawn "wezterm"; }
+          Mod+Return { spawn "wezterm"; }
           Mod+D { spawn "fuzzel"; }
+          Mod+P { spawn "fuzzel"; }
           Mod+Q repeat=false { close-window; }
           
-          XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1+"; }
-          XF86AudioLowerVolume allow-when-locked=true { spawn-sh "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1-"; }
-          XF86AudioMute        allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }
-          XF86AudioMicMute     allow-when-locked=true { spawn-sh "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }
+          XF86AudioRaiseVolume allow-when-locked=true { spawn "sh" "-c" "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1+"; }
+          XF86AudioLowerVolume allow-when-locked=true { spawn "sh" "-c" "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1-"; }
+          XF86AudioMute        allow-when-locked=true { spawn "sh" "-c" "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }
+          XF86AudioMicMute     allow-when-locked=true { spawn "sh" "-c" "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }
 
-          XF86AudioPlay        allow-when-locked=true { spawn-sh "playerctl play-pause"; }
-          XF86AudioStop        allow-when-locked=true { spawn-sh "playerctl stop"; }
-          XF86AudioPrev        allow-when-locked=true { spawn-sh "playerctl previous"; }
-          XF86AudioNext        allow-when-locked=true { spawn-sh "playerctl next"; }
+          XF86AudioPlay        allow-when-locked=true { spawn "sh" "-c" "playerctl play-pause"; }
+          XF86AudioStop        allow-when-locked=true { spawn "sh" "-c" "playerctl stop"; }
+          XF86AudioPrev        allow-when-locked=true { spawn "sh" "-c" "playerctl previous"; }
+          XF86AudioNext        allow-when-locked=true { spawn "sh" "-c" "playerctl next"; }
 
           XF86MonBrightnessUp allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+10%"; }
           XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "10%-"; }
@@ -238,6 +229,7 @@ with lib;
       spawn-at-startup "${pkgs.waybar}/bin/waybar"
       spawn-at-startup "${pkgs.mako}/bin/mako"
       spawn-at-startup "${pkgs.firefox}/bin/firefox"
+      spawn-at-startup "${pkgs.strawberry}/bin/strawberry"
       spawn-at-startup "${pkgs.xwayland-satellite}/bin/xwayland-satellite"
     '';
   };

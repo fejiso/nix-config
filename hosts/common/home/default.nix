@@ -88,19 +88,6 @@
   # Enable syncthing service
   services.syncthing.enable = true;
 
-  # Configure wezterm (Linux only)
-  programs.wezterm = lib.mkIf pkgs.stdenv.isLinux {
-    enable = true;
-    extraConfig = ''
-      return {
-        window_background_opacity = 0.8,
-        text_background_opacity = 1.0,
-        enable_wayland = true,
-        window_decorations = "RESIZE",
-      }
-    '';
-  };
-
   # Enable waybar
   programs.waybar = {
     enable = true;
@@ -213,7 +200,7 @@
           return-type = "json";
           max-length = 40;
           format-icons = {
-            spotify = "";
+            clementine = "";
             default = "🎜";
           };
           escape = true;
