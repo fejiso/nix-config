@@ -19,6 +19,7 @@
     ./home-manager.nix
     ./netbird.nix
     inputs.home-manager.nixosModules.home-manager
+    ../../../modules/nixos/nfs-mounts.nix
   ];
 
   nixpkgs = {
@@ -31,6 +32,9 @@
       allowUnfree = true;
     };
   };
+
+  # Enable NFS mounts
+  services.nfs-mounts.enable = true;
 
   # Set hostname
   networking.hostName = hostname;
