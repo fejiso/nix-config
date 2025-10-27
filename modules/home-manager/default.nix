@@ -15,5 +15,6 @@
     ./gpg.nix
     ./gpg-agent.nix
     ./niri.nix
+    ./tidalcycles.nix
   ];
 }
