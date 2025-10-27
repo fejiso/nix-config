@@ -112,6 +112,13 @@
   hardware.bluetooth.enable = true;
   services.blueman.enable = true;
 
+  # Memory management
+  zramSwap = {
+    enable = true;
+    algorithm = "lzo";
+    memoryPercent = 25;
+  };
+
   # Services
   services.dbus.enable = true;
   services.openssh.enable = true;

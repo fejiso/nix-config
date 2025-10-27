@@ -8,7 +8,7 @@ with lib;
   };
 
   config = mkIf config.programs.niri.enable {
-    home.packages = with pkgs; [ niri waybar brightnessctl wireplumber hyprlock swayidle pavucontrol variety swww xwayland-satellite wlopm ];
+    home.packages = with pkgs; [ niri waybar brightnessctl wireplumber hyprlock swayidle pavucontrol swww xwayland-satellite wlopm git curl ];
 
     services.swayidle = {
       enable = true;
@@ -16,6 +16,79 @@ with lib;
         { timeout = 900; command = "${pkgs.hyprlock}/bin/hyprlock"; }
         { timeout = 1800; command = "${pkgs.niri}/bin/niri msg action power-off-monitors"; }
       ];
+    };
+
+    # Wallpaper script
+    home.file.".local/bin/set-wallpaper.sh" = {
+      text = ''
+        #!${pkgs.bash}/bin/bash
+        
+        WALLPAPER_DIR="$HOME/.local/share/wallpapers/dharmx-walls"
+        WALLS_REPO="https://github.com/dharmx/walls.git"
+        
+        # Create wallpaper directory if it doesn't exist
+        mkdir -p "$WALLPAPER_DIR"
+        
+        # Clone or update the wallpaper repository
+        if [ ! -d "$WALLPAPER_DIR/.git" ]; then
+            echo "Cloning wallpaper repository..."
+            git clone "$WALLS_REPO" "$WALLPAPER_DIR"
+        else
+            echo "Updating wallpaper repository..."
+            cd "$WALLPAPER_DIR" && git pull
+        fi
+        
+        # Get list of all image files
+        WALLPAPERS=($(find "$WALLPAPER_DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) | sort))
+        
+        if [ ''${#WALLPAPERS[@]} -eq 0 ]; then
+            echo "No wallpapers found in $WALLPAPER_DIR"
+            exit 1
+        fi
+        
+        # Get the list of connected displays - use the connector names instead
+        OUTPUTS=$(niri msg outputs | grep -o '([^)]*-[0-9]*)' | tr -d '()')
+        
+        # Set a random wallpaper for each output
+        for output in $OUTPUTS; do
+            random_wallpaper=''${WALLPAPERS[$RANDOM % ''${#WALLPAPERS[@]}]}
+            echo "Setting wallpaper for $output: $random_wallpaper"
+            swww img "$random_wallpaper" --outputs "$output" --transition-type fade --transition-duration 1
+        done
+      '';
+      executable = true;
+    };
+
+    # Systemd user service for wallpaper management
+    systemd.user.services.wallpaper = {
+      Unit = {
+        Description = "Set random wallpaper from dharmx/walls";
+        After = [ "graphical-session.target" ];
+        PartOf = [ "graphical-session.target" ];
+      };
+      Service = {
+        Type = "oneshot";
+        ExecStart = "${config.home.homeDirectory}/.local/bin/set-wallpaper.sh";
+        Environment = "PATH=${pkgs.git}/bin:${pkgs.curl}/bin:${pkgs.swww}/bin:${pkgs.niri}/bin:${pkgs.coreutils}/bin:${pkgs.findutils}/bin:${pkgs.gnugrep}/bin:${pkgs.gawk}/bin";
+      };
+      Install = {
+        WantedBy = [ "graphical-session.target" ];
+      };
+    };
+
+    # Timer to change wallpaper periodically (every 30 minutes)
+    systemd.user.timers.wallpaper = {
+      Unit = {
+        Description = "Change wallpaper every 30 minutes";
+      };
+      Timer = {
+        OnStartupSec = "2min";
+        OnUnitActiveSec = "30min";
+        Unit = "wallpaper.service";
+      };
+      Install = {
+        WantedBy = [ "timers.target" ];
+      };
     };
 
     xdg.configFile."niri/config.kdl".text = ''
@@ -290,7 +363,8 @@ with lib;
           
           Mod+V { toggle-window-floating; }
           
-          Mod+W { toggle-column-tabbed-display; }
+          Mod+Alt+W { toggle-column-tabbed-display; }
+          Mod+W { spawn "${config.home.homeDirectory}/.local/bin/set-wallpaper.sh"; }
           
           Print { screenshot; }
           Ctrl+Alt+Print { screenshot; }
@@ -307,7 +381,7 @@ with lib;
       }
 
       spawn-at-startup "${pkgs.swww}/bin/swww-daemon"
-      spawn-at-startup "${pkgs.variety}/bin/variety"
+      spawn-at-startup "sleep 3 && ${config.home.homeDirectory}/.local/bin/set-wallpaper.sh"
       spawn-at-startup "${pkgs.waybar}/bin/waybar"
       spawn-at-startup "${pkgs.mako}/bin/mako"
       spawn-at-startup "${pkgs.firefox}/bin/firefox"

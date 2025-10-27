@@ -9,9 +9,9 @@ This repository contains a comprehensive Nix configuration for managing multiple
 
 This flake-based configuration supports:
 
-- **Multiple NixOS systems**: `elitedex`, `lenovix`, and `a8` (x86_64-linux)
+- **Multiple NixOS systems**: `elitedx`, `lenovix`, `a8`, and `blacktop` (x86_64-linux)
 - **macOS system**: `work-laptop` (aarch64-darwin)
-- **Standalone home-manager configurations**: for non-NixOS Linux systems (`devdesktop` and `blacktop`)
+- **Standalone home-manager configurations**: for non-NixOS Linux systems (`devdesktop`)
 - **Cross-platform support**: for aarch64/x86_64 on both Linux and Darwin
 
 # Repository Structure
@@ -22,9 +22,9 @@ This configuration is organized as follows:
   - **common/**: Shared configurations for all systems
     - **nixos/**: Common NixOS configurations
     - **home/**: Common home-manager configurations
-  - **elitedex/**, **lenovix/**, **a8/**: NixOS system configurations
+  - **elitedex/**, **lenovix/**, **a8/**, **blacktop/**: NixOS system configurations
   - **work-laptop/**: macOS (Darwin) configuration
-  - **devdesktop/**, **blacktop/**: Standalone home-manager configurations
+  - **devdesktop/**: Standalone home-manager configuration
 
 - **modules/**: Custom modules
   - **nixos/**: NixOS modules
@@ -46,23 +46,29 @@ This configuration includes:
 5. **Custom modules**: Organized modular configuration for both NixOS and home-manager
 6. **Custom overlays**: Package modifications and additions
 7. **Special packages**: Integration with airspy-adsb-bin for ADS-B tracking
+8. **Desktop environment**: Niri window manager with Waybar status bar
+9. **Development tools**: Comprehensive development setup with Git, Fish shell, Zellij terminal multiplexer
+10. **NFS integration**: Automated NFS mount management
+11. **Distributed builds**: Support for distributed Nix builds across systems
+12. **Netbird VPN**: Integrated mesh VPN solution
 
 ## Usage
 
 ### NixOS Systems
 
-This configuration supports three NixOS systems: `elitedex`, `lenovix`, and `a8` (all x86_64-linux).
+This configuration supports four NixOS systems: `elitedex`, `lenovix`, `a8`, and `blacktop` (all x86_64-linux).
 
 #### Building and Activating NixOS Configurations
 
 ```bash
-# Apply configuration (replace hostname with elitedex, lenovix, or a8)
+# Apply configuration (replace hostname with elitedex, lenovix, a8, or blacktop)
 sudo nixos-rebuild switch --flake .#hostname
 
 # Examples:
 sudo nixos-rebuild switch --flake .#elitedex
 sudo nixos-rebuild switch --flake .#lenovix
 sudo nixos-rebuild switch --flake .#a8
+sudo nixos-rebuild switch --flake .#blacktop
 
 # Build without activating
 sudo nixos-rebuild build --flake .#hostname
@@ -116,16 +122,13 @@ darwin-rebuild switch --rollback
 
 ### Standalone Home Manager
 
-For non-NixOS Linux systems, this configuration supports two hosts: `devdesktop` (for user `superfer`) and `blacktop` (for user `z-247`).
+For non-NixOS Linux systems, this configuration supports one host: `devdesktop` (for user `superfer`).
 
 #### Building and Activating Home Manager Configurations
 
 ```bash
 # For superfer user on devdesktop
 home-manager switch --flake .#superfer@devdesktop
-
-# For z-247 user on blacktop
-home-manager switch --flake .#z-247@blacktop
 
 # Build without activating
 home-manager build --flake .#username@hostname

@@ -29,8 +29,16 @@
     allowDiscards = true;
   };
   boot.loader.systemd-boot.configurationLimit = 1;
-  boot.resumeDevice = "/dev/disk/by-uuid/E02A-0157";
+  boot.resumeDevice = "/dev/disk/by-uuid/54cc1038-6f3b-49c0-925b-81ad8127d045";
   boot.kernelParams = [ "resume_offset=533760" ];
+
+  # Swap configuration
+  swapDevices = [
+    {
+      device = "/swapfile";
+      size = 18432; # 18GB in MB
+    }
+  ];
 
   # Networking
   networking.hostName = "blacktop";
@@ -38,6 +46,13 @@
 
   # Window managers
   programs.niri.enable = true;
+
+  # Gaming
+  programs.steam = {
+    enable = true;
+    remotePlay.openFirewall = true; # Open ports in the firewall for Steam Remote Play
+    dedicatedServer.openFirewall = true; # Open ports in the firewall for Source Dedicated Server
+  };
 
   # Services
   services.pcscd.enable = true;  # Smart card daemon for hardware tokens

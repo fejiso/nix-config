@@ -16,4 +16,7 @@
   
   # Enable Niri
   programs.niri.enable = true;
+
+  # Enable TidalCycles
+  programs.tidalcycles.enable = true;
 }

@@ -10,8 +10,12 @@
       config.font_size = 12.0
       config.window_background_opacity = 0.8
       config.text_background_opacity = 1.0
-      config.enable_wayland = true
+      ${if pkgs.stdenv.isLinux then "config.enable_wayland = true" else ""}
       config.window_decorations = "NONE"
+    
+      
+      -- Ensure transparency works with Wayland compositors
+      config.front_end = "OpenGL"
       
       return config
     '';
