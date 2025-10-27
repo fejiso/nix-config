@@ -43,6 +43,7 @@
   home.packages = with pkgs; [
     # System utilities
     htop
+    btop
     tree
     wget
     curl

@@ -76,6 +76,7 @@
     curl
     git
     htop
+    btop
     tree
     unzip
     zip
@@ -92,6 +93,7 @@
     mpv
     file
     pinentry
+    wine
     inputs.home-manager.packages.${pkgs.system}.default
   ];
 
@@ -120,6 +122,7 @@
     noto-fonts-cjk-sans
     noto-fonts-emoji
     nerd-fonts.fira-code
+    fira-code
   ];
 
   # Users

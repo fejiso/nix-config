@@ -103,6 +103,9 @@
     enable = true;
     nix-direnv.enable = true;
   };
+  programs.claude-code = {
+  	enable = true;
+  };
   
   # Starship prompt
   programs.starship = {

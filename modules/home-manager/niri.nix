@@ -8,7 +8,7 @@ with lib;
   };
 
   config = mkIf config.programs.niri.enable {
-    home.packages = with pkgs; [ niri waybar brightnessctl wireplumber hyprlock swayidle pavucontrol variety swww xwayland-satellite ];
+    home.packages = with pkgs; [ niri waybar brightnessctl wireplumber hyprlock swayidle pavucontrol variety swww xwayland-satellite wlopm ];
 
     services.swayidle = {
       enable = true;
@@ -30,7 +30,88 @@ with lib;
       }
 
       layout {
-          gaps 2
+          gaps 4
+	    preset-column-widths {
+		proportion 0.33333
+		proportion 0.5
+		proportion 0.66667
+	    }
+
+	    default-column-width { proportion 0.5; }
+
+	    preset-window-heights {
+		proportion 0.33333
+		proportion 0.5
+		proportion 0.66667
+	    }
+
+	    focus-ring {
+		// off
+		// on
+		width 4
+		active-color "#7fc8ff"
+		inactive-color "#505050"
+		urgent-color "#9b0000"
+		// active-gradient from="#80c8ff" to="#bbddff" angle=45
+		// inactive-gradient from="#505050" to="#808080" angle=45 relative-to="workspace-view"
+		// urgent-gradient from="#800" to="#a33" angle=45
+	    }
+
+	    border {
+		// off
+		// on
+		width 2
+		active-color "#7fc8ff"
+		inactive-color "#505050"
+		urgent-color "#9b0000"
+		// active-gradient from="#ffbb66" to="#ffc880" angle=45 relative-to="workspace-view"
+		// inactive-gradient from="#505050" to="#808080" angle=45 relative-to="workspace-view" in="srgb-linear"
+		// urgent-gradient from="#800" to="#a33" angle=45
+	    }
+
+	    shadow {
+		// off
+		// on
+		softness 15
+		spread 2
+		offset x=2 y=3
+		draw-behind-window true
+		color "#00000040"
+		// inactive-color "#00000054"
+	    }
+
+	    tab-indicator {
+		// off
+		// on
+		hide-when-single-tab
+		place-within-column
+		gap 5
+		width 4
+		length total-proportion=1.0
+		position "right"
+		gaps-between-tabs 2
+		corner-radius 8
+		active-color "red"
+		inactive-color "gray"
+		urgent-color "blue"
+		// active-gradient from="#80c8ff" to="#bbddff" angle=45
+		// inactive-gradient from="#505050" to="#808080" angle=45 relative-to="workspace-view"
+		// urgent-gradient from="#800" to="#a33" angle=45
+	    }
+
+	    insert-hint {
+		// off
+		// on
+		color "#ffc87f80"
+		// gradient from="#ffbb6680" to="#ffc88080" angle=45 relative-to="workspace-view"
+	    }
+
+	    struts {
+		// left 64
+		// right 64
+		// top 64
+		// bottom 64
+	    }
       }
 
       output "AU Optronics 0xA48F Unknown" {
@@ -60,7 +141,7 @@ with lib;
           match app-id="strawberry"
           default-column-width { proportion 1.0; }
           open-on-output "PNP(AOC) 24B2W1G5 UOWN41A000261"
-          open-on-workspace 2
+          open-on-workspace "2"
           open-maximized true
       }
 
@@ -212,12 +293,13 @@ with lib;
           Mod+W { toggle-column-tabbed-display; }
           
           Print { screenshot; }
+          Ctrl+Alt+Print { screenshot; }
           Ctrl+Print { screenshot-screen; }
           Alt+Print { screenshot-window; }
           
           Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
           
-          Ctrl+Alt+Delete { quit; }
+          Ctrl+Alt+Delete { spawn "hyprlock"; }
           
           Mod+Shift+P { power-off-monitors; }
           
