@@ -94,6 +94,9 @@
     file
     pinentry
     wine
+    wl-clipboard
+    lsof
+    vscode
     inputs.home-manager.packages.${pkgs.system}.default
   ];
 

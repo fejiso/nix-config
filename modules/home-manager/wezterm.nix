@@ -13,6 +13,21 @@
       ${if pkgs.stdenv.isLinux then "config.enable_wayland = true" else ""}
       config.window_decorations = "NONE"
     
+      ${if pkgs.stdenv.isLinux then ''
+      -- Clipboard configuration for Linux/Wayland
+      config.keys = {
+        {
+          key = 'c',
+          mods = 'CTRL|SHIFT',
+          action = wezterm.action.CopyTo 'ClipboardAndPrimarySelection',
+        },
+        {
+          key = 'v',
+          mods = 'CTRL|SHIFT',
+          action = wezterm.action.PasteFrom 'Clipboard',
+        },
+      }
+      '' else ""}
       
       -- Ensure transparency works with Wayland compositors
       config.front_end = "OpenGL"

@@ -15,116 +15,132 @@ with lib;
       haskellPackages.tidal-link
       
       # SuperCollider and audio engine
-      supercollider
       supercollider-with-sc3-plugins
-      
-      # Additional TidalCycles extensions
-      haskellPackages.tidal-vis
-      haskellPackages.tidal-serial
       
       # GHC and Haskell development tools
       ghc
       cabal-install
       
-      # Audio tools and dependencies
-      jack2
-      qjackctl
-      
-      # Optional: Audio utilities
-      pulseaudio
+      # Audio utilities
       alsa-utils
+      qjackctl
+      pipewire
+      pipewire.jack
+      jack-example-tools
     ];
 
     # Create TidalCycles boot file
     home.file.".ghci".text = ''
       :set -XOverloadedStrings
-      :set prompt ""
-      :set prompt-cont ""
-      import Sound.Tidal.Context
-      tidal <- startTidal (superdirtTarget {oLatency = 0.1, oAddress = "127.0.0.1", oPort = 57120}) (defaultConfig {cCtrlListen = True, cFrameTimespan = 1/20})
       :set prompt "tidal> "
-      :set prompt-cont ""
+      import Sound.Tidal.Context
+      tidal <- startTidal (superdirtTarget {oAddress = "127.0.0.1", oPort = 57120}) (defaultConfig {cFrameTimespan = 1/20})
       let d1 = streamReplace tidal 1
       let d2 = streamReplace tidal 2
       let d3 = streamReplace tidal 3
       let d4 = streamReplace tidal 4
-      let d5 = streamReplace tidal 5
-      let d6 = streamReplace tidal 6
-      let d7 = streamReplace tidal 7
-      let d8 = streamReplace tidal 8
-      let d9 = streamReplace tidal 9
-      let d10 = streamReplace tidal 10
-      let d11 = streamReplace tidal 11
-      let d12 = streamReplace tidal 12
-      let d13 = streamReplace tidal 13
-      let d14 = streamReplace tidal 14
-      let d15 = streamReplace tidal 15
-      let d16 = streamReplace tidal 16
-      let hush = streamHush tidal
-      let list = streamList tidal
-      let mute = streamMute tidal
-      let unmute = streamUnmute tidal
-      let solo = streamSolo tidal
-      let unsolo = streamUnsolo tidal
-      let once = streamOnce tidal
-      let asap = streamAsap tidal
-      let nudgeAll = streamNudgeAll tidal
-      let all = streamAll tidal
-      let resetCycles = streamResetCycles tidal
-      let setcps = asap . cps
-      let xfade i = transition tidal True (Sound.Tidal.Transition.xfadeIn 4) i
-      let xfadeIn i t = transition tidal True (Sound.Tidal.Transition.xfadeIn t) i
-      let histpan i t = transition tidal True (Sound.Tidal.Transition.histpan t) i
-      let wait i t = transition tidal True (Sound.Tidal.Transition.wait t) i
-      let waitT i f t = transition tidal True (Sound.Tidal.Transition.waitT f t) i
-      let jump i = transition tidal True (Sound.Tidal.Transition.jump) i
-      let jumpIn i t = transition tidal True (Sound.Tidal.Transition.jumpIn t) i
-      let jumpIn' i t = transition tidal True (Sound.Tidal.Transition.jumpIn' t) i
-      let jumpMod i t = transition tidal True (Sound.Tidal.Transition.jumpMod t) i
-      let mortal i lifespan release = transition tidal True (Sound.Tidal.Transition.mortal lifespan release) i
-      let interpolate i = transition tidal True (Sound.Tidal.Transition.interpolate) i
-      let interpolateIn i t = transition tidal True (Sound.Tidal.Transition.interpolateIn t) i
-      let clutch i = transition tidal True (Sound.Tidal.Transition.clutch) i
-      let clutchIn i t = transition tidal True (Sound.Tidal.Transition.clutchIn t) i
-      let anticipate i = transition tidal True (Sound.Tidal.Transition.anticipate) i
-      let anticipateIn i t = transition tidal True (Sound.Tidal.Transition.anticipateIn t) i
-      let forId i t = transition tidal False (Sound.Tidal.Transition.mortalOverlay t) i
-      :set prompt "tidal> "
-      :set prompt-cont ""
+      putStrLn "TidalCycles ready! Try: d1 $ s \"bd sn bd sn\""
     '';
 
-    # SuperCollider startup file for SuperDirt
+    # SuperCollider startup script
     home.file.".local/share/SuperCollider/startup.scd".text = ''
-      // Start SuperDirt automatically
-      (
-      s.options.numBuffers = 1024 * 256; // increase buffer number for loading samples
-      s.options.memSize = 8192 * 32; // increase memory size
-      s.options.numInputBusChannels = 2; // default number of input channels
-      s.options.numOutputBusChannels = 2; // default number of output channels
-      s.options.maxNodes = 1024 * 32; // increase max nodes
+      // Check if SuperDirt is installed, install if not
+      if(Quarks.isInstalled("SuperDirt").not, {
+          "SuperDirt not found. Installing...".postln;
+          Quarks.checkForUpdates({
+              Quarks.install("SuperDirt");
+              "SuperDirt installed. Please restart SuperCollider and run tidal-start again.".postln;
+          });
+      }, {
+          "SuperDirt found, starting...".postln;
+          // Configure server options
+          s.options.numBuffers = 1024 * 16; 
+          s.options.memSize = 8192 * 16;
+          s.options.numInputBusChannels = 0;
+          s.options.numOutputBusChannels = 2;
+          s.options.maxNodes = 1024 * 8;
+          Server.default = s;
 
-      s.waitForBoot {
-          ~dirt = SuperDirt(2, s); // two output channels, increase if you want to pan across more channels
-          ~dirt.loadSoundFiles; // load default samples
-          s.sync; // wait for loading samples to finish
-          ~dirt.start(57120, 0 ! 12); // start SuperDirt, listening on port 57120, create twelve orbits
-      };
-      )
+          // Boot server and start SuperDirt
+          s.waitForBoot {
+              ~dirt = SuperDirt(2, s);
+              // Load default samples - this downloads and loads Dirt-Samples
+              ~dirt.loadSoundFiles("/home/z-247/.local/share/SuperCollider/downloaded-quarks/Dirt-Samples/*");
+              // Also try loading from default locations
+              ~dirt.loadSoundFiles;
+              s.sync;
+              ~dirt.start(57120, 0 ! 12);
+              "SuperDirt started on port 57120".postln;
+              "Available samples: ".postln;
+              ~dirt.soundLibrary.postln;
+          };
+      });
     '';
+
+    # Create GHC environment with Tidal packages
+    home.file.".local/bin/tidal-ghci".text = ''
+      #!/usr/bin/env bash
+      # Start GHCi with Tidal packages available
+      ${pkgs.haskellPackages.ghcWithPackages (p: [ p.tidal p.tidal-core p.tidal-link ])}/bin/ghci
+    '';
+    
+    home.file.".local/bin/tidal-ghci".executable = true;
+
+    # Create SuperDirt installation script
+    home.file.".local/bin/tidal-install-superdirt".text = ''
+      #!/usr/bin/env bash
+      echo "Installing SuperDirt and Dirt-Samples via SuperCollider..."
+      cat > /tmp/install_superdirt.scd << 'EOF'
+"Updating Quarks...".postln;
+Quarks.checkForUpdates({
+    "Installing SuperDirt...".postln;
+    Quarks.install("SuperDirt");
+    "Installing Dirt-Samples...".postln;
+    Quarks.install("Dirt-Samples");
+    "Installation complete. You can now exit SuperCollider.".postln;
+});
+EOF
+      echo "Starting SuperCollider to install SuperDirt and samples..."
+      echo "Please wait for the installation to complete, then type 0.exit and press Enter to quit."
+      sclang /tmp/install_superdirt.scd
+      rm /tmp/install_superdirt.scd
+    '';
+    
+    home.file.".local/bin/tidal-install-superdirt".executable = true;
 
     # Create helper scripts
     home.file.".local/bin/tidal-start".text = ''
       #!/usr/bin/env bash
-      # Start SuperCollider with SuperDirt
-      echo "Starting SuperCollider with SuperDirt..."
-      sclang ~/.local/share/SuperCollider/startup.scd &
+      echo "Checking if SuperDirt is installed..."
+      cat > /tmp/check_superdirt.scd << 'EOF'
+if(Quarks.isInstalled("SuperDirt"), {"INSTALLED".postln}, {"NOT_INSTALLED".postln});
+0.exit;
+EOF
+      if ! sclang /tmp/check_superdirt.scd 2>/dev/null | grep -q "INSTALLED"; then
+          rm /tmp/check_superdirt.scd
+          echo "SuperDirt not installed. Installing now..."
+          ~/.local/bin/tidal-install-superdirt
+          echo "SuperDirt installed. Please run tidal-start again."
+          exit 0
+      else
+          rm /tmp/check_superdirt.scd
+      fi
       
-      # Wait a moment for SuperCollider to start
-      sleep 3
+      # Start SuperCollider with SuperDirt using PipeWire JACK
+      echo "Starting SuperCollider with SuperDirt..."
+      pw-jack sclang ~/.local/share/SuperCollider/startup.scd &
+      SC_PID=$!
+      
+      # Wait for SuperCollider to start and SuperDirt to load
+      echo "Waiting for SuperDirt to start..."
+      sleep 5
       
       # Start GHCi with TidalCycles
       echo "Starting TidalCycles..."
-      ghci
+      ~/.local/bin/tidal-ghci
+      
+      # Clean up SuperCollider when GHCi exits
+      kill $SC_PID 2>/dev/null
     '';
     
     home.file.".local/bin/tidal-start".executable = true;
