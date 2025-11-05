@@ -53,7 +53,6 @@ with lib;
           });
       }, {
           "SuperDirt found, starting...".postln;
-          // Configure server options
           s.options.numBuffers = 1024 * 16; 
           s.options.memSize = 8192 * 16;
           s.options.numInputBusChannels = 0;
@@ -125,10 +124,10 @@ EOF
       else
           rm /tmp/check_superdirt.scd
       fi
-      
-      # Start SuperCollider with SuperDirt using PipeWire JACK
+     
+      # Start SuperCollider with SuperDirt
       echo "Starting SuperCollider with SuperDirt..."
-      pw-jack sclang ~/.local/share/SuperCollider/startup.scd &
+      sclang ~/.local/share/SuperCollider/startup.scd &
       SC_PID=$!
       
       # Wait for SuperCollider to start and SuperDirt to load
