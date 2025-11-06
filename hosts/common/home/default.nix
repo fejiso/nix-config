@@ -45,6 +45,7 @@
     htop
     btop
     tree
+    pstree
     wget
     curl
     unzip

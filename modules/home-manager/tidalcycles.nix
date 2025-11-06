@@ -17,8 +17,8 @@ with lib;
       # SuperCollider and audio engine
       supercollider-with-sc3-plugins
       
-      # GHC and Haskell development tools
-      ghc
+      # GHC with Tidal packages for VS Code integration (includes base GHC)
+      (haskellPackages.ghcWithPackages (p: [ p.tidal p.tidal-core p.tidal-link ]))
       cabal-install
       
       # Audio utilities
@@ -29,8 +29,8 @@ with lib;
       jack-example-tools
     ];
 
-    # Create TidalCycles boot file
-    home.file.".ghci".text = ''
+    # Create TidalCycles boot file using standard BootTidal.hs
+    home.file.".tidal/BootTidal.hs".text = ''
       :set -XOverloadedStrings
       :set prompt "tidal> "
       import Sound.Tidal.Context
@@ -39,6 +39,13 @@ with lib;
       let d2 = streamReplace tidal 2
       let d3 = streamReplace tidal 3
       let d4 = streamReplace tidal 4
+      let d5 = streamReplace tidal 5
+      let d6 = streamReplace tidal 6
+      let d7 = streamReplace tidal 7
+      let d8 = streamReplace tidal 8
+      let d9 = streamReplace tidal 9
+      let hush = streamHush tidal
+      let solo = streamSolo tidal
       putStrLn "TidalCycles ready! Try: d1 $ s \"bd sn bd sn\""
     '';
 
@@ -77,13 +84,23 @@ with lib;
     '';
 
     # Create GHC environment with Tidal packages
-    home.file.".local/bin/tidal-ghci".text = ''
+    home.file.".local/bin/tidal_ghci".text = ''
       #!/usr/bin/env bash
-      # Start GHCi with Tidal packages available
-      ${pkgs.haskellPackages.ghcWithPackages (p: [ p.tidal p.tidal-core p.tidal-link ])}/bin/ghci
+      # Start GHCi with Tidal packages available and BootTidal.hs as ghci script
+      ${pkgs.haskellPackages.ghcWithPackages (p: [ p.tidal p.tidal-core p.tidal-link ])}/bin/ghci -ghci-script ~/.tidal/BootTidal.hs
     '';
     
-    home.file.".local/bin/tidal-ghci".executable = true;
+    home.file.".local/bin/tidal_ghci".executable = true;
+    
+    # Create ghc-pkg symlink for VS Code TidalCycles extension
+    home.file.".local/bin/ghc-pkg".source = "${pkgs.haskellPackages.ghcWithPackages (p: [ p.tidal p.tidal-core p.tidal-link ])}/bin/ghc-pkg";
+    
+    # Create ghc symlink for VS Code TidalCycles extension  
+    home.file.".local/bin/ghc".source = "${pkgs.haskellPackages.ghcWithPackages (p: [ p.tidal p.tidal-core p.tidal-link ])}/bin/ghc";
+    
+    # Create tidal directory structure that VS Code extension expects
+    home.file.".local/bin/tidal/ghci".source = "${pkgs.haskellPackages.ghcWithPackages (p: [ p.tidal p.tidal-core p.tidal-link ])}/bin/ghci";
+    
 
     # Create SuperDirt installation script
     home.file.".local/bin/tidal-install-superdirt".text = ''
@@ -136,7 +153,7 @@ EOF
       
       # Start GHCi with TidalCycles
       echo "Starting TidalCycles..."
-      ~/.local/bin/tidal-ghci
+      ~/.local/bin/tidal_ghci
       
       # Clean up SuperCollider when GHCi exits
       kill $SC_PID 2>/dev/null

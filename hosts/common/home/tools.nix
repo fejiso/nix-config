@@ -6,51 +6,85 @@
   ...
 }: {
   # Helix editor configuration
-  # programs.helix = {
-  #   enable = true;
-  #   settings = {
-  #     theme = "gruvbox_dark_hard";
-  #     editor = {
-  #       true-color = true;
-  #       line-number = "relative";
-  #       mouse = true;
-  #       cursor-shape = {
-  #         insert = "bar";
-  #         normal = "block";
-  #         select = "underline";
-  #       };
-  #       file-picker = {
-  #         hidden = false;
-  #       };
-  #       auto-save = true;
-  #       auto-format = true;
-  #       idle-timeout = 50;
-  #     };
-  #     keys.normal = {
-  #       space.space = "file_picker";
-  #       space.w = ":w";
-  #       space.q = ":q";
-  #       esc = ["collapse_selection" "keep_primary_selection"];
-  #     };
-  #   };
-  #   languages = {
-  #     language = [
-  #       {
-  #         name = "nix";
-  #         auto-format = true;
-  #         formatter.command = "${pkgs.alejandra}/bin/alejandra";
-  #       }
-  #       {
-  #         name = "rust";
-  #         auto-format = true;
-  #       }
-  #       {
-  #         name = "python";
-  #         auto-format = true;
-  #       }
-  #     ];
-  #   };
-  # };
+  programs.helix = {
+    enable = true;
+    settings = {
+      theme = "gruvbox_dark_hard";
+      editor = {
+        true-color = true;
+        line-number = "relative";
+        mouse = true;
+        cursor-shape = {
+          insert = "bar";
+          normal = "block";
+          select = "underline";
+        };
+        file-picker = {
+          hidden = false;
+        };
+        auto-save = true;
+        auto-format = true;
+        idle-timeout = 50;
+      };
+    };
+    languages = {
+      language-server.pylsp = {
+        command = "${pkgs.python3Packages.python-lsp-server}/bin/pylsp";
+      };
+      language-server.rust-analyzer = {
+        command = "${pkgs.rust-analyzer}/bin/rust-analyzer";
+      };
+      language-server.clangd = {
+        command = "${pkgs.clang-tools}/bin/clangd";
+      };
+      language-server.haskell-language-server = {
+        command = "${pkgs.haskell-language-server}/bin/haskell-language-server-wrapper";
+        args = ["--lsp"];
+      };
+      language-server.jdtls = {
+        command = "${pkgs.jdt-language-server}/bin/jdtls";
+      };
+      
+      language = [
+        {
+          name = "nix";
+          auto-format = true;
+          formatter.command = "${pkgs.alejandra}/bin/alejandra";
+        }
+        {
+          name = "rust";
+          auto-format = true;
+          language-servers = ["rust-analyzer"];
+        }
+        {
+          name = "python";
+          auto-format = true;
+          language-servers = ["pylsp"];
+        }
+        {
+          name = "haskell";
+          auto-format = true;
+          language-servers = ["haskell-language-server"];
+          file-types = ["hs" "lhs" "tidal"];
+        }
+        {
+          name = "c";
+          auto-format = true;
+          language-servers = ["clangd"];
+        }
+        {
+          name = "cpp";
+          auto-format = true;
+          language-servers = ["clangd"];
+        }
+        {
+          name = "java";
+          auto-format = true;
+          language-servers = ["jdtls"];
+        }
+      ];
+    };
+  };
 
   # Bat configuration
   programs.bat = {

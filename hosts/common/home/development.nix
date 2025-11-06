@@ -15,9 +15,17 @@
     
     # Development tools
     
+    # Language servers
+    haskell-language-server
+    python3Packages.python-lsp-server
+    clang-tools  # includes clangd for C/C++
+    jdt-language-server  # Java
+    rust-analyzer
+    
     # AWS tools
     
     # Text editors and IDEs
+    vscode-fhs
   ];
   
   # Direnv for environment management
@@ -28,11 +36,101 @@
     nix-direnv.enable = true;
   };
   
-  # Neovim configuration
+  # Neovim configuration with LazyVim
   programs.neovim = {
     enable = true;
     defaultEditor = true;
     viAlias = true;
     vimAlias = true;
+    
+    extraPackages = with pkgs; [
+      # LazyVim dependencies
+      git
+      ripgrep
+      fd
+      nodejs
+      tree-sitter
+      
+      # Language servers (already in development tools but explicit here)
+      lua-language-server
+      nil # Nix LSP
+    ];
+    
+    extraLuaConfig = ''
+      -- Bootstrap lazy.nvim
+      local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+      if not vim.loop.fs_stat(lazypath) then
+        vim.fn.system({
+          "git",
+          "clone",
+          "--filter=blob:none",
+          "https://github.com/folke/lazy.nvim.git",
+          "--branch=stable",
+          lazypath,
+        })
+      end
+      vim.opt.rtp:prepend(lazypath)
+      
+      -- LazyVim setup
+      require("lazy").setup({
+        spec = {
+          { "LazyVim/LazyVim", import = "lazyvim.plugins" },
+          { "thgrund/tidal.nvim", 
+            config = function()
+              require("tidal").setup({
+                boot = {
+                  tidal = {
+                    cmd = "${config.home.homeDirectory}/.local/bin/tidal_ghci",
+                    args = {},
+                    file = "${config.home.homeDirectory}/.tidal/BootTidal.hs",
+                    enabled = true,
+                  },
+                  sclang = {
+                    cmd = "sclang",
+                    args = {},
+                    file = vim.api.nvim_get_runtime_file("bootfiles/BootSuperDirt.scd", false)[1],
+                    enabled = false,
+                  },
+                  split = "v",
+                },
+                mappings = {
+                  send_line = { mode = { "i", "n" }, key = "<S-CR>" },
+                  send_visual = { mode = { "x" }, key = "<S-CR>" },
+                  send_block = { mode = { "i", "n", "x" }, key = "<M-CR>" },
+                  send_node = { mode = "n", key = "<leader><CR>" },
+                  send_silence = { mode = "n", key = "<leader>d" },
+                  send_hush = { mode = "n", key = "<leader><Esc>" },
+                },
+              })
+            end,
+            ft = { "haskell", "tidal" },
+          },
+        },
+        defaults = {
+          lazy = false,
+          version = false,
+        },
+        checker = { enabled = true },
+        performance = {
+          rtp = {
+            disabled_plugins = {
+              "gzip",
+              "tarPlugin",
+              "tohtml",
+              "tutor",
+              "zipPlugin",
+            },
+          },
+        },
+      })
+      
+      -- Set up file association for .tidal files
+      vim.filetype.add({
+        extension = {
+          tidal = "haskell",
+        },
+      })
+    '';
   };
+  
 }

@@ -87,6 +87,7 @@
     gnupg
     nix-index
     fish
+    gcc
     zellij
     zoxide
     python3Full

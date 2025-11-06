@@ -8,15 +8,31 @@ with lib;
   };
 
   config = mkIf config.programs.niri.enable {
-    home.packages = with pkgs; [ niri waybar brightnessctl wireplumber hyprlock swayidle pavucontrol swww xwayland-satellite wlopm git curl ];
+    home.packages = with pkgs; [ niri waybar brightnessctl wireplumber hyprlock hypridle pavucontrol swww xwayland-satellite wlopm git curl ];
 
-    services.swayidle = {
-      enable = true;
-      timeouts = [
-        { timeout = 900; command = "${pkgs.hyprlock}/bin/hyprlock"; }
-        { timeout = 1800; command = "${pkgs.niri}/bin/niri msg action power-off-monitors"; }
-      ];
-    };
+    # Disable swayidle, use hypridle instead
+    services.swayidle.enable = false;
+    
+    # Hypridle configuration
+    xdg.configFile."hypr/hypridle.conf".text = ''
+      general {
+          lock_cmd = pidof hyprlock || hyprlock
+          unlock_cmd = notify-send "unlock!"
+          before_sleep_cmd = loginctl lock-session
+          after_sleep_cmd = hyprctl dispatch dpms on
+      }
+
+      listener {
+          timeout = 900
+          on-timeout = loginctl lock-session
+      }
+
+      listener {
+          timeout = 1800
+          on-timeout = niri msg action power-off-monitors
+          on-resume = niri msg action power-on-monitors
+      }
+    '';
 
     # Wallpaper script
     home.file.".local/bin/set-wallpaper.sh" = {
