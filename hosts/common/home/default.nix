@@ -82,6 +82,7 @@
     rmlint
     sops
     strawberry
+    telegram-desktop
   ];
 
   # Enable home-manager
