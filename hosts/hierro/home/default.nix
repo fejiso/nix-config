@@ -20,13 +20,8 @@
   # Disable Wayland window manager
   wayland.windowManager.sway.enable = lib.mkForce false;
   
-  # Server-focused packages only
+  # Server-focused packages only - inherit from common but filter out GUI apps
   home.packages = with pkgs; [
-    # Remove GUI applications, keep CLI tools
-  ] ++ (builtins.filter (pkg: 
-    # Filter out GUI applications from common packages
-    ! (lib.hasAttr "pname" pkg && builtins.elem pkg.pname [
-      "firefox" "strawberry" "localsend" "telegram-desktop"
-    ])
-  ) config.home.packages);
+    # CLI tools only for server
+  ];
 }
