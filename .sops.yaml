@@ -6,6 +6,8 @@ keys:
   - &elitedx_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for elitedx
   - &lenovix_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for lenovix  
   - &a8_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for a8
+  - &hierro ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBgTN8rJvs9tZlSA0t3lNQX4MY15aJWUjxASTz32NdHt
+  - &blacktop AAAAC3NzaC1lZDI1NTE5AAAAINQePaMUwEu3oPfVMg/Yk9BiX6QbDmxRBC3Icnd1GkGQ 
 
 creation_rules:
   # User-level secrets (home-manager) - use age key
