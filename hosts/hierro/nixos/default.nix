@@ -21,7 +21,7 @@
   # Disable desktop/wayland services for server
   services.xserver.enable = lib.mkForce false;
   services.displayManager.sddm.enable = lib.mkForce false;
-  hardware.pulseaudio.enable = lib.mkForce false;
+  services.pulseaudio.enable = lib.mkForce false;
   services.pipewire.enable = lib.mkForce false;
   hardware.bluetooth.enable = lib.mkForce false;
   
