@@ -74,6 +74,7 @@
 
     # Added imperatively installed packages
     git-filter-repo
+    git-crypt
     localsend
     nil
     nix
@@ -83,6 +84,7 @@
     sops
     strawberry
     telegram-desktop
+    zoom-us
   ];
 
   # Enable home-manager
