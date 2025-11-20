@@ -66,7 +66,7 @@
         tool = "vimdiff";
       };
       credential = {
-        helper = "store --file ${config.home.homeDirectory}/.git-credentials";
+        helper = "store --file ${config.home.homeDirectory}/.config/sops-nix/secrets/git-credentials";
       };
       interactive = {
         #diffFilter = "diff-so-fancy --patch";
