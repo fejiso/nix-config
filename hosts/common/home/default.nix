@@ -58,6 +58,7 @@
     zoxide
     broot
     fzf
+    nmap
     
     # Terminal and shell tools
     zellij
@@ -85,13 +86,42 @@
     strawberry
     telegram-desktop
     zoom-us
+    libreoffice
   ];
 
   # Enable home-manager
   programs.home-manager.enable = true;
 
   # Enable syncthing service
-  services.syncthing.enable = true;
+  services.syncthing = {
+    enable = true;
+    package = pkgs.unstable.syncthing;
+  };
+
+  # Enable mako notification daemon
+  services.mako.enable = true;
+
+  # Swayidle configuration
+  services.swayidle = lib.mkIf (!config.programs.niri.enable) {
+    enable = true;
+    events = [
+      {
+        event = "before-sleep";
+        command = "${pkgs.hyprlock}/bin/hyprlock";
+      }
+    ];
+    timeouts = [
+      {
+        timeout = 600;
+        command = "${pkgs.hyprlock}/bin/hyprlock";
+      }
+      {
+        timeout = 900;
+        command = "swaymsg 'output * dpms off'";
+        resumeCommand = "swaymsg 'output * dpms on'";
+      }
+    ];
+  };
 
   # Enable waybar
   programs.waybar = {

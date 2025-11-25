@@ -103,17 +103,7 @@
         { workspace = "10"; output = "DP-3"; }
       ];
     };
-    extraConfig = ''
-      bar swaybar_command waybar
-      exec swayidle -w \
-               timeout 600 'swaylock -f -c 000000' \
-               timeout 900 'swaymsg "output * dpms off"' \
-                    resume 'swaymsg "output * dpms on"' \
-               before-sleep 'swaylock -f -c 000000' &
-      exec mako &
-      exec kanshi &
-      floating_modifier Mod4 normal
-    '';
+    
     wrapperFeatures = {
       base = true;
       gtk = true;

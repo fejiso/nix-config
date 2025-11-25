@@ -30,6 +30,10 @@
     ];
     config = {
       allowUnfree = true;
+      permittedInsecurePackages = [
+        "mbedtls-2.28.10"
+        "freeimage-3.18.0-unstable-2024-04-18"
+      ];
     };
   };
 
@@ -97,6 +101,7 @@
     wine
     wl-clipboard
     lsof
+    nmap
     vscode
     inputs.home-manager.packages.${pkgs.system}.default
   ];
