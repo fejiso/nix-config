@@ -32,6 +32,8 @@
       -- Ensure transparency works with Wayland compositors
       config.front_end = "OpenGL"
       
+      config.mux_enable_ssh_agent = false
+      
       return config
     '';
   };
