@@ -8,10 +8,10 @@
     validateSopsFiles = false;
     
     secrets = {
-      #  netbird-env = {
-      #    sopsFile = "${inputs.self}/secrets/netbird-age.env";
-      #    format = "dotenv";
-      #  };
+      netbird-env = {
+        sopsFile = "${inputs.self}/secrets/netbird-age.env";
+        format = "dotenv";
+      };
     };
   };
 }

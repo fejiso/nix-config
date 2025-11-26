@@ -7,17 +7,21 @@ keys:
   - &lenovix_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for lenovix  
   - &a8_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for a8
   - &hierro_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBgTN8rJvs9tZlSA0t3lNQX4MY15aJWUjxASTz32NdHt
-  - &blacktop_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINQePaMUwEu3oPfVMg/Yk9BiX6QbDmxRBC3Icnd1GkGQ 
+  - &blacktop_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINQePaMUwEu3oPfVMg/Yk9BiX6QbDmxRBC3Icnd1GkGQ
+  
+  # Age keys (derived from SSH host keys for sops-nix)
+  - &blacktop_age age1m5q2w5ezcrys2zj5mq20wcc37f5qurpeuc0g33e7969rzzxajsyq5apfqj 
 
 creation_rules:
   # Home-manager secrets - use user SSH key
   - path_regex: 'secrets/git-credentials-age\.yaml$'
     age: *user_ssh
 
-  # System/host secrets - use host SSH keys
+  # System/host secrets - use host SSH keys and age keys
   - path_regex: 'secrets/.*$'
     age:
       - *blacktop_ssh
       - *hierro_ssh
       - *user_ssh
+      - *blacktop_age
       
