@@ -10,6 +10,7 @@ keys:
   - &blacktop_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINQePaMUwEu3oPfVMg/Yk9BiX6QbDmxRBC3Icnd1GkGQ
   
   # Age keys (derived from SSH host keys for sops-nix)
+  - &hierro_age age1hva90d7n8xdqhus9r9r96pfs6uyrglkh7446l7hde40j4kg9pugstjczuv
   - &blacktop_age age1m5q2w5ezcrys2zj5mq20wcc37f5qurpeuc0g33e7969rzzxajsyq5apfqj 
 
 creation_rules:
@@ -23,5 +24,6 @@ creation_rules:
       - *blacktop_ssh
       - *hierro_ssh
       - *user_ssh
+      - *hierro_age
       - *blacktop_age
       
