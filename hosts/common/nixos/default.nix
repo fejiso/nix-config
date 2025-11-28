@@ -79,6 +79,7 @@
     wget
     curl
     git
+    git-crypt
     htop
     btop
     tree
