@@ -8,9 +8,9 @@
     validateSopsFiles = false;
     
     secrets = {
-      netbird-env = {
-        sopsFile = "${inputs.self}/secrets/netbird-age.env";
-        format = "dotenv";
+      netbird-setup-key = {
+        sopsFile = "${inputs.self}/secrets/netbird.yaml";
+        key = "netbird_setup_key";
       };
     };
   };
