@@ -120,6 +120,7 @@
       a8 = mkNixosSystem "a8" "x86_64-linux";
       blacktop = mkNixosSystem "blacktop" "x86_64-linux";
       hierro = mkNixosSystem "hierro" "x86_64-linux";
+      butthead = mkNixosSystem "butthead" "x86_64-linux";
     };
     
     # Standalone home-manager configurations (for non-NixOS systems)
