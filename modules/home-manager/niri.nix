@@ -299,8 +299,6 @@ with lib;
           
           Mod+Ctrl+Shift+Semicolon { move-column-left; }
           Mod+Ctrl+Shift+Slash { move-column-right; }
-          Mod+Ctrl+Shift+J { move-window-up; }
-          Mod+Ctrl+Shift+K { move-window-down; }
           
           Mod+Home { focus-column-first; }
           Mod+End { focus-column-last; }
