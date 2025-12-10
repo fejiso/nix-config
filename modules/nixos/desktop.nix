@@ -31,7 +31,10 @@
   services.xserver.displayManager.gdm.enable = true;
   services.xserver.displayManager.gdm.autoSuspend = false;
   services.xserver.displayManager.defaultSession = "niri";
-  services.xserver.desktopManager.gnome.enable = true;
+  services.xserver.desktopManager.gnome.enable = false;
+  
+  # Disable GNOME GCR SSH agent to avoid conflict
+  services.gnome.gcr-ssh-agent.enable = false;
 
   # User groups and configuration
   users.groups.plugdev = {};

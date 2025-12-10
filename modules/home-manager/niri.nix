@@ -117,7 +117,7 @@ with lib;
               xkb {
                   layout "us,ru"
                   variant "altgr-intl,,"
-                  options "grp:lalt_lshift_toggle"
+                  options "grp:lalt_lshift_toggle,compose:ralt,nodeadkeys"
               }
           }
       }

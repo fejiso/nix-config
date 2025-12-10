@@ -95,10 +95,10 @@
     gcc
     zellij
     zoxide
-    python3Full
+    python3
     mpv
     file
-    pinentry
+    pinentry-curses
     wine
     wl-clipboard
     lsof
@@ -137,7 +137,7 @@
   fonts.packages = with pkgs; [
     noto-fonts
     noto-fonts-cjk-sans
-    noto-fonts-emoji
+    noto-fonts-color-emoji
     nerd-fonts.fira-code
     fira-code
   ];
