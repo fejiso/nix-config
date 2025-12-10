@@ -104,7 +104,7 @@
     lsof
     nmap
     vscode
-    inputs.home-manager.packages.${pkgs.system}.default
+    inputs.home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
 
   # Enable documentation

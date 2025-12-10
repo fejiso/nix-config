@@ -299,6 +299,8 @@ with lib;
           
           Mod+Ctrl+Shift+Semicolon { move-column-left; }
           Mod+Ctrl+Shift+Slash { move-column-right; }
+          Mod+Ctrl+Shift+J { move-window-up; }
+          Mod+Ctrl+Shift+K { move-window-down; }
           
           Mod+Home { focus-column-first; }
           Mod+End { focus-column-last; }
@@ -310,8 +312,8 @@ with lib;
           Mod+Shift+Ctrl+Up { move-column-to-monitor-up; }
           Mod+Shift+Ctrl+Right { move-column-to-monitor-right; }
           Mod+Shift+Ctrl+H { move-column-to-monitor-left; }
-          Mod+Shift+Ctrl+J { move-column-to-monitor-down; }
-          Mod+Shift+Ctrl+K { move-column-to-monitor-up; }
+          // Mod+Shift+Ctrl+J { move-column-to-monitor-down; }
+          // Mod+Shift+Ctrl+K { move-column-to-monitor-up; }
           Mod+Shift+Ctrl+L { move-column-to-monitor-right; }
           
           Mod+1 { focus-workspace 1; }

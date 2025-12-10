@@ -9,7 +9,7 @@
   ...
 }: {
   # Laptop-specific power management
-  services.logind.lidSwitchExternalPower = "ignore";
+  services.logind.settings.Login.HandleLidSwitchExternalPower = "ignore";
   
   # Battery management and power saving
   services.upower.enable = true;
@@ -47,7 +47,7 @@
   programs.light.enable = true;
   
   # Enable touchpad support
-  services.xserver.libinput = {
+  services.libinput = {
     enable = true;
     touchpad = {
       tapping = true;
