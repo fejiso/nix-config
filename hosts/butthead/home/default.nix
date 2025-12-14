@@ -15,6 +15,9 @@
   # Enable desktop programs (shares config with blacktop)
   programs.niri.enable = true;
 
+  # Enable Android development tools
+  programs.android-tools.enable = true;
+
   # Media server specific applications
   home.packages = with pkgs; [
     # Media management tools

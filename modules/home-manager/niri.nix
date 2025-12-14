@@ -120,6 +120,8 @@ with lib;
                   options "grp:lalt_lshift_toggle,compose:ralt,nodeadkeys"
               }
           }
+
+          focus-follows-mouse max-scroll-amount="0%"
       }
 
       layout {

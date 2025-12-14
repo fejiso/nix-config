@@ -16,5 +16,6 @@
     ./gpg-agent.nix
     ./niri.nix
     ./tidalcycles.nix
+    ./android-tools.nix
   ];
 }

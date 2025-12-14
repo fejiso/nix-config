@@ -103,6 +103,7 @@
     wl-clipboard
     lsof
     nmap
+    bind.dnsutils
     vscode
     inputs.home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
