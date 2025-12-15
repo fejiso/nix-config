@@ -59,6 +59,7 @@
       lidarr.enable = true;
       prowlarr.enable = true;
       jellyfin.enable = true;
+      emby.enable = true;
     };
   };
   
@@ -91,5 +92,5 @@
   ];
 
   # System state version
-  system.stateVersion = "25.05";
+  system.stateVersion = "25.11";
 }

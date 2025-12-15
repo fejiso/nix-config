@@ -23,12 +23,12 @@
     # Media management tools
     jellyfin-media-player
     vlc
-    
+
     # System monitoring for server
     htop
     iotop
     nethogs
-    
+
     # Container management tools
     podman-tui
   ];

@@ -252,7 +252,6 @@
 
   # Set environment variables for GPG
   home.sessionVariables = {
-    GPG_TTY = "$(tty)";
     GNUPGHOME = "${config.home.homeDirectory}/.gnupg";
   };
 

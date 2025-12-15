@@ -104,6 +104,7 @@
     lsof
     nmap
     bind.dnsutils
+    ddrescue
     vscode
     inputs.home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];

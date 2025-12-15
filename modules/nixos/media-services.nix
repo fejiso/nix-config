@@ -65,6 +65,15 @@ with lib;
           description = "Port for Jellyfin web interface";
         };
       };
+
+      emby = {
+        enable = mkEnableOption "Emby media server";
+        port = mkOption {
+          type = types.port;
+          default = 8920;
+          description = "Port for Emby web interface";
+        };
+      };
     };
   };
 
@@ -216,7 +225,7 @@ with lib;
         # Jellyfin container
         jellyfin = mkIf config.services.media-stack.services.jellyfin.enable {
           enable = true;
-          
+
           bindMounts = {
             "/media" = {
               hostPath = "${config.services.media-stack.dataDir}/media";
@@ -227,19 +236,19 @@ with lib;
               isReadOnly = false;
             };
           };
-          
+
           forwardPorts = [{
             hostPort = config.services.media-stack.services.jellyfin.port;
             containerPort = 8096;
           }];
-          
+
           nixosConfig = {
             services.jellyfin = {
               enable = true;
               openFirewall = true;
               dataDir = "/config";
             };
-            
+
             users.users.jellyfin = {
               isSystemUser = true;
               group = "jellyfin";
@@ -252,10 +261,57 @@ with lib;
             users.groups.media = {
               gid = 13000;
             };
-            
+
             # Hardware acceleration support
             hardware.graphics.enable = true;
-            
+
+            system.stateVersion = "25.05";
+          };
+        };
+
+        # Emby container
+        emby = mkIf config.services.media-stack.services.emby.enable {
+          enable = true;
+
+          bindMounts = {
+            "/media" = {
+              hostPath = "${config.services.media-stack.dataDir}/media";
+              isReadOnly = true;
+            };
+            "/config" = {
+              hostPath = "/var/lib/emby";
+              isReadOnly = false;
+            };
+          };
+
+          forwardPorts = [{
+            hostPort = config.services.media-stack.services.emby.port;
+            containerPort = 8920;
+          }];
+
+          nixosConfig = {
+            services.emby = {
+              enable = true;
+              openFirewall = true;
+              dataDir = "/config";
+            };
+
+            users.users.emby = {
+              isSystemUser = true;
+              group = "emby";
+              extraGroups = [ "media" "video" "render" ];
+              uid = 13105;
+            };
+            users.groups.emby = {
+              gid = 13105;
+            };
+            users.groups.media = {
+              gid = 13000;
+            };
+
+            # Hardware acceleration support
+            hardware.graphics.enable = true;
+
             system.stateVersion = "25.05";
           };
         };
@@ -273,6 +329,7 @@ with lib;
       "d /var/lib/radarr 0755 radarr radarr -"
       "d /var/lib/lidarr 0755 lidarr lidarr -"
       "d /var/lib/jellyfin 0755 jellyfin jellyfin -"
+      "d /var/lib/emby 0755 emby emby -"
     ];
   };
 }
