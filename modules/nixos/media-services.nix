@@ -324,12 +324,13 @@ with lib;
     };
 
     # Create necessary directories
+    # Use numeric UIDs/GIDs since container users don't exist on host
     systemd.tmpfiles.rules = [
-      "d /var/lib/sonarr 0755 sonarr sonarr -"
-      "d /var/lib/radarr 0755 radarr radarr -"
-      "d /var/lib/lidarr 0755 lidarr lidarr -"
-      "d /var/lib/jellyfin 0755 jellyfin jellyfin -"
-      "d /var/lib/emby 0755 emby emby -"
+      "d /var/lib/sonarr 0755 13101 13000 -"
+      "d /var/lib/radarr 0755 13102 13000 -"
+      "d /var/lib/lidarr 0755 13103 13000 -"
+      "d /var/lib/jellyfin 0755 13104 13104 -"
+      "d /var/lib/emby 0755 13105 13105 -"
     ];
   };
 }

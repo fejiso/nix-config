@@ -258,10 +258,11 @@
 
 
   sops = {
-    age.keyFile = "${config.home.homeDirectory}/.config/sops/age/keys.txt";
+    # Use SSH key for decryption instead of age key file
+    age.sshKeyPaths = [ "${config.home.homeDirectory}/.ssh/id_ed25519" ];
     defaultSopsFile = "${inputs.self}/secrets/secrets.yaml";
     validateSopsFiles = false;
-    
+
     secrets = {
       git-credentials = {
         sopsFile = "${inputs.self}/secrets/git-credentials-age.yaml";

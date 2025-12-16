@@ -1,4 +1,4 @@
-{ config, pkgs, lib, ... }:
+{ config, pkgs, lib, hostname ? "", ... }:
 
 with lib;
 
@@ -209,6 +209,19 @@ with lib;
           }
       }
 
+      ${if hostname == "butthead" then ''
+      // Butthead: Desktop with AOC monitors only
+      output "PNP(AOC) 24B2W1G5 UOWN41A000261" {
+          position x=1920 y=0
+          mode "1920x1080@74.973"
+      }
+
+      output "PNP(AOC) 27G2G4 GYGM7HA433965" {
+          position x=0 y=0
+          mode "1920x1080@144.000"
+      }
+      '' else ''
+      // Blacktop: Laptop with panel + external monitors
       output "AU Optronics 0xA48F Unknown" {
           position x=1920 y=0
           scale 1.0
@@ -224,6 +237,7 @@ with lib;
           position x=0 y=0
           mode "1920x1080@144.000"
       }
+      ''}
 
       window-rule {
           match app-id="firefox"

@@ -3,42 +3,49 @@
 { config, lib, pkgs, modulesPath, ... }:
 
 {
-  imports = [ (modulesPath + "/installer/scan/not-detected.nix") ];
+  imports =
+    [ (modulesPath + "/installer/scan/not-detected.nix")
+    ];
 
-  # Boot configuration - customize based on actual hardware
-  boot.initrd.availableKernelModules = [ "xhci_pci" "thunderbolt" "vmd" "nvme" "usb_storage" "sd_mod" ];
+  boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usbhid" "usb_storage" "sd_mod" ];
   boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "kvm-intel" ]; # or "kvm-amd" for AMD
+  boot.kernelModules = [ "kvm-amd" ];
   boot.extraModulePackages = [ ];
 
-  # Filesystems - TO BE CUSTOMIZED based on actual hardware
-  fileSystems."/" = {
-    device = "/dev/disk/by-uuid/PLACEHOLDER-ROOT-UUID";
-    fsType = "ext4";
-  };
+  fileSystems."/" =
+    { device = "/dev/mapper/crypted";
+      fsType = "btrfs";
+      options = [ "subvol=@" ];
+    };
 
-  fileSystems."/boot" = {
-    device = "/dev/disk/by-uuid/PLACEHOLDER-BOOT-UUID";
-    fsType = "vfat";
-    options = [ "fmask=0022" "dmask=0022" ];
-  };
+  boot.initrd.luks.devices."crypted".device = "/dev/disk/by-uuid/bf051aaa-1621-4464-afeb-925a52c74be5";
 
-  # Storage disks for media (examples - customize based on actual setup)
-  # fileSystems."/mnt/disk1" = {
-  #   device = "/dev/disk/by-uuid/DISK1-UUID";
-  #   fsType = "ext4";
-  # };
-  
-  # Swap configuration
-  swapDevices = [
-    { device = "/swapfile"; size = 32768; } # 32GB swap
-  ];
+  fileSystems."/home" =
+    { device = "/dev/mapper/crypted";
+      fsType = "btrfs";
+      options = [ "subvol=@home" ];
+    };
 
-  # Networking
-  networking.useDHCP = lib.mkDefault true;
+  fileSystems."/nix" =
+    { device = "/dev/mapper/crypted";
+      fsType = "btrfs";
+      options = [ "subvol=@nix" ];
+    };
 
-  # Hardware support
+  fileSystems."/var/log" =
+    { device = "/dev/mapper/crypted";
+      fsType = "btrfs";
+      options = [ "subvol=@log" ];
+    };
+
+  fileSystems."/boot" =
+    { device = "/dev/disk/by-uuid/D31C-07AA";
+      fsType = "vfat";
+      options = [ "fmask=0022" "dmask=0022" ];
+    };
+
+  swapDevices = [ ];
+
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-  hardware.cpu.intel.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
-  # hardware.cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware; # For AMD
+  hardware.cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;
 }
