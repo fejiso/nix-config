@@ -30,9 +30,10 @@
     ];
     config = {
       allowUnfree = true;
-      permittedInsecurePackages = [
+      permittedInsecurePackages = lib.mkDefault [
         "mbedtls-2.28.10"
         "freeimage-3.18.0-unstable-2024-04-18"
+        "qtwebengine-5.15.19"
       ];
     };
   };

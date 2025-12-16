@@ -9,14 +9,7 @@
 }: {
   imports = [
     ./hardware-configuration.nix
-    ../../common/nixos/nix.nix
-    ../../common/nixos/users.nix
-    ../../common/nixos/security.nix
-    ../../common/nixos/networking.nix
-    ../../common/nixos/services.nix
-    ../../common/nixos/sops.nix
-    ../../common/nixos/distributed-build.nix
-    ../../common/nixos/netbird.nix
+    ../../common/nixos
     (import ../../../modules/nixos/desktop.nix)
     (import ../../../modules/nixos/systemd-nspawn.nix)
     (import ../../../modules/nixos/media-services.nix)
@@ -91,6 +84,6 @@
     iotop
   ];
 
-  # System state version
-  system.stateVersion = "25.11";
+  # System state version (override common config)
+  system.stateVersion = lib.mkForce "25.11";
 }

@@ -83,9 +83,6 @@ with lib;
   };
 
   config = mkIf config.services.nspawn-containers.enable {
-    # Enable systemd-nspawn
-    systemd.additionalUpstreamSystemUnits = [ "systemd-nspawn@.service" ];
-    
     # Create containers
     containers = mapAttrs (name: containerConfig: {
       inherit (containerConfig) autoStart privateNetwork bindMounts forwardPorts;
