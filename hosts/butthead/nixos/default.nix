@@ -158,7 +158,7 @@
           ! -name "*.partial" ! -name "*.tmp" ! -path "*/.snapraid.content" \
           -print0 | while IFS= read -r -d "" file; do
 
-          # Check if file is open
+          # First check if file is open
           if ! ${pkgs.lsof}/bin/lsof "$file" >/dev/null 2>&1; then
             # Get relative path
             relpath="''${file#/mnt/data01/}"
@@ -167,11 +167,16 @@
             # Create target directory if needed
             mkdir -p "$targetdir"
 
-            # Move file (rsync for safety, then remove source)
-            if ${pkgs.rsync}/bin/rsync -a --remove-source-files "$file" "$targetdir/"; then
-              echo "Migrated: $relpath"
+            # Double-check file is not open right before transfer
+            if ! ${pkgs.lsof}/bin/lsof "$file" >/dev/null 2>&1; then
+              # Move file (rsync for safety, then remove source)
+              if ${pkgs.rsync}/bin/rsync -a --remove-source-files "$file" "$targetdir/"; then
+                echo "Migrated: $relpath"
+              else
+                echo "Failed to migrate: $relpath" >&2
+              fi
             else
-              echo "Failed to migrate: $relpath" >&2
+              echo "Skipped (opened during check): $relpath"
             fi
           fi
         done
