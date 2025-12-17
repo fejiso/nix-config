@@ -21,7 +21,6 @@
   # Media server specific applications
   home.packages = with pkgs; [
     # Media management tools
-    jellyfin-media-player
     vlc
 
     # System monitoring for server

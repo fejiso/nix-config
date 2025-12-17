@@ -1,7 +1,7 @@
 keys:
   # User SSH key for home-manager secrets
   - &user_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICQ5a7p+8LrnKTch/UUAJ3YpAYT6PS8fM+0FKtSspZ5U fjimenez@vfjimenez
-  
+
   # SSH host keys for NixOS system secrets
   - &elitedx_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for elitedx
   - &lenovix_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for lenovix
