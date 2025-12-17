@@ -27,6 +27,18 @@
 
   # Enable container support for media services
   boot.enableContainers = true;
+
+  # Enable ROCm for ML/LLM/AI workloads
+  systemd.tmpfiles.rules = [
+    "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}"
+  ];
+
+  hardware.graphics = {
+    enable = true;
+    extraPackages = with pkgs; [
+      rocmPackages.clr.icd
+    ];
+  };
   
   # Storage configuration for media server
   # Individual data disk mounts
@@ -224,17 +236,21 @@
     # Storage and filesystem tools
     mergerfs
     snapraid
-    
+
     # Container management tools are included in systemd
     # systemd includes machinectl for container management
-    
+
     # Media tools
     ffmpeg
     mediainfo
-    
+
     # Monitoring
     ncdu
     iotop
+
+    # ROCm for ML/AI
+    rocmPackages.rocm-smi
+    rocmPackages.rocminfo
   ];
 
   # System state version (override common config)
