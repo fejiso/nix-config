@@ -80,7 +80,7 @@
   #   options = [ "defaults" "noatime" ];
   # };
 
-  # MergerFS pool combining all data disks
+  # MergerFS pool combining all data disks (SSD writes first)
   fileSystems."/mnt/user" = {
     device = "/mnt/data01:/mnt/data02:/mnt/data03:/mnt/data04:/mnt/data05:/mnt/data06";
     fsType = "fuse.mergerfs";
@@ -90,7 +90,21 @@
       "use_ino"
       "cache.files=partial"
       "dropcacheonclose=true"
-      "category.create=mfs"
+      "category.create=ff"
+    ];
+  };
+
+  # Slow storage pool (HDDs only, for aging files from SSD)
+  fileSystems."/mnt/storage" = {
+    device = "/mnt/data02:/mnt/data03:/mnt/data04:/mnt/data05:/mnt/data06";
+    fsType = "fuse.mergerfs";
+    options = [
+      "defaults"
+      "allow_other"
+      "use_ino"
+      "cache.files=partial"
+      "dropcacheonclose=true"
+      "category.create=epmfs"
     ];
   };
 
@@ -118,6 +132,63 @@
       "/mnt/data05/.snapraid.content"
       "/mnt/data06/.snapraid.content"
     ];
+  };
+
+  # Daily SnapRAID sync at 4am
+  systemd.timers.snapraid-sync = {
+    description = "Daily SnapRAID sync at 4am";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "04:00";
+      Persistent = true;
+      Unit = "snapraid-sync.service";
+    };
+  };
+
+  # SSD cache migration script
+  systemd.services.ssd-migrate = {
+    description = "Migrate old files from SSD to HDD pool";
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = pkgs.writeShellScript "ssd-migrate" ''
+        set -e
+
+        # Find files on SSD older than 24h, not currently open, and move to HDD pool
+        ${pkgs.findutils}/bin/find /mnt/data01 -type f -mtime +1 -size +1M \
+          ! -name "*.partial" ! -name "*.tmp" ! -path "*/.snapraid.content" \
+          -print0 | while IFS= read -r -d "" file; do
+
+          # Check if file is open
+          if ! ${pkgs.lsof}/bin/lsof "$file" >/dev/null 2>&1; then
+            # Get relative path
+            relpath="''${file#/mnt/data01/}"
+            targetdir="/mnt/storage/$(dirname "$relpath")"
+
+            # Create target directory if needed
+            mkdir -p "$targetdir"
+
+            # Move file (rsync for safety, then remove source)
+            if ${pkgs.rsync}/bin/rsync -a --remove-source-files "$file" "$targetdir/"; then
+              echo "Migrated: $relpath"
+            else
+              echo "Failed to migrate: $relpath" >&2
+            fi
+          fi
+        done
+
+        # Remove empty directories on SSD
+        ${pkgs.findutils}/bin/find /mnt/data01 -type d -empty -delete 2>/dev/null || true
+      '';
+    };
+  };
+
+  systemd.timers.ssd-migrate = {
+    description = "Daily SSD to HDD migration at 3am";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "03:00";
+      Persistent = true;
+    };
   };
 
   # Enable media and download services in containers
