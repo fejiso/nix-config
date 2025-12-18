@@ -28,9 +28,19 @@
   # Enable container support for media services
   boot.enableContainers = true;
 
-  # Enable ROCm for ML/LLM/AI workloads
+  # Enable Podman for nginx-proxy-manager
+  virtualisation.podman = {
+    enable = true;
+    dockerCompat = false;
+  };
+
+  # Enable ROCm for ML/LLM/AI workloads and create service directories
   systemd.tmpfiles.rules = [
     "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}"
+    "d /var/lib/nginx-proxy-manager 0755 nginx-proxy-manager nginx-proxy-manager -"
+    "d /var/lib/nginx-proxy-manager/data 0755 nginx-proxy-manager nginx-proxy-manager -"
+    "d /var/lib/nginx-proxy-manager/letsencrypt 0755 nginx-proxy-manager nginx-proxy-manager -"
+    "d /run/user/13200 0700 nginx-proxy-manager nginx-proxy-manager -"
   ];
 
   hardware.graphics = {
@@ -85,12 +95,12 @@
     options = [ "defaults" "noatime" ];
   };
 
-  # Parity2 - sdd1 not formatted yet
-  # fileSystems."/mnt/parity2" = {
-  #   device = "/dev/disk/by-label/parity2"; # sdd1 - 7.3T
-  #   fsType = "btrfs";
-  #   options = [ "defaults" "noatime" ];
-  # };
+  # Parity2
+  fileSystems."/mnt/parity2" = {
+    device = "/dev/disk/by-label/parity2"; # sdd1 - 7.3T
+    fsType = "btrfs";
+    options = [ "defaults" "noatime" ];
+  };
 
   # MergerFS pool combining all data disks (SSD writes first)
   fileSystems."/mnt/user" = {
@@ -133,7 +143,7 @@
     };
     parityFiles = [
       "/mnt/parity1/snapraid.parity"
-      # "/mnt/parity2/snapraid.2-parity"  # Add when sdd1 is formatted
+      "/mnt/parity2/snapraid.2-parity"  # Add when sdd1 is formatted
     ];
     contentFiles = [
       "/var/snapraid/snapraid.content"
@@ -236,9 +246,10 @@
     # Storage and filesystem tools
     mergerfs
     snapraid
+    hdparm
 
-    # Container management tools are included in systemd
-    # systemd includes machinectl for container management
+    # Container management tools
+    shadow  # Required for rootless Podman (newuidmap/newgidmap)
 
     # Media tools
     ffmpeg
@@ -252,6 +263,131 @@
     rocmPackages.rocm-smi
     rocmPackages.rocminfo
   ];
+
+  # Aggressive VFS caching to keep directory structure in RAM
+  boot.kernel.sysctl = {
+    "vm.vfs_cache_pressure" = 10; # Keep dentries/inodes in cache (default 100)
+    "vm.dirty_writeback_centisecs" = 1500; # Delay writes to reduce spinups
+  };
+
+  # Aggressive drive spindown for HDDs
+  systemd.services.hdd-spindown = {
+    description = "Configure aggressive HDD spindown";
+    wantedBy = [ "multi-user.target" ];
+    after = [ "local-fs.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = pkgs.writeShellScript "hdd-spindown" ''
+        # Apply aggressive spindown to all SATA drives except SSD (sdc)
+        for disk in /dev/sd?; do
+          disk_name=$(basename $disk)
+
+          # Skip SSD cache disk
+          if [ "$disk_name" = "sdc" ]; then
+            ${pkgs.hdparm}/bin/hdparm -B 254 -S 0 $disk  # Never spin down SSD
+            echo "SSD $disk: disabled spindown"
+            continue
+          fi
+
+          # Aggressive spindown for HDDs: 5 minutes
+          # -B 127 = minimum power management
+          # -S 60 = spindown after 5 minutes
+          ${pkgs.hdparm}/bin/hdparm -B 127 -S 60 $disk
+          echo "HDD $disk: 5 minute spindown"
+        done
+      '';
+    };
+  };
+
+  # NFS server configuration
+  services.nfs.server = {
+    enable = true;
+    # Export /mnt/user to Netbird network (read-only) and blacktop (read-write)
+    exports = ''
+      /mnt/user 100.107.0.0/16(ro,sync,no_subtree_check,crossmnt,fsid=0) 100.107.6.184(rw,sync,no_subtree_check,crossmnt,fsid=0)
+    '';
+  };
+
+  # Vaultwarden (Bitwarden-compatible server)
+  services.vaultwarden = {
+    enable = true;
+    config = {
+      DOMAIN = "https://vaultwarden.example.com"; # Update with your actual domain
+      ROCKET_ADDRESS = "0.0.0.0";
+      ROCKET_PORT = 4743;
+      SIGNUPS_ALLOWED = true;
+      INVITATIONS_ALLOWED = true;
+      WEBSOCKET_ENABLED = false;
+    };
+    environmentFile = "/var/lib/vaultwarden/vaultwarden.env";
+  };
+
+  # Open NFS ports in firewall
+  networking.firewall = {
+    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 3002 4743 ];
+    allowedUDPPorts = [ 2049 111 20048 ];
+  };
+
+  # Dedicated user for nginx-proxy-manager
+  users.users.nginx-proxy-manager = {
+    isSystemUser = true;
+    group = "nginx-proxy-manager";
+    uid = 13200;
+    home = "/var/lib/nginx-proxy-manager";
+    createHome = true;
+    subUidRanges = [{ startUid = 100000; count = 65536; }];
+    subGidRanges = [{ startGid = 100000; count = 65536; }];
+  };
+  users.groups.nginx-proxy-manager = {
+    gid = 13200;
+  };
+
+  # Nginx Proxy Manager container (rootless)
+  systemd.services.nginx-proxy-manager = {
+    description = "Nginx Proxy Manager";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+
+    serviceConfig = {
+      Type = "simple";
+      User = "nginx-proxy-manager";
+      Group = "nginx-proxy-manager";
+      Restart = "always";
+      RestartSec = "10s";
+      TimeoutStartSec = "5min";
+
+      # Environment for rootless Podman
+      Environment = [
+        "HOME=/var/lib/nginx-proxy-manager"
+        "XDG_RUNTIME_DIR=/run/user/13200"
+        "PATH=/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin"
+      ];
+
+      ExecStartPre = [
+        # Pull the latest image
+        "${pkgs.podman}/bin/podman pull docker.io/jc21/nginx-proxy-manager:latest"
+        # Remove old container if it exists
+        "-${pkgs.podman}/bin/podman rm -f nginx-proxy-manager"
+      ];
+
+      ExecStart = ''
+        ${pkgs.podman}/bin/podman run --rm --name nginx-proxy-manager \
+          --memory=1G \
+          -p 8102:81 \
+          -p 8002:80 \
+          -p 44302:443 \
+          -p 3002:3000 \
+          -v /var/lib/nginx-proxy-manager/data:/data:rw \
+          -v /var/lib/nginx-proxy-manager/letsencrypt:/etc/letsencrypt:rw \
+          -e DB_SQLITE_FILE=/data/database.sqlite \
+          docker.io/jc21/nginx-proxy-manager:latest
+      '';
+
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 nginx-proxy-manager";
+    };
+  };
 
   # System state version (override common config)
   system.stateVersion = lib.mkForce "25.11";

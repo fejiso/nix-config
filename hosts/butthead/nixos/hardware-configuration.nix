@@ -18,7 +18,10 @@
       options = [ "subvol=@" ];
     };
 
-  boot.initrd.luks.devices."crypted".device = "/dev/disk/by-uuid/bf051aaa-1621-4464-afeb-925a52c74be5";
+  boot.initrd.luks.devices."crypted" = {
+    device = "/dev/disk/by-uuid/bf051aaa-1621-4464-afeb-925a52c74be5";
+    keyFile = "/boot/luks-key";
+  };
 
   fileSystems."/home" =
     { device = "/dev/mapper/crypted";
