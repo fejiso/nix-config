@@ -4,7 +4,7 @@ keys:
 
   # SSH host keys for NixOS system secrets
   - &elitedx_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for elitedx
-  - &lenovix_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for lenovix
+  - &lenovix_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKjSXKkOBTwOny1O6ssb4yFOuntAKh07qiDjhJnVRXV2
   - &a8_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for a8
   - &hierro_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBgTN8rJvs9tZlSA0t3lNQX4MY15aJWUjxASTz32NdHt
   - &blacktop_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINQePaMUwEu3oPfVMg/Yk9BiX6QbDmxRBC3Icnd1GkGQ
@@ -13,7 +13,8 @@ keys:
   # Age keys (derived from SSH host keys for sops-nix)
   - &hierro_age age1hva90d7n8xdqhus9r9r96pfs6uyrglkh7446l7hde40j4kg9pugstjczuv
   - &blacktop_age age1m5q2w5ezcrys2zj5mq20wcc37f5qurpeuc0g33e7969rzzxajsyq5apfqj
-  - &butthead_age age1tm9cm7cvu76dgdgrg88ws2y2zfjyzmr2rpwrl3fjczpzc3zsmyvsgkne0c 
+  - &butthead_age age1tm9cm7cvu76dgdgrg88ws2y2zfjyzmr2rpwrl3fjczpzc3zsmyvsgkne0c
+  - &lenovix_age age18hutz4xq0lk2y0vy0flk5w0qx5as8xlr9k0wd5qshjvglldceq6spxmp02 
 
 creation_rules:
   # Home-manager secrets - use user SSH key
@@ -26,8 +27,10 @@ creation_rules:
       - *blacktop_ssh
       - *hierro_ssh
       - *butthead_ssh
+      - *lenovix_ssh
       - *user_ssh
       - *hierro_age
       - *blacktop_age
       - *butthead_age
+      - *lenovix_age
       
