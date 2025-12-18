@@ -18,32 +18,36 @@
   # Host-specific networking
   networking.hostName = "lenovix";
 
-  # Motion webcam streaming
-  services.motion = {
-    enable = true;
-    settings = {
-      daemon = "on";
-      webcontrol_localhost = "off";
-      webcontrol_port = 8080;
-      stream_localhost = "off";
-      stream_port = 8081;
-      videodevice = "/dev/video0";
-      width = 1280;
-      height = 720;
-      framerate = 15;
-      auto_brightness = "on";
-      target_dir = "/var/lib/motion";
-      text_left = "lenovix";
-      text_right = "%Y-%m-%d %H:%M:%S";
+  # Webcam streaming with mjpg-streamer
+  systemd.services.mjpg-streamer = {
+    description = "MJPG Streamer for webcam";
+    after = [ "network.target" ];
+    wantedBy = [ "multi-user.target" ];
+
+    serviceConfig = {
+      Type = "simple";
+      User = "mjpg-streamer";
+      Group = "video";
+      Restart = "always";
+      RestartSec = "5s";
+
+      ExecStart = ''
+        ${pkgs.mjpg-streamer}/bin/mjpg_streamer \
+          -i "input_uvc.so -d /dev/video0 -r 1280x720 -f 15" \
+          -o "output_http.so -p 8080 -w ${pkgs.mjpg-streamer}/share/mjpg-streamer/www"
+      '';
     };
   };
 
-  # Open firewall for motion
-  networking.firewall.allowedTCPPorts = [ 8080 8081 ];
-
-  # Ensure video group exists and motion user has access
+  # Create mjpg-streamer user
+  users.users.mjpg-streamer = {
+    isSystemUser = true;
+    group = "video";
+  };
   users.groups.video = {};
-  systemd.services.motion.serviceConfig.SupplementaryGroups = [ "video" ];
+
+  # Open firewall for webcam stream
+  networking.firewall.allowedTCPPorts = [ 8080 ];
 
   # System state version
   system.stateVersion = "25.05";
