@@ -8,13 +8,14 @@
   home.packages = with pkgs; [
     # Programming languages
     python3
+    uv  # Fast Python package installer and resolver
     nodejs
     go
     rustc
     cargo
-    
+
     # Development tools
-    
+
     # Language servers
     haskell-language-server
     python3Packages.python-lsp-server
@@ -50,10 +51,13 @@
       fd
       nodejs
       tree-sitter
-      
+
       # Language servers (already in development tools but explicit here)
       lua-language-server
       nil # Nix LSP
+
+      # Debug adapters for nvim-dap
+      vscode-extensions.ms-python.debugpy  # Python debugger
     ];
     
     extraLuaConfig = ''
@@ -75,6 +79,10 @@
       require("lazy").setup({
         spec = {
           { "LazyVim/LazyVim", import = "lazyvim.plugins" },
+          -- Enable DAP (Debug Adapter Protocol)
+          { import = "lazyvim.plugins.extras.dap.core" },
+          -- Enable Neotest for running tests
+          { import = "lazyvim.plugins.extras.test.core" },
           { "thgrund/tidal.nvim", 
             config = function()
               require("tidal").setup({
