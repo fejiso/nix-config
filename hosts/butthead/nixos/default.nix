@@ -21,7 +21,20 @@
   boot.loader.efi.canTouchEfiVariables = true;
   boot.initrd.systemd.enable = true;
   boot.initrd.compressor = "xz";
-  
+
+  # Swap configuration for hibernation (64GB RAM + 2GB margin)
+  swapDevices = [
+    {
+      device = "/swapfile";
+      size = 67584; # 66GB in MB
+    }
+  ];
+
+  # Hibernation configuration
+  boot.resumeDevice = "/dev/mapper/crypted";
+  # TODO: After swapfile is created, run: sudo btrfs inspect-internal map-swapfile -r /swapfile
+  # Then set: boot.kernelParams = [ "resume_offset=XXXXX" ];
+
   # Host-specific networking
   networking.hostName = "butthead";
 
@@ -32,6 +45,18 @@
   virtualisation.podman = {
     enable = true;
     dockerCompat = false;
+    extraPackages = [ pkgs.slirp4netns ];
+  };
+
+  # Use podman for oci-containers
+  virtualisation.oci-containers.backend = "podman";
+
+  # Configure containers.conf for pasta networking
+  virtualisation.containers.containersConf.settings = {
+    network = {
+      default_rootless_network_cmd = "pasta";
+      pasta_options = ["--map-gw"];
+    };
   };
 
   # Enable ROCm for ML/LLM/AI workloads and create service directories
@@ -41,6 +66,7 @@
     "d /var/lib/nginx-proxy-manager/data 0755 nginx-proxy-manager nginx-proxy-manager -"
     "d /var/lib/nginx-proxy-manager/letsencrypt 0755 nginx-proxy-manager nginx-proxy-manager -"
     "d /run/user/13200 0700 nginx-proxy-manager nginx-proxy-manager -"
+    "d /run/user/13105 0700 emby-podman emby-podman -"
   ];
 
   hardware.graphics = {
@@ -154,17 +180,23 @@
       "/mnt/data05/.snapraid.content"
       "/mnt/data06/.snapraid.content"
     ];
+
+    # Scrub configuration
+    scrub = {
+      interval = "02:00";  # Daily scrub at 2am
+      plan = 5;  # Scrub 5% of array
+      olderThan = 10;  # Prioritize blocks older than 10 days
+    };
+
+    # Sync configuration
+    sync.interval = "04:00";  # Daily sync at 4am
   };
 
-  # Daily SnapRAID sync at 4am
-  systemd.timers.snapraid-sync = {
-    description = "Daily SnapRAID sync at 4am";
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnCalendar = "04:00";
-      Persistent = true;
-      Unit = "snapraid-sync.service";
-    };
+  # Enable btrfs automatic scrubbing
+  services.btrfs.autoScrub = {
+    enable = true;
+    interval = "monthly";
+    fileSystems = [ "/mnt/data01" "/mnt/data02" "/mnt/data03" "/mnt/data04" "/mnt/data05" "/mnt/data06" "/mnt/parity1" "/mnt/parity2" ];
   };
 
   # SSD cache migration script
@@ -227,7 +259,7 @@
       radarr.enable = true;
       lidarr.enable = true;
       prowlarr.enable = true;
-      emby.enable = true;
+      emby.enable = false;  # Using Podman instead
     };
   };
 
@@ -325,7 +357,7 @@
 
   # Open NFS ports in firewall
   networking.firewall = {
-    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 3002 4743 ];
+    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 3002 4743 8096 ];
     allowedUDPPorts = [ 2049 111 20048 ];
   };
 
@@ -343,12 +375,69 @@
     gid = 13200;
   };
 
+  # Dedicated user for emby
+  users.users.emby-podman = {
+    isSystemUser = true;
+    group = "emby-podman";
+    uid = 13105;
+    home = "/var/lib/emby-podman";
+    createHome = true;
+    subUidRanges = [{ startUid = 200000; count = 65536; }];
+    subGidRanges = [{ startGid = 200000; count = 65536; }];
+  };
+  users.groups.emby-podman = {
+    gid = 13105;
+  };
+
+  # Emby container (uses host network so NPM can reach it at localhost)
+  systemd.services.emby = {
+    description = "Emby Media Server";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+
+    serviceConfig = {
+      Type = "simple";
+      User = "emby-podman";
+      Group = "emby-podman";
+      Restart = "always";
+      RestartSec = "10s";
+      TimeoutStartSec = "5min";
+
+      Environment = [
+        "HOME=/var/lib/emby-podman"
+        "XDG_RUNTIME_DIR=/run/user/13105"
+        "PATH=/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin"
+      ];
+
+      ExecStartPre = [
+        "${pkgs.podman}/bin/podman pull docker.io/emby/embyserver:latest"
+        "-${pkgs.podman}/bin/podman rm -f emby"
+      ];
+
+      ExecStart = ''
+        ${pkgs.podman}/bin/podman run --rm --name emby \
+          -p 8096:8096 \
+          -v /var/lib/emby:/config:rw \
+          -v /mnt/user/media:/media:ro \
+          --device /dev/dri:/dev/dri \
+          -e UID=13105 \
+          -e GID=13105 \
+          docker.io/emby/embyserver:latest
+      '';
+
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 emby";
+    };
+  };
+
   # Nginx Proxy Manager container (rootless)
   systemd.services.nginx-proxy-manager = {
     description = "Nginx Proxy Manager";
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
     wantedBy = [ "multi-user.target" ];
+
+    path = [ pkgs.podman pkgs.slirp4netns ];
 
     serviceConfig = {
       Type = "simple";
@@ -358,27 +447,23 @@
       RestartSec = "10s";
       TimeoutStartSec = "5min";
 
-      # Environment for rootless Podman
       Environment = [
         "HOME=/var/lib/nginx-proxy-manager"
         "XDG_RUNTIME_DIR=/run/user/13200"
-        "PATH=/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin"
       ];
 
       ExecStartPre = [
-        # Pull the latest image
         "${pkgs.podman}/bin/podman pull docker.io/jc21/nginx-proxy-manager:latest"
-        # Remove old container if it exists
         "-${pkgs.podman}/bin/podman rm -f nginx-proxy-manager"
       ];
 
       ExecStart = ''
         ${pkgs.podman}/bin/podman run --rm --name nginx-proxy-manager \
           --memory=1G \
+          --network=slirp4netns:allow_host_loopback=true \
           -p 8102:81 \
           -p 8002:80 \
           -p 44302:443 \
-          -p 3002:3000 \
           -v /var/lib/nginx-proxy-manager/data:/data:rw \
           -v /var/lib/nginx-proxy-manager/letsencrypt:/etc/letsencrypt:rw \
           -e DB_SQLITE_FILE=/data/database.sqlite \

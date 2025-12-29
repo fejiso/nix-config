@@ -106,6 +106,7 @@
     nmap
     bind.dnsutils
     ddrescue
+    smartmontools
     vscode
     inputs.home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
