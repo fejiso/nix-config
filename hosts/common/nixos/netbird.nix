@@ -26,4 +26,16 @@
       ExecStop = "${pkgs.netbird}/bin/netbird down";
     };
   };
+
+  # Restart netbird after system wakes from suspend
+  systemd.services.netbird-resume = {
+    description = "Restart NetBird after suspend/resume";
+    after = [ "suspend.target" "hibernate.target" "hybrid-sleep.target" ];
+    wantedBy = [ "suspend.target" "hibernate.target" "hybrid-sleep.target" ];
+
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.systemd}/bin/systemctl restart netbird.service";
+    };
+  };
 }
