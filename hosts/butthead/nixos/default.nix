@@ -51,6 +51,50 @@
   # Use podman for oci-containers
   virtualisation.oci-containers.backend = "podman";
 
+  # Ensure setuid wrappers for rootless podman
+  security.wrappers = {
+    newuidmap = {
+      source = "${pkgs.shadow}/bin/newuidmap";
+      setuid = true;
+      owner = "root";
+      group = "root";
+    };
+    newgidmap = {
+      source = "${pkgs.shadow}/bin/newgidmap";
+      setuid = true;
+      owner = "root";
+      group = "root";
+    };
+  };
+
+  # Daily container image updates using podman auto-update
+  systemd.timers.podman-auto-update = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "daily";
+      RandomizedDelaySec = "2h";
+      Persistent = true;
+    };
+  };
+
+  systemd.services.podman-auto-update = {
+    description = "Update container images and restart if needed";
+    serviceConfig = {
+      Type = "oneshot";
+    };
+    script = ''
+      # Update containers for all users with XDG_RUNTIME_DIR
+      for runtime_dir in /run/user/*; do
+        if [ -d "$runtime_dir" ]; then
+          uid=$(basename "$runtime_dir")
+          username=$(id -un "$uid" 2>/dev/null) || continue
+          echo "Checking containers for user $username (UID $uid)"
+          sudo -u "$username" XDG_RUNTIME_DIR="$runtime_dir" ${pkgs.podman}/bin/podman auto-update || true
+        fi
+      done
+    '';
+  };
+
   # Configure containers.conf for pasta networking
   virtualisation.containers.containersConf.settings = {
     network = {
@@ -63,8 +107,9 @@
   systemd.tmpfiles.rules = [
     "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}"
     "d /var/lib/nginx-proxy-manager 0755 nginx-proxy-manager nginx-proxy-manager -"
-    "d /var/lib/nginx-proxy-manager/data 0755 nginx-proxy-manager nginx-proxy-manager -"
-    "d /var/lib/nginx-proxy-manager/letsencrypt 0755 nginx-proxy-manager nginx-proxy-manager -"
+    "d /var/lib/npm-storage 0755 100000 100000 -"
+    "Z /var/lib/npm-storage/data 0755 100000 100000 -"
+    "Z /var/lib/npm-storage/letsencrypt 0755 100000 100000 -"
     "d /run/user/13200 0700 nginx-proxy-manager nginx-proxy-manager -"
     "d /run/user/13105 0700 emby-podman emby-podman -"
   ];
@@ -357,7 +402,7 @@
 
   # Open NFS ports in firewall
   networking.firewall = {
-    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 3002 4743 8096 ];
+    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 3002 4743 8096 8080 8989 7878 8686 ];
     allowedUDPPorts = [ 2049 111 20048 ];
   };
 
@@ -375,18 +420,87 @@
     gid = 13200;
   };
 
+  # Shared group for media services
+  users.groups.media-services = {
+    gid = 13100;
+  };
+
+  # Enable lingering for podman users to create /run/user/UID directories
+  systemd.services.enable-linger-podman-users = {
+    description = "Enable lingering for podman users";
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = [
+        "${pkgs.systemd}/bin/loginctl enable-linger nginx-proxy-manager"
+        "${pkgs.systemd}/bin/loginctl enable-linger emby-podman"
+        "${pkgs.systemd}/bin/loginctl enable-linger sabnzbd-podman"
+        "${pkgs.systemd}/bin/loginctl enable-linger sonarr-podman"
+        "${pkgs.systemd}/bin/loginctl enable-linger radarr-podman"
+        "${pkgs.systemd}/bin/loginctl enable-linger lidarr-podman"
+      ];
+    };
+  };
+
   # Dedicated user for emby
   users.users.emby-podman = {
     isSystemUser = true;
-    group = "emby-podman";
+    group = "media-services";
+    extraGroups = [ "media-services" ];
     uid = 13105;
     home = "/var/lib/emby-podman";
     createHome = true;
     subUidRanges = [{ startUid = 200000; count = 65536; }];
     subGidRanges = [{ startGid = 200000; count = 65536; }];
   };
-  users.groups.emby-podman = {
-    gid = 13105;
+
+  # Dedicated user for sabnzbd
+  users.users.sabnzbd-podman = {
+    isSystemUser = true;
+    group = "media-services";
+    extraGroups = [ "media-services" ];
+    uid = 13106;
+    home = "/var/lib/sabnzbd-podman";
+    createHome = true;
+    subUidRanges = [{ startUid = 300000; count = 65536; }];
+    subGidRanges = [{ startGid = 300000; count = 65536; }];
+  };
+
+  # Dedicated user for sonarr
+  users.users.sonarr-podman = {
+    isSystemUser = true;
+    group = "media-services";
+    extraGroups = [ "media-services" ];
+    uid = 13107;
+    home = "/var/lib/sonarr-podman";
+    createHome = true;
+    subUidRanges = [{ startUid = 400000; count = 65536; }];
+    subGidRanges = [{ startGid = 400000; count = 65536; }];
+  };
+
+  # Dedicated user for radarr
+  users.users.radarr-podman = {
+    isSystemUser = true;
+    group = "media-services";
+    extraGroups = [ "media-services" ];
+    uid = 13108;
+    home = "/var/lib/radarr-podman";
+    createHome = true;
+    subUidRanges = [{ startUid = 500000; count = 65536; }];
+    subGidRanges = [{ startGid = 500000; count = 65536; }];
+  };
+
+  # Dedicated user for lidarr
+  users.users.lidarr-podman = {
+    isSystemUser = true;
+    group = "media-services";
+    extraGroups = [ "media-services" ];
+    uid = 13109;
+    home = "/var/lib/lidarr-podman";
+    createHome = true;
+    subUidRanges = [{ startUid = 600000; count = 65536; }];
+    subGidRanges = [{ startGid = 600000; count = 65536; }];
   };
 
   # Emby container (uses host network so NPM can reach it at localhost)
@@ -399,7 +513,8 @@
     serviceConfig = {
       Type = "simple";
       User = "emby-podman";
-      Group = "emby-podman";
+      Group = "media-services";
+      UMask = "0002";
       Restart = "always";
       RestartSec = "10s";
       TimeoutStartSec = "5min";
@@ -411,19 +526,28 @@
       ];
 
       ExecStartPre = [
-        "${pkgs.podman}/bin/podman pull docker.io/emby/embyserver:latest"
         "-${pkgs.podman}/bin/podman rm -f emby"
       ];
 
       ExecStart = ''
         ${pkgs.podman}/bin/podman run --rm --name emby \
+          --label io.containers.autoupdate=registry \
+          --log-driver=journald \
+          --shm-size=1024m \
+          --tmpfs /run \
+          --tmpfs /var/run \
           -p 8096:8096 \
           -v /var/lib/emby:/config:rw \
-          -v /mnt/user/media:/media:ro \
+          -v /mnt/user/Movies:/movies:ro \
+          -v /mnt/user/Series:/tv:ro \
+          -v /mnt/user/Music:/music:ro \
+          -v /mnt/user/Backups/Emby:/backup:rw \
           --device /dev/dri:/dev/dri \
-          -e UID=13105 \
-          -e GID=13105 \
-          docker.io/emby/embyserver:latest
+          -e PUID=13105 \
+          -e PGID=13100 \
+          -e UMASK=002 \
+          -e TZ=Europe/Dublin \
+          lscr.io/linuxserver/emby:latest
       '';
 
       ExecStop = "${pkgs.podman}/bin/podman stop -t 10 emby";
@@ -444,33 +568,211 @@
       User = "nginx-proxy-manager";
       Group = "nginx-proxy-manager";
       Restart = "always";
-      RestartSec = "10s";
+      RestartSec = "30min";
       TimeoutStartSec = "5min";
 
       Environment = [
         "HOME=/var/lib/nginx-proxy-manager"
         "XDG_RUNTIME_DIR=/run/user/13200"
+        "PATH=${pkgs.slirp4netns}/bin:/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin"
       ];
 
       ExecStartPre = [
-        "${pkgs.podman}/bin/podman pull docker.io/jc21/nginx-proxy-manager:latest"
         "-${pkgs.podman}/bin/podman rm -f nginx-proxy-manager"
+        "${pkgs.podman}/bin/podman pull docker.io/jc21/nginx-proxy-manager:latest"
+      ];
+
+      ExecStart = "${pkgs.bash}/bin/bash -c 'set -x; ${pkgs.podman}/bin/podman run --rm --name nginx-proxy-manager --label io.containers.autoupdate=registry --log-driver=journald --memory=1G --network=slirp4netns:allow_host_loopback=true -p 8102:81 -p 8002:80 -p 44302:443 -v /var/lib/npm-storage/data:/data:rw -v /var/lib/npm-storage/letsencrypt:/etc/letsencrypt:rw -e DB_SQLITE_FILE=/data/database.sqlite docker.io/jc21/nginx-proxy-manager:latest'";
+
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 nginx-proxy-manager";
+    };
+  };
+
+  # Sabnzbd container (rootless)
+  systemd.services.sabnzbd = {
+    description = "Sabnzbd";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+
+    path = [ pkgs.podman ];
+
+    serviceConfig = {
+      Type = "simple";
+      User = "sabnzbd-podman";
+      Group = "media-services";
+      UMask = "0002";
+      Restart = "always";
+      RestartSec = "10s";
+      TimeoutStartSec = "5min";
+
+      Environment = [
+        "HOME=/var/lib/sabnzbd-podman"
+        "XDG_RUNTIME_DIR=/run/user/13106"
+        "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
+      ];
+
+      ExecStartPre = [
+        "-${pkgs.podman}/bin/podman rm -f sabnzbd"
       ];
 
       ExecStart = ''
-        ${pkgs.podman}/bin/podman run --rm --name nginx-proxy-manager \
-          --memory=1G \
-          --network=slirp4netns:allow_host_loopback=true \
-          -p 8102:81 \
-          -p 8002:80 \
-          -p 44302:443 \
-          -v /var/lib/nginx-proxy-manager/data:/data:rw \
-          -v /var/lib/nginx-proxy-manager/letsencrypt:/etc/letsencrypt:rw \
-          -e DB_SQLITE_FILE=/data/database.sqlite \
-          docker.io/jc21/nginx-proxy-manager:latest
+        ${pkgs.podman}/bin/podman run --rm --name sabnzbd \
+          --label io.containers.autoupdate=registry \
+          --log-driver=journald \
+          -p 8080:8080 \
+          -v /var/lib/sabnzbd:/config:rw \
+          -v /mnt/user/download:/downloads:rw \
+          -v /mnt/user/downloadtemp/incomplete:/incomplete-downloads:rw \
+          -e PUID=13106 \
+          -e PGID=13100 \
+          -e UMASK=002 \
+          -e TZ=Europe/Dublin \
+          lscr.io/linuxserver/sabnzbd:latest
       '';
 
-      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 nginx-proxy-manager";
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 sabnzbd";
+    };
+  };
+
+  # Sonarr container (rootless)
+  systemd.services.sonarr = {
+    description = "Sonarr";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+
+    path = [ pkgs.podman ];
+
+    serviceConfig = {
+      Type = "simple";
+      User = "sonarr-podman";
+      Group = "media-services";
+      UMask = "0002";
+      Restart = "always";
+      RestartSec = "10s";
+      TimeoutStartSec = "5min";
+
+      Environment = [
+        "HOME=/var/lib/sonarr-podman"
+        "XDG_RUNTIME_DIR=/run/user/13107"
+        "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
+      ];
+
+      ExecStartPre = [
+        "-${pkgs.podman}/bin/podman rm -f sonarr"
+      ];
+
+      ExecStart = ''
+        ${pkgs.podman}/bin/podman run --rm --name sonarr \
+          --label io.containers.autoupdate=registry \
+          --log-driver=journald \
+          -p 8989:8989 \
+          -v /var/lib/sonarr:/config:rw \
+          -v /mnt/user/download:/downloads:rw \
+          -v /mnt/user/Series:/tv:rw \
+          -e PUID=13107 \
+          -e PGID=13100 \
+          -e UMASK=002 \
+          -e TZ=Europe/Dublin \
+          lscr.io/linuxserver/sonarr:latest
+      '';
+
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 sonarr";
+    };
+  };
+
+  # Radarr container (rootless)
+  systemd.services.radarr = {
+    description = "Radarr";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+
+    path = [ pkgs.podman ];
+
+    serviceConfig = {
+      Type = "simple";
+      User = "radarr-podman";
+      Group = "media-services";
+      UMask = "0002";
+      Restart = "always";
+      RestartSec = "10s";
+      TimeoutStartSec = "5min";
+
+      Environment = [
+        "HOME=/var/lib/radarr-podman"
+        "XDG_RUNTIME_DIR=/run/user/13108"
+        "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
+      ];
+
+      ExecStartPre = [
+        "-${pkgs.podman}/bin/podman rm -f radarr"
+      ];
+
+      ExecStart = ''
+        ${pkgs.podman}/bin/podman run --rm --name radarr \
+          --label io.containers.autoupdate=registry \
+          --log-driver=journald \
+          -p 7878:7878 \
+          -v /var/lib/radarr:/config:rw \
+          -v /mnt/user/download:/downloads:rw \
+          -v /mnt/user/Movies:/movies:rw \
+          -e PUID=13108 \
+          -e PGID=13100 \
+          -e UMASK=002 \
+          -e TZ=Europe/Dublin \
+          lscr.io/linuxserver/radarr:latest
+      '';
+
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 radarr";
+    };
+  };
+
+  # Lidarr container (rootless)
+  systemd.services.lidarr = {
+    description = "Lidarr";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+
+    path = [ pkgs.podman ];
+
+    serviceConfig = {
+      Type = "simple";
+      User = "lidarr-podman";
+      Group = "media-services";
+      UMask = "0002";
+      Restart = "always";
+      RestartSec = "10s";
+      TimeoutStartSec = "5min";
+
+      Environment = [
+        "HOME=/var/lib/lidarr-podman"
+        "XDG_RUNTIME_DIR=/run/user/13109"
+        "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
+      ];
+
+      ExecStartPre = [
+        "-${pkgs.podman}/bin/podman rm -f lidarr"
+      ];
+
+      ExecStart = ''
+        ${pkgs.podman}/bin/podman run --rm --name lidarr \
+          --label io.containers.autoupdate=registry \
+          --log-driver=journald \
+          -p 8686:8686 \
+          -v /var/lib/lidarr:/config:rw \
+          -v /mnt/user/download:/downloads:rw \
+          -v /mnt/user/Music:/music:rw \
+          -e PUID=13109 \
+          -e PGID=13100 \
+          -e UMASK=002 \
+          -e TZ=Europe/Dublin \
+          lscr.io/linuxserver/lidarr:latest
+      '';
+
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 lidarr";
     };
   };
 
