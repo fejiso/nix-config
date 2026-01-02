@@ -258,8 +258,8 @@
 
 
   sops = {
-    # Use SSH key for decryption instead of age key file
-    age.sshKeyPaths = [ "${config.home.homeDirectory}/.ssh/id_ed25519" ];
+    # Use age key file for decryption
+    age.keyFile = "${config.home.homeDirectory}/.config/sops/age/keys.txt";
     defaultSopsFile = "${inputs.self}/secrets/secrets.yaml";
     validateSopsFiles = false;
 

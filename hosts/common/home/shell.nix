@@ -61,7 +61,6 @@
     oh-my-zsh = {
       enable = true;
       plugins = ["git" "sudo" "docker" "kubectl"];
-      theme = "robbyrussell";
     };
     
     initContent = ''
@@ -109,7 +108,7 @@
   
   # Starship prompt
   programs.starship = {
-    enable = false;
+    enable = true;
     settings = {
       add_newline = false;
       character = {

@@ -1,6 +1,7 @@
 keys:
   # User SSH key for home-manager secrets
   - &user_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICQ5a7p+8LrnKTch/UUAJ3YpAYT6PS8fM+0FKtSspZ5U fjimenez@vfjimenez
+  - &user_age age1pylg5fzewum5jk3z64s7pqkffu4ljjnr3mkm0n8z3rl4upsrp4rsszw4gk
 
   # SSH host keys for NixOS system secrets
   - &elitedx_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for elitedx
@@ -19,7 +20,9 @@ keys:
 creation_rules:
   # Home-manager secrets - use user SSH key
   - path_regex: 'secrets/git-credentials-age\.yaml$'
-    age: *user_ssh
+    age:
+      - *user_ssh
+      - *user_age
 
   # System/host secrets - use host SSH keys and age keys
   - path_regex: 'secrets/.*$'
