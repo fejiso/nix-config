@@ -62,4 +62,9 @@
     powerOnBoot = true;
   };
   services.blueman.enable = true;
+
+  # Laptop-specific packages
+  environment.systemPackages = with pkgs; [
+    powertop
+  ];
 }

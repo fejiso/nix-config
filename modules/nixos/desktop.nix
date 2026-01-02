@@ -40,7 +40,7 @@
   users.groups.plugdev = {};
   users.users.z-247 = {
     isNormalUser = true;
-    extraGroups = [ "wheel" "networkmanager" "plugdev" ];
+    extraGroups = [ "wheel" "networkmanager" "plugdev" "media-services" ];
     packages = with pkgs; [
       amazon-q-cli
       tree

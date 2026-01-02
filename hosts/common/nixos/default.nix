@@ -108,6 +108,7 @@
     ddrescue
     smartmontools
     vscode
+    sqlite
     inputs.home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
 

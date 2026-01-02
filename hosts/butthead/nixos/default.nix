@@ -6,7 +6,54 @@
   pkgs,
   hostname,
   ...
-}: {
+}:
+let
+  # Helper function to create media service configurations
+  mkMediaService = { name, port, volumes, image ? "lscr.io/linuxserver/${name}:latest" }: {
+    description = lib.strings.toUpper (lib.substring 0 1 name) + lib.substring 1 (lib.stringLength name) name;
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+
+    path = [ pkgs.podman ];
+
+    serviceConfig = {
+      Type = "simple";
+      User = "media-podman";
+      Group = "media-services";
+      UMask = "0002";
+      Restart = "always";
+      RestartSec = "10s";
+      TimeoutStartSec = "5min";
+
+      Environment = [
+        "HOME=/var/lib/media-podman"
+        "XDG_RUNTIME_DIR=/run/user/13106"
+        "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
+      ];
+
+      ExecStartPre = [
+        "-${pkgs.podman}/bin/podman rm -f ${name}"
+      ];
+
+      ExecStart = ''
+        ${pkgs.podman}/bin/podman run --rm --name ${name} \
+          --label io.containers.autoupdate=registry \
+          --log-driver=journald \
+          -p ${toString port}:${toString port} \
+          ${lib.concatMapStringsSep " " (v: "-v ${v}") volumes} \
+          -e PUID=0 \
+          -e PGID=0 \
+          -e UMASK=002 \
+          -e TZ=Europe/Dublin \
+          ${image}
+      '';
+
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 ${name}";
+    };
+  };
+in
+{
   imports = [
     ./hardware-configuration.nix
     ../../common/nixos
@@ -112,6 +159,7 @@
     "Z /var/lib/npm-storage/letsencrypt 0755 100000 100000 -"
     "d /run/user/13200 0700 nginx-proxy-manager nginx-proxy-manager -"
     "d /run/user/13105 0700 emby-podman emby-podman -"
+    "d /run/user/13110 0700 prowlarr-podman prowlarr-podman -"
   ];
 
   hardware.graphics = {
@@ -439,6 +487,7 @@
         "${pkgs.systemd}/bin/loginctl enable-linger sonarr-podman"
         "${pkgs.systemd}/bin/loginctl enable-linger radarr-podman"
         "${pkgs.systemd}/bin/loginctl enable-linger lidarr-podman"
+        "${pkgs.systemd}/bin/loginctl enable-linger prowlarr-podman"
       ];
     };
   };
@@ -455,52 +504,20 @@
     subGidRanges = [{ startGid = 200000; count = 65536; }];
   };
 
-  # Dedicated user for sabnzbd
-  users.users.sabnzbd-podman = {
+  # Shared user for all media services (sabnzbd, sonarr, radarr, lidarr, prowlarr)
+  users.users.media-podman = {
     isSystemUser = true;
     group = "media-services";
     extraGroups = [ "media-services" ];
     uid = 13106;
-    home = "/var/lib/sabnzbd-podman";
+    home = "/var/lib/media-podman";
     createHome = true;
-    subUidRanges = [{ startUid = 300000; count = 65536; }];
-    subGidRanges = [{ startGid = 300000; count = 65536; }];
-  };
-
-  # Dedicated user for sonarr
-  users.users.sonarr-podman = {
-    isSystemUser = true;
-    group = "media-services";
-    extraGroups = [ "media-services" ];
-    uid = 13107;
-    home = "/var/lib/sonarr-podman";
-    createHome = true;
-    subUidRanges = [{ startUid = 400000; count = 65536; }];
-    subGidRanges = [{ startGid = 400000; count = 65536; }];
-  };
-
-  # Dedicated user for radarr
-  users.users.radarr-podman = {
-    isSystemUser = true;
-    group = "media-services";
-    extraGroups = [ "media-services" ];
-    uid = 13108;
-    home = "/var/lib/radarr-podman";
-    createHome = true;
-    subUidRanges = [{ startUid = 500000; count = 65536; }];
-    subGidRanges = [{ startGid = 500000; count = 65536; }];
-  };
-
-  # Dedicated user for lidarr
-  users.users.lidarr-podman = {
-    isSystemUser = true;
-    group = "media-services";
-    extraGroups = [ "media-services" ];
-    uid = 13109;
-    home = "/var/lib/lidarr-podman";
-    createHome = true;
-    subUidRanges = [{ startUid = 600000; count = 65536; }];
-    subGidRanges = [{ startGid = 600000; count = 65536; }];
+    subUidRanges = [
+      { startUid = 300000; count = 65536; }
+    ];
+    subGidRanges = [
+      { startGid = 300000; count = 65536; }
+    ];
   };
 
   # Emby container (uses host network so NPM can reach it at localhost)
@@ -588,192 +605,53 @@
     };
   };
 
-  # Sabnzbd container (rootless)
-  systemd.services.sabnzbd = {
-    description = "Sabnzbd";
-    after = [ "network-online.target" ];
-    wants = [ "network-online.target" ];
-    wantedBy = [ "multi-user.target" ];
-
-    path = [ pkgs.podman ];
-
-    serviceConfig = {
-      Type = "simple";
-      User = "sabnzbd-podman";
-      Group = "media-services";
-      UMask = "0002";
-      Restart = "always";
-      RestartSec = "10s";
-      TimeoutStartSec = "5min";
-
-      Environment = [
-        "HOME=/var/lib/sabnzbd-podman"
-        "XDG_RUNTIME_DIR=/run/user/13106"
-        "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
-      ];
-
-      ExecStartPre = [
-        "-${pkgs.podman}/bin/podman rm -f sabnzbd"
-      ];
-
-      ExecStart = ''
-        ${pkgs.podman}/bin/podman run --rm --name sabnzbd \
-          --label io.containers.autoupdate=registry \
-          --log-driver=journald \
-          -p 8080:8080 \
-          -v /var/lib/sabnzbd:/config:rw \
-          -v /mnt/user/download:/downloads:rw \
-          -v /mnt/user/downloadtemp/incomplete:/incomplete-downloads:rw \
-          -e PUID=13106 \
-          -e PGID=13100 \
-          -e UMASK=002 \
-          -e TZ=Europe/Dublin \
-          lscr.io/linuxserver/sabnzbd:latest
-      '';
-
-      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 sabnzbd";
-    };
+  # Media services (all run under single media-podman user)
+  systemd.services.sabnzbd = mkMediaService {
+    name = "sabnzbd";
+    port = 8080;
+    volumes = [
+      "/var/lib/sabnzbd:/config:rw"
+      "/mnt/user/download:/downloads:rw"
+      "/mnt/user/downloadtemp/incomplete:/incomplete-downloads:rw"
+    ];
   };
 
-  # Sonarr container (rootless)
-  systemd.services.sonarr = {
-    description = "Sonarr";
-    after = [ "network-online.target" ];
-    wants = [ "network-online.target" ];
-    wantedBy = [ "multi-user.target" ];
-
-    path = [ pkgs.podman ];
-
-    serviceConfig = {
-      Type = "simple";
-      User = "sonarr-podman";
-      Group = "media-services";
-      UMask = "0002";
-      Restart = "always";
-      RestartSec = "10s";
-      TimeoutStartSec = "5min";
-
-      Environment = [
-        "HOME=/var/lib/sonarr-podman"
-        "XDG_RUNTIME_DIR=/run/user/13107"
-        "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
-      ];
-
-      ExecStartPre = [
-        "-${pkgs.podman}/bin/podman rm -f sonarr"
-      ];
-
-      ExecStart = ''
-        ${pkgs.podman}/bin/podman run --rm --name sonarr \
-          --label io.containers.autoupdate=registry \
-          --log-driver=journald \
-          -p 8989:8989 \
-          -v /var/lib/sonarr:/config:rw \
-          -v /mnt/user/download:/downloads:rw \
-          -v /mnt/user/Series:/tv:rw \
-          -e PUID=13107 \
-          -e PGID=13100 \
-          -e UMASK=002 \
-          -e TZ=Europe/Dublin \
-          lscr.io/linuxserver/sonarr:latest
-      '';
-
-      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 sonarr";
-    };
+  systemd.services.sonarr = mkMediaService {
+    name = "sonarr";
+    port = 8989;
+    volumes = [
+      "/var/lib/sonarr:/config:rw"
+      "/mnt/user/download:/downloads:rw"
+      "/mnt/user/Series:/tv:rw"
+    ];
   };
 
-  # Radarr container (rootless)
-  systemd.services.radarr = {
-    description = "Radarr";
-    after = [ "network-online.target" ];
-    wants = [ "network-online.target" ];
-    wantedBy = [ "multi-user.target" ];
-
-    path = [ pkgs.podman ];
-
-    serviceConfig = {
-      Type = "simple";
-      User = "radarr-podman";
-      Group = "media-services";
-      UMask = "0002";
-      Restart = "always";
-      RestartSec = "10s";
-      TimeoutStartSec = "5min";
-
-      Environment = [
-        "HOME=/var/lib/radarr-podman"
-        "XDG_RUNTIME_DIR=/run/user/13108"
-        "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
-      ];
-
-      ExecStartPre = [
-        "-${pkgs.podman}/bin/podman rm -f radarr"
-      ];
-
-      ExecStart = ''
-        ${pkgs.podman}/bin/podman run --rm --name radarr \
-          --label io.containers.autoupdate=registry \
-          --log-driver=journald \
-          -p 7878:7878 \
-          -v /var/lib/radarr:/config:rw \
-          -v /mnt/user/download:/downloads:rw \
-          -v /mnt/user/Movies:/movies:rw \
-          -e PUID=13108 \
-          -e PGID=13100 \
-          -e UMASK=002 \
-          -e TZ=Europe/Dublin \
-          lscr.io/linuxserver/radarr:latest
-      '';
-
-      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 radarr";
-    };
+  systemd.services.radarr = mkMediaService {
+    name = "radarr";
+    port = 7878;
+    volumes = [
+      "/var/lib/radarr:/config:rw"
+      "/mnt/user/download:/downloads:rw"
+      "/mnt/user/Movies:/movies:rw"
+    ];
   };
 
-  # Lidarr container (rootless)
-  systemd.services.lidarr = {
-    description = "Lidarr";
-    after = [ "network-online.target" ];
-    wants = [ "network-online.target" ];
-    wantedBy = [ "multi-user.target" ];
+  systemd.services.lidarr = mkMediaService {
+    name = "lidarr";
+    port = 8686;
+    volumes = [
+      "/var/lib/lidarr:/config:rw"
+      "/mnt/user/download:/downloads:rw"
+      "/mnt/user/Music:/music:rw"
+    ];
+  };
 
-    path = [ pkgs.podman ];
-
-    serviceConfig = {
-      Type = "simple";
-      User = "lidarr-podman";
-      Group = "media-services";
-      UMask = "0002";
-      Restart = "always";
-      RestartSec = "10s";
-      TimeoutStartSec = "5min";
-
-      Environment = [
-        "HOME=/var/lib/lidarr-podman"
-        "XDG_RUNTIME_DIR=/run/user/13109"
-        "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
-      ];
-
-      ExecStartPre = [
-        "-${pkgs.podman}/bin/podman rm -f lidarr"
-      ];
-
-      ExecStart = ''
-        ${pkgs.podman}/bin/podman run --rm --name lidarr \
-          --label io.containers.autoupdate=registry \
-          --log-driver=journald \
-          -p 8686:8686 \
-          -v /var/lib/lidarr:/config:rw \
-          -v /mnt/user/download:/downloads:rw \
-          -v /mnt/user/Music:/music:rw \
-          -e PUID=13109 \
-          -e PGID=13100 \
-          -e UMASK=002 \
-          -e TZ=Europe/Dublin \
-          lscr.io/linuxserver/lidarr:latest
-      '';
-
-      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 lidarr";
-    };
+  systemd.services.prowlarr = mkMediaService {
+    name = "prowlarr";
+    port = 9696;
+    volumes = [
+      "/var/lib/prowlarr:/config:rw"
+    ];
   };
 
   # System state version (override common config)
