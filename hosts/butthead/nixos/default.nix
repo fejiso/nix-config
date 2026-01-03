@@ -26,6 +26,11 @@ let
       RestartSec = "10s";
       TimeoutStartSec = "5min";
 
+      # Resource limits for desktop usage
+      CPUQuota = "150%";  # Max 1.5 CPU cores per service
+      MemoryMax = "2G";   # Max 2GB RAM per service
+      IOWeight = 100;     # Lower I/O priority
+
       Environment = [
         "HOME=/var/lib/media-podman"
         "XDG_RUNTIME_DIR=/run/user/13106"
@@ -354,17 +359,10 @@ in
   };
 
   # Enable media and download services in containers
-  services.media-stack = {
-    enable = true;
-    dataDir = "/mnt/user";
-    services = {
-      sonarr.enable = true;
-      radarr.enable = true;
-      lidarr.enable = true;
-      prowlarr.enable = true;
-      emby.enable = false;  # Using Podman instead
-    };
-  };
+  # Disabled - using podman services defined below instead
+  # services.media-stack = {
+  #   enable = false;
+  # };
 
   services.download-stack = {
     enable = true;
@@ -545,6 +543,12 @@ in
       Restart = "always";
       RestartSec = "10s";
       TimeoutStartSec = "5min";
+
+      # Resource limits - low priority but access to all cores
+      MemoryMax = "16G";   # Max 16GB RAM
+      CPUWeight = 20;      # Low CPU priority (default is 100)
+      IOWeight = 50;       # Low I/O priority
+      Nice = 19;           # Lowest process priority
 
       Environment = [
         "HOME=/var/lib/emby-podman"
