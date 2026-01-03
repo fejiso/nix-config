@@ -113,13 +113,20 @@
       add_newline = true;
 
       format = lib.concatStrings [
+        "$os"
         "$username"
         "$hostname"
         "$directory"
         "$git_branch"
+        "$git_commit"
         "$git_state"
         "$git_status"
         "$git_metrics"
+        "$c"
+        "$cmake"
+        "$haskell"
+        "$erlang"
+        "$zig"
         "$nix_shell"
         "$python"
         "$nodejs"
@@ -130,6 +137,7 @@
         "$kubernetes"
         "$terraform"
         "$aws"
+        "$memory_usage"
         "$cmd_duration"
         "$line_break"
         "$jobs"
@@ -158,6 +166,15 @@
         format = "on [$symbol$branch(:$remote_branch)]($style) ";
         symbol = " ";
         style = "bold purple";
+      };
+
+      git_commit = {
+        commit_hash_length = 7;
+        format = "[\($hash$tag\)]($style) ";
+        style = "bold green";
+        only_detached = false;
+        tag_disabled = false;
+        tag_symbol = " 🏷 ";
       };
 
       git_status = {
@@ -232,6 +249,37 @@
         style = "bold red";
       };
 
+      c = {
+        format = "via [$symbol($version(-$name) )]($style)";
+        symbol = " ";
+        style = "bold blue";
+        detect_extensions = ["c" "h"];
+      };
+
+      cmake = {
+        format = "via [$symbol($version )]($style)";
+        symbol = "△ ";
+        style = "bold blue";
+      };
+
+      haskell = {
+        format = "via [$symbol($version )]($style)";
+        symbol = " ";
+        style = "bold purple";
+      };
+
+      erlang = {
+        format = "via [$symbol($version )]($style)";
+        symbol = " ";
+        style = "bold red";
+      };
+
+      zig = {
+        format = "via [$symbol($version )]($style)";
+        symbol = " ";
+        style = "bold yellow";
+      };
+
       docker_context = {
         format = "via [$symbol$context]($style) ";
         symbol = " ";
@@ -303,6 +351,43 @@
         format = "[$hostname]($style) in ";
         style = "bold green";
         ssh_only = true;
+      };
+
+      os = {
+        disabled = false;
+        format = "[$symbol]($style) ";
+        style = "bold white";
+        symbols = {
+          Alpine = " ";
+          Amazon = " ";
+          Android = " ";
+          Arch = " ";
+          CentOS = " ";
+          Debian = " ";
+          Fedora = " ";
+          FreeBSD = " ";
+          Gentoo = " ";
+          Linux = " ";
+          Macos = " ";
+          Manjaro = " ";
+          NixOS = " ";
+          OpenBSD = " ";
+          openSUSE = " ";
+          Raspbian = " ";
+          Redhat = " ";
+          RedHatEnterprise = " ";
+          Ubuntu = " ";
+          Unknown = " ";
+          Windows = " ";
+        };
+      };
+
+      memory_usage = {
+        disabled = false;
+        threshold = 75;
+        format = "via $symbol[$ram( | $swap)]($style) ";
+        symbol = " ";
+        style = "bold dimmed white";
       };
     };
   };
