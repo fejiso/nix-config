@@ -110,10 +110,199 @@
   programs.starship = {
     enable = true;
     settings = {
-      add_newline = false;
+      add_newline = true;
+
+      format = lib.concatStrings [
+        "$username"
+        "$hostname"
+        "$directory"
+        "$git_branch"
+        "$git_state"
+        "$git_status"
+        "$git_metrics"
+        "$nix_shell"
+        "$python"
+        "$nodejs"
+        "$rust"
+        "$golang"
+        "$java"
+        "$docker_context"
+        "$kubernetes"
+        "$terraform"
+        "$aws"
+        "$cmd_duration"
+        "$line_break"
+        "$jobs"
+        "$battery"
+        "$time"
+        "$status"
+        "$character"
+      ];
+
       character = {
         success_symbol = "[➜](bold green)";
-        error_symbol = "[➜](bold red)";
+        error_symbol = "[✗](bold red)";
+        vicmd_symbol = "[V](bold green)";
+      };
+
+      directory = {
+        truncation_length = 3;
+        truncate_to_repo = true;
+        format = "[$path]($style)[$read_only]($read_only_style) ";
+        style = "bold cyan";
+        read_only = " ";
+        read_only_style = "red";
+      };
+
+      git_branch = {
+        format = "on [$symbol$branch(:$remote_branch)]($style) ";
+        symbol = " ";
+        style = "bold purple";
+      };
+
+      git_status = {
+        format = "([$all_status$ahead_behind]($style) )";
+        conflicted = "=";
+        ahead = "⇡\${count}";
+        behind = "⇣\${count}";
+        diverged = "⇕⇡\${ahead_count}⇣\${behind_count}";
+        untracked = "?\${count}";
+        stashed = "$";
+        modified = "!\${count}";
+        staged = "+\${count}";
+        renamed = "»\${count}";
+        deleted = "✘\${count}";
+        style = "bold red";
+      };
+
+      git_state = {
+        format = "[\($state( $progress_current of $progress_total)\)]($style) ";
+        style = "bright-black";
+      };
+
+      git_metrics = {
+        disabled = false;
+        added_style = "bold green";
+        deleted_style = "bold red";
+        format = "[+$added]($added_style)/[-$deleted]($deleted_style) ";
+      };
+
+      cmd_duration = {
+        min_time = 500;
+        format = "took [$duration]($style) ";
+        style = "bold yellow";
+      };
+
+      nix_shell = {
+        disabled = false;
+        impure_msg = "[impure](bold red)";
+        pure_msg = "[pure](bold green)";
+        format = "via [$symbol$state( \($name\))]($style) ";
+        symbol = " ";
+        style = "bold blue";
+      };
+
+      python = {
+        format = "via [\${symbol}\${pyenv_prefix}(\${version} )(\($virtualenv\) )]($style)";
+        symbol = " ";
+        style = "yellow bold";
+      };
+
+      nodejs = {
+        format = "via [$symbol($version )]($style)";
+        symbol = " ";
+        style = "bold green";
+      };
+
+      rust = {
+        format = "via [$symbol($version )]($style)";
+        symbol = " ";
+        style = "bold red";
+      };
+
+      golang = {
+        format = "via [$symbol($version )]($style)";
+        symbol = " ";
+        style = "bold cyan";
+      };
+
+      java = {
+        format = "via [$symbol($version )]($style)";
+        symbol = " ";
+        style = "bold red";
+      };
+
+      docker_context = {
+        format = "via [$symbol$context]($style) ";
+        symbol = " ";
+        style = "bold blue";
+      };
+
+      kubernetes = {
+        format = "on [$symbol$context( \($namespace\))]($style) ";
+        symbol = "☸ ";
+        style = "bold blue";
+        disabled = false;
+      };
+
+      terraform = {
+        format = "via [$symbol$workspace]($style) ";
+        symbol = "💠 ";
+        style = "bold purple";
+      };
+
+      aws = {
+        format = "on [$symbol($profile )(\($region\) )]($style)";
+        symbol = "☁️  ";
+        style = "bold yellow";
+      };
+
+      battery = {
+        full_symbol = "🔋";
+        charging_symbol = "⚡";
+        discharging_symbol = "💀";
+        display = [
+          {
+            threshold = 15;
+            style = "bold red";
+          }
+          {
+            threshold = 50;
+            style = "bold yellow";
+          }
+        ];
+      };
+
+      time = {
+        disabled = false;
+        format = "at [$time]($style) ";
+        style = "bold white";
+        time_format = "%T";
+      };
+
+      status = {
+        disabled = false;
+        format = "[$symbol$status]($style) ";
+        symbol = "✖";
+        style = "bold red";
+      };
+
+      jobs = {
+        symbol = "+";
+        number_threshold = 1;
+        symbol_threshold = 1;
+      };
+
+      username = {
+        format = "[$user]($style)@";
+        style_user = "bold blue";
+        show_always = false;
+      };
+
+      hostname = {
+        format = "[$hostname]($style) in ";
+        style = "bold green";
+        ssh_only = true;
       };
     };
   };

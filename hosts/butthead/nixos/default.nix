@@ -448,7 +448,7 @@ in
   services.vaultwarden = {
     enable = true;
     config = {
-      DOMAIN = "https://vaultwarden.example.com"; # Update with your actual domain
+      DOMAIN = "https://vaultwarden.fer.xyz";
       ROCKET_ADDRESS = "0.0.0.0";
       ROCKET_PORT = 4743;
       SIGNUPS_ALLOWED = true;
@@ -570,8 +570,8 @@ in
           -v /mnt/user/Music:/music:ro \
           -v /mnt/user/Backups/Emby:/backup:rw \
           --device /dev/dri:/dev/dri \
-          -e PUID=13105 \
-          -e PGID=13100 \
+          -e PUID=0 \
+          -e PGID=0 \
           -e UMASK=002 \
           -e TZ=Europe/Dublin \
           lscr.io/linuxserver/emby:latest
