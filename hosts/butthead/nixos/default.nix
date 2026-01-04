@@ -66,6 +66,7 @@ in
     (import ../../../modules/nixos/systemd-nspawn.nix)
     (import ../../../modules/nixos/media-services.nix)
     (import ../../../modules/nixos/download-services.nix)
+    (import ../../../modules/nixos/tdarr.nix)
   ];
 
   # Boot configuration
@@ -364,14 +365,28 @@ in
   #   enable = false;
   # };
 
-  services.download-stack = {
+  # Disabled - using podman services defined below instead
+  # services.download-stack = {
+  #   enable = false;
+  # };
+
+  # Tdarr transcoding server
+  services.tdarr = {
     enable = true;
-    downloadDir = "/mnt/user/downloads";
-    services = {
-      qbittorrent.enable = true;
-      sabnzbd.enable = true;
-      deluge.enable = true;
+    server = {
+      enable = true;
+      internalNode = false;  # Use separate node for better control
     };
+    node = {
+      enable = true;
+      nodeId = "butthead_worker";
+    };
+    mediaDirectories = {
+      tv = "/mnt/user/Series";
+      movies = "/mnt/user/Movies";
+      music = "/mnt/user/Music";
+    };
+    transcodeCache = "/mnt/user/downloadtemp/tdarr-cache";
   };
 
   # Additional packages for media server functionality
@@ -458,7 +473,7 @@ in
 
   # Open NFS ports in firewall
   networking.firewall = {
-    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 3002 4743 8096 8080 8989 7878 8686 ];
+    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 3002 4743 8096 8080 8989 7878 8686 9696 5299 8081 8112 3344 8000 ];
     allowedUDPPorts = [ 2049 111 20048 ];
   };
 
@@ -491,11 +506,7 @@ in
       ExecStart = [
         "${pkgs.systemd}/bin/loginctl enable-linger nginx-proxy-manager"
         "${pkgs.systemd}/bin/loginctl enable-linger emby-podman"
-        "${pkgs.systemd}/bin/loginctl enable-linger sabnzbd-podman"
-        "${pkgs.systemd}/bin/loginctl enable-linger sonarr-podman"
-        "${pkgs.systemd}/bin/loginctl enable-linger radarr-podman"
-        "${pkgs.systemd}/bin/loginctl enable-linger lidarr-podman"
-        "${pkgs.systemd}/bin/loginctl enable-linger prowlarr-podman"
+        "${pkgs.systemd}/bin/loginctl enable-linger media-podman"
       ];
     };
   };
@@ -620,16 +631,6 @@ in
   };
 
   # Media services (all run under single media-podman user)
-  systemd.services.sabnzbd = mkMediaService {
-    name = "sabnzbd";
-    port = 8080;
-    volumes = [
-      "/var/lib/sabnzbd:/config:rw"
-      "/mnt/user/download:/downloads:rw"
-      "/mnt/user/downloadtemp/incomplete:/incomplete-downloads:rw"
-    ];
-  };
-
   systemd.services.sonarr = mkMediaService {
     name = "sonarr";
     port = 8989;
@@ -674,6 +675,129 @@ in
     volumes = [
       "/var/lib/lazylibrarian:/config:rw"
       "/mnt/user/Books:/books:rw"
+      "/mnt/user/download:/downloads:rw"
+    ];
+  };
+
+  # Uptime Kuma monitoring
+  systemd.services.uptime-kuma = {
+    description = "Uptime Kuma Monitoring";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+
+    path = [ pkgs.podman ];
+
+    serviceConfig = {
+      Type = "simple";
+      User = "media-podman";
+      Group = "media-services";
+      Restart = "always";
+      RestartSec = "10s";
+      TimeoutStartSec = "5min";
+
+      # Resource limits
+      CPUQuota = "100%";
+      MemoryMax = "512M";
+      IOWeight = 100;
+
+      Environment = [
+        "HOME=/var/lib/media-podman"
+        "XDG_RUNTIME_DIR=/run/user/13106"
+        "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
+      ];
+
+      ExecStartPre = [
+        "-${pkgs.podman}/bin/podman rm -f uptime-kuma"
+      ];
+
+      ExecStart = ''
+        ${pkgs.podman}/bin/podman run --rm --name uptime-kuma \
+          --label io.containers.autoupdate=registry \
+          --log-driver=journald \
+          -p 3344:3001 \
+          -v /var/lib/uptime-kuma:/app/data:rw \
+          louislam/uptime-kuma:latest
+      '';
+
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 uptime-kuma";
+    };
+  };
+
+  # Restic REST server for backups
+  systemd.services.restic-rest-server = {
+    description = "Restic REST Server";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+
+    path = [ pkgs.podman ];
+
+    serviceConfig = {
+      Type = "simple";
+      User = "media-podman";
+      Group = "media-services";
+      Restart = "always";
+      RestartSec = "10s";
+      TimeoutStartSec = "5min";
+
+      # Resource limits
+      CPUQuota = "100%";
+      MemoryMax = "1G";
+      IOWeight = 50;
+      Nice = 15;
+
+      Environment = [
+        "HOME=/var/lib/media-podman"
+        "XDG_RUNTIME_DIR=/run/user/13106"
+        "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
+      ];
+
+      ExecStartPre = [
+        "-${pkgs.podman}/bin/podman rm -f restic-rest-server"
+      ];
+
+      ExecStart = ''
+        ${pkgs.podman}/bin/podman run --rm --name restic-rest-server \
+          --label io.containers.autoupdate=registry \
+          --log-driver=journald \
+          -p 8000:8000 \
+          -v /var/lib/restic:/data:rw \
+          -e OPTIONS="--no-auth" \
+          restic/rest-server:latest
+      '';
+
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 restic-rest-server";
+    };
+  };
+
+  # Download services (all run under single media-podman user)
+  systemd.services.sabnzbd = mkMediaService {
+    name = "sabnzbd";
+    port = 8080;
+    volumes = [
+      "/var/lib/sabnzbd:/config:rw"
+      "/mnt/user/download:/downloads:rw"
+      "/mnt/user/downloadtemp/incomplete:/incomplete-downloads:rw"
+    ];
+  };
+
+  systemd.services.qbittorrent = mkMediaService {
+    name = "qbittorrent";
+    port = 8081;
+    image = "lscr.io/linuxserver/qbittorrent:latest";
+    volumes = [
+      "/var/lib/qbittorrent:/config:rw"
+      "/mnt/user/download:/downloads:rw"
+    ];
+  };
+
+  systemd.services.deluge = mkMediaService {
+    name = "deluge";
+    port = 8112;
+    image = "lscr.io/linuxserver/deluge:latest";
+    volumes = [
+      "/var/lib/deluge:/config:rw"
       "/mnt/user/download:/downloads:rw"
     ];
   };
