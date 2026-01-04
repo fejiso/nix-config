@@ -384,7 +384,6 @@ in
     mediaDirectories = {
       tv = "/mnt/user/Series";
       movies = "/mnt/user/Movies";
-      music = "/mnt/user/Music";
     };
     transcodeCache = "/mnt/user/downloadtemp/tdarr-cache";
   };
