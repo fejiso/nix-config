@@ -506,6 +506,7 @@ in
         "${pkgs.systemd}/bin/loginctl enable-linger nginx-proxy-manager"
         "${pkgs.systemd}/bin/loginctl enable-linger emby-podman"
         "${pkgs.systemd}/bin/loginctl enable-linger media-podman"
+        "${pkgs.systemd}/bin/loginctl enable-linger utils-podman"
       ];
     };
   };
@@ -536,6 +537,24 @@ in
     subGidRanges = [
       { startGid = 300000; count = 65536; }
     ];
+  };
+
+  # User for utility services (uptime-kuma, restic, etc)
+  users.users.utils-podman = {
+    isSystemUser = true;
+    group = "utils-podman";
+    uid = 13107;
+    home = "/var/lib/utils-podman";
+    createHome = true;
+    subUidRanges = [
+      { startUid = 400000; count = 65536; }
+    ];
+    subGidRanges = [
+      { startGid = 400000; count = 65536; }
+    ];
+  };
+  users.groups.utils-podman = {
+    gid = 13107;
   };
 
   # Emby container (uses host network so NPM can reach it at localhost)
@@ -689,8 +708,8 @@ in
 
     serviceConfig = {
       Type = "simple";
-      User = "media-podman";
-      Group = "media-services";
+      User = "utils-podman";
+      Group = "utils-podman";
       Restart = "always";
       RestartSec = "10s";
       TimeoutStartSec = "5min";
@@ -701,8 +720,8 @@ in
       IOWeight = 100;
 
       Environment = [
-        "HOME=/var/lib/media-podman"
-        "XDG_RUNTIME_DIR=/run/user/13106"
+        "HOME=/var/lib/utils-podman"
+        "XDG_RUNTIME_DIR=/run/user/13107"
         "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
       ];
 
@@ -734,8 +753,8 @@ in
 
     serviceConfig = {
       Type = "simple";
-      User = "media-podman";
-      Group = "media-services";
+      User = "utils-podman";
+      Group = "utils-podman";
       Restart = "always";
       RestartSec = "10s";
       TimeoutStartSec = "5min";
@@ -747,8 +766,8 @@ in
       Nice = 15;
 
       Environment = [
-        "HOME=/var/lib/media-podman"
-        "XDG_RUNTIME_DIR=/run/user/13106"
+        "HOME=/var/lib/utils-podman"
+        "XDG_RUNTIME_DIR=/run/user/13107"
         "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
       ];
 
