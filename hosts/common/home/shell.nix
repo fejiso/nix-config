@@ -10,10 +10,22 @@ let
   hostnameColor =
     let
       hostname = config.networking.hostName or "unknown";
-      # Hash hostname to get a consistent number
+      # Hash hostname to get a consistent hex string
       hash = builtins.hashString "md5" hostname;
-      # Convert first 8 chars of hash to number
-      hashNum = lib.mod (lib.toInt ("0x" + builtins.substring 0 8 hash)) 16;
+
+      # Hex digit lookup table
+      hexDigits = {
+        "0" = 0; "1" = 1; "2" = 2; "3" = 3; "4" = 4; "5" = 5; "6" = 6; "7" = 7;
+        "8" = 8; "9" = 9; "a" = 10; "b" = 11; "c" = 12; "d" = 13; "e" = 14; "f" = 15;
+      };
+
+      # Convert hex string to integer
+      hexToInt = hexStr:
+        lib.foldl' (acc: c: acc * 16 + hexDigits.${c}) 0 (lib.stringToCharacters hexStr);
+
+      # Take first 4 hex chars and convert to int, then mod 16
+      hashNum = lib.mod (hexToInt (builtins.substring 0 4 hash)) 16;
+
       # Color palette - 16 distinct colors
       colors = [
         "bold red"
