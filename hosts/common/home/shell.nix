@@ -4,7 +4,38 @@
   lib,
   pkgs,
   ...
-}: {
+}:
+let
+  # Compute hostname color at build time
+  hostnameColor =
+    let
+      hostname = config.networking.hostName or "unknown";
+      # Hash hostname to get a consistent number
+      hash = builtins.hashString "md5" hostname;
+      # Convert first 8 chars of hash to number
+      hashNum = lib.mod (lib.toInt ("0x" + builtins.substring 0 8 hash)) 16;
+      # Color palette - 16 distinct colors
+      colors = [
+        "bold red"
+        "bold green"
+        "bold yellow"
+        "bold blue"
+        "bold purple"
+        "bold cyan"
+        "bold bright-red"
+        "bold bright-green"
+        "bold bright-yellow"
+        "bold bright-blue"
+        "bold bright-purple"
+        "bold bright-cyan"
+        "bold 208"  # orange
+        "bold 165"  # magenta
+        "bold 51"   # sky blue
+        "bold 226"  # yellow
+      ];
+    in
+      builtins.elemAt colors hashNum;
+in {
   
 
   # Fish shell configuration
@@ -349,8 +380,8 @@
 
       hostname = {
         format = "[$hostname]($style) in ";
-        style = "bold green";
-        ssh_only = true;
+        style = hostnameColor;
+        ssh_only = false;
       };
 
       os = {
