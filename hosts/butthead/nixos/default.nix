@@ -452,11 +452,11 @@ in
     enable = true;
     # Export individual directories to Netbird network
     exports = ''
-      /mnt/user/Series 100.107.0.0/16(ro,sync,no_subtree_check)
-      /mnt/user/Videos 100.107.0.0/16(ro,sync,no_subtree_check)
-      /mnt/user/Music 100.107.0.0/16(ro,sync,no_subtree_check) 100.107.6.184(rw,sync,no_subtree_check)
-      /mnt/user/ROMs 100.107.0.0/16(ro,sync,no_subtree_check)
-      /mnt/user/Backups 100.107.0.0/16(rw,sync,no_subtree_check)
+      /mnt/user/Series 100.107.0.0/16(ro,sync,no_subtree_check,fsid=1)
+      /mnt/user/Videos 100.107.0.0/16(ro,sync,no_subtree_check,fsid=2)
+      /mnt/user/Music 100.107.0.0/16(ro,sync,no_subtree_check,fsid=3) 100.107.6.184(rw,sync,no_subtree_check,fsid=3)
+      /mnt/user/ROMs 100.107.0.0/16(ro,sync,no_subtree_check,fsid=4)
+      /mnt/user/Backups 100.107.0.0/16(rw,sync,no_subtree_check,fsid=5)
     '';
   };
 
