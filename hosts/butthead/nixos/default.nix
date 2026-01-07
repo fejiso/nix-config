@@ -450,9 +450,13 @@ in
   # NFS server configuration
   services.nfs.server = {
     enable = true;
-    # Export /mnt/user to Netbird network (read-only) and blacktop (read-write)
+    # Export individual directories to Netbird network
     exports = ''
-      /mnt/user 100.107.0.0/16(ro,sync,no_subtree_check,crossmnt,fsid=0) 100.107.6.184(rw,sync,no_subtree_check,crossmnt,fsid=0)
+      /mnt/user/Series 100.107.0.0/16(ro,sync,no_subtree_check)
+      /mnt/user/Videos 100.107.0.0/16(ro,sync,no_subtree_check)
+      /mnt/user/Music 100.107.0.0/16(ro,sync,no_subtree_check) 100.107.6.184(rw,sync,no_subtree_check)
+      /mnt/user/ROMs 100.107.0.0/16(ro,sync,no_subtree_check)
+      /mnt/user/Backups 100.107.0.0/16(rw,sync,no_subtree_check)
     '';
   };
 

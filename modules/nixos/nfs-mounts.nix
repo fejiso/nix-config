@@ -19,14 +19,15 @@ with lib;
       "d /mnt/Backups 0755 root root -"
       "d /mnt/Videos 0755 root root -"
       "d /mnt/Music 0755 root root -"
+      "d /mnt/ROMs 0755 root root -"
     ];
 
     # NFS mounts
     fileSystems = {
       "/mnt/Series" = {
-        device = "100.107.6.18:/mnt/user/Series";
+        device = "100.107.75.195:/mnt/user/Series";
         fsType = "nfs";
-        options = [ 
+        options = [
           "x-systemd.automount"
           "x-systemd.idle-timeout=1min"
           "async"
@@ -39,7 +40,7 @@ with lib;
       };
 
       "/mnt/Backups" = {
-        device = "100.107.6.18:/mnt/user/Backups";
+        device = "100.107.75.195:/mnt/user/Backups";
         fsType = "nfs";
         options = [
           "rw"
@@ -51,7 +52,7 @@ with lib;
       };
 
       "/mnt/Videos" = {
-        device = "100.107.6.18:/mnt/user/Videos";
+        device = "100.107.75.195:/mnt/user/Videos";
         fsType = "nfs";
         options = [
           "x-systemd.automount"
@@ -65,7 +66,21 @@ with lib;
       };
 
       "/mnt/Music" = {
-        device = "100.107.6.18:/mnt/user/Music";
+        device = "100.107.75.195:/mnt/user/Music";
+        fsType = "nfs";
+        options = [
+          "x-systemd.automount"
+          "x-systemd.idle-timeout=1min"
+          "async"
+          "rw"
+          "intr"
+          "hard"
+          "noauto"
+        ];
+      };
+
+      "/mnt/ROMs" = {
+        device = "100.107.75.195:/mnt/user/ROMs";
         fsType = "nfs";
         options = [
           "x-systemd.automount"
