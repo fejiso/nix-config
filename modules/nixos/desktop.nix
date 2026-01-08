@@ -49,13 +49,13 @@
 
   # Desktop system packages
   environment.systemPackages = with pkgs; [
-    vim
     wget
     firefox
     git
     alacritty
     fuzzel
     swaylock
+    pciutils
     mako
     swayidle
     usbutils

@@ -130,6 +130,8 @@ with lib;
         ];
 
         ExecStartPre = [
+          "+${pkgs.coreutils}/bin/mkdir -p ${config.services.tdarr.transcodeCache}"
+          "+${pkgs.coreutils}/bin/chown 13106:13100 ${config.services.tdarr.transcodeCache}"
           "-${pkgs.podman}/bin/podman rm -f tdarr-server"
         ];
 
@@ -192,6 +194,8 @@ with lib;
         ];
 
         ExecStartPre = [
+          "+${pkgs.coreutils}/bin/mkdir -p ${config.services.tdarr.transcodeCache}"
+          "+${pkgs.coreutils}/bin/chown 13106:13100 ${config.services.tdarr.transcodeCache}"
           "-${pkgs.podman}/bin/podman rm -f tdarr-node"
         ];
 

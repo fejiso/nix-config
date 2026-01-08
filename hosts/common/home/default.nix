@@ -74,6 +74,11 @@
     nano
 
     # Added imperatively installed packages
+    lshw
+    jq
+    pciutils
+    lmsensors
+    
     git-filter-repo
     git-crypt
     localsend

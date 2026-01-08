@@ -15,39 +15,39 @@
   fileSystems."/" =
     { device = "/dev/mapper/crypted";
       fsType = "btrfs";
-      options = [ "subvol=@" ];
+      options = [ "subvol=@" "degraded" "compress=lzo" "noatime" ];
     };
 
   boot.initrd.luks.devices."crypted" = {
-    device = "/dev/disk/by-uuid/bf051aaa-1621-4464-afeb-925a52c74be5";
+    device = "/dev/disk/by-uuid/1d7380f8-9909-4f68-9e1d-c9f48e0dcba4";
     keyFile = "/boot/luks-key";
   };
 
   fileSystems."/home" =
     { device = "/dev/mapper/crypted";
       fsType = "btrfs";
-      options = [ "subvol=@home" ];
+      options = [ "subvol=@home" "degraded" "compress=lzo" "noatime" ];
     };
 
   fileSystems."/nix" =
     { device = "/dev/mapper/crypted";
       fsType = "btrfs";
-      options = [ "subvol=@nix" ];
+      options = [ "subvol=@nix" "degraded" "compress=lzo" "noatime" ];
     };
 
   fileSystems."/var/log" =
     { device = "/dev/mapper/crypted";
       fsType = "btrfs";
-      options = [ "subvol=@log" ];
+      options = [ "subvol=@log" "degraded" "compress=lzo" "noatime" ];
     };
 
   fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/D31C-07AA";
+    { device = "/dev/disk/by-uuid/6B41-D58D";
       fsType = "vfat";
       options = [ "fmask=0022" "dmask=0022" ];
     };
 
-  swapDevices = [ ];
+  # swapDevices configured in default.nix for hibernation support
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
   hardware.cpu.amd.updateMicrocode = lib.mkDefault config.hardware.enableRedistributableFirmware;

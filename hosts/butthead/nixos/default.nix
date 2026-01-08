@@ -75,18 +75,7 @@ in
   boot.initrd.systemd.enable = true;
   boot.initrd.compressor = "xz";
 
-  # Swap configuration for hibernation (64GB RAM + 2GB margin)
-  swapDevices = [
-    {
-      device = "/swapfile";
-      size = 67584; # 66GB in MB
-    }
-  ];
-
-  # Hibernation configuration
-  boot.resumeDevice = "/dev/mapper/crypted";
-  # TODO: After swapfile is created, run: sudo btrfs inspect-internal map-swapfile -r /swapfile
-  # Then set: boot.kernelParams = [ "resume_offset=XXXXX" ];
+  # Swap disabled - 64GB RAM is sufficient
 
   # Host-specific networking
   networking.hostName = "butthead";
