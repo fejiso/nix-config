@@ -77,7 +77,6 @@
     lshw
     jq
     pciutils
-    lmsensors
     
     git-filter-repo
     git-crypt
