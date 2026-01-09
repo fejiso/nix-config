@@ -75,7 +75,14 @@ in
   boot.initrd.systemd.enable = true;
   boot.initrd.compressor = "xz";
 
-  # Swap disabled - 64GB RAM is sufficient
+  # Swap configuration with hibernation support
+  swapDevices = [{
+    device = "/swapfile";
+  }];
+
+  # Hibernation configuration
+  boot.resumeDevice = "/dev/disk/by-uuid/2ae17721-d56e-4707-90af-9d17b37a14c7";
+  boot.kernelParams = [ "resume_offset=3987983" ];
 
   # Host-specific networking
   networking.hostName = "butthead";
@@ -697,8 +704,6 @@ in
     wants = [ "network-online.target" ];
     wantedBy = [ "multi-user.target" ];
 
-    path = [ pkgs.podman ];
-
     serviceConfig = {
       Type = "simple";
       User = "utils-podman";
@@ -711,6 +716,10 @@ in
       CPUQuota = "100%";
       MemoryMax = "512M";
       IOWeight = 100;
+
+      # Capture stderr/stdout
+      StandardOutput = "journal";
+      StandardError = "journal";
 
       Environment = [
         "HOME=/var/lib/utils-podman"
@@ -728,7 +737,7 @@ in
           --log-driver=journald \
           -p 3344:3001 \
           -v /var/lib/uptime-kuma:/app/data:rw \
-          louislam/uptime-kuma:latest
+          docker.io/louislam/uptime-kuma:latest
       '';
 
       ExecStop = "${pkgs.podman}/bin/podman stop -t 10 uptime-kuma";
@@ -741,8 +750,6 @@ in
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
     wantedBy = [ "multi-user.target" ];
-
-    path = [ pkgs.podman ];
 
     serviceConfig = {
       Type = "simple";
@@ -775,7 +782,7 @@ in
           -p 8000:8000 \
           -v /var/lib/restic:/data:rw \
           -e OPTIONS="--no-auth" \
-          restic/rest-server:latest
+          docker.io/restic/rest-server:latest
       '';
 
       ExecStop = "${pkgs.podman}/bin/podman stop -t 10 restic-rest-server";

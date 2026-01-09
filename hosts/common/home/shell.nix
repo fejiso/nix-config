@@ -75,7 +75,6 @@ in {
       la = "eza -la";
       ls = "eza";
       cat = "bat";
-      grep = "rg";
       cd = "z";  # Use zoxide for cd
     };
   };
@@ -92,7 +91,6 @@ in {
       la = "eza -la";
       ls = "eza";
       cat = "bat";
-      grep = "rg";
       cd = "z";  # Use zoxide for cd
     };
     
@@ -123,7 +121,6 @@ in {
       la = "eza -la";
       ls = "eza";
       cat = "bat";
-      grep = "rg";
       cd = "z";  # Use zoxide for cd
     };
     initExtra = ''
