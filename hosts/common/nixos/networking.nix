@@ -36,8 +36,8 @@
   # Firewall
   networking.firewall = {
     enable = true;
-    allowedTCPPorts = [];
-    allowedUDPPorts = [];
+    allowedTCPPorts = [ 22000 ]; # Syncthing file transfers
+    allowedUDPPorts = [ 22000 21027 ]; # Syncthing discovery
   };
 
   # Enable IPv6
