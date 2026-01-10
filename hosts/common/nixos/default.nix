@@ -131,7 +131,7 @@
   zramSwap = {
     enable = true;
     algorithm = "lzo";
-    memoryPercent = 25;
+    memoryPercent = 10;
   };
 
   # Services

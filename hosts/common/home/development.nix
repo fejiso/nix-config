@@ -22,13 +22,10 @@
     clang-tools  # includes clangd for C/C++
     jdt-language-server  # Java
     rust-analyzer
-    
+
     # AWS tools
-    
-    # Text editors and IDEs
-    vscode-fhs
   ];
-  
+
   # Direnv for environment management
   programs.direnv = {
     enable = true;

@@ -67,7 +67,11 @@ in
     (import ../../../modules/nixos/media-services.nix)
     (import ../../../modules/nixos/download-services.nix)
     (import ../../../modules/nixos/tdarr.nix)
+    (import ../../../modules/nixos/development.nix)
   ];
+
+  # Enable development tools
+  development.enable = true;
 
   # Boot configuration
   boot.loader.systemd-boot.enable = true;
@@ -172,6 +176,8 @@ in
     "d /run/user/13200 0700 nginx-proxy-manager nginx-proxy-manager -"
     "d /run/user/13105 0700 emby-podman emby-podman -"
     "d /run/user/13110 0700 prowlarr-podman prowlarr-podman -"
+    "d /var/lib/ollama 0755 utils-podman utils-podman -"
+    "d /var/lib/open-webui 0755 utils-podman utils-podman -"
   ];
 
   hardware.graphics = {
@@ -472,7 +478,7 @@ in
 
   # Open NFS ports in firewall
   networking.firewall = {
-    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 3002 4743 8096 8080 8989 7878 8686 9696 5299 8081 8112 3344 8000 ];
+    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 3002 4743 8096 8080 8989 7878 8686 9696 5299 8081 8112 3344 8000 11434 3003 ];
     allowedUDPPorts = [ 2049 111 20048 ];
   };
 
@@ -786,6 +792,103 @@ in
       '';
 
       ExecStop = "${pkgs.podman}/bin/podman stop -t 10 restic-rest-server";
+    };
+  };
+
+  # Ollama LLM runtime
+  systemd.services.ollama = {
+    description = "Ollama LLM Runtime";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+
+    serviceConfig = {
+      Type = "simple";
+      User = "utils-podman";
+      Group = "utils-podman";
+      Restart = "always";
+      RestartSec = "10s";
+      TimeoutStartSec = "5min";
+
+      # Resource limits - needs more resources for LLMs
+      MemoryMax = "16G";
+      IOWeight = 50;
+
+      # Capture stderr/stdout
+      StandardOutput = "journal";
+      StandardError = "journal";
+
+      Environment = [
+        "HOME=/var/lib/utils-podman"
+        "XDG_RUNTIME_DIR=/run/user/13107"
+        "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
+      ];
+
+      ExecStartPre = [
+        "-${pkgs.podman}/bin/podman rm -f ollama"
+      ];
+
+      ExecStart = ''
+        ${pkgs.podman}/bin/podman run --rm --name ollama \
+          --label io.containers.autoupdate=registry \
+          --log-driver=journald \
+          -p 11434:11434 \
+          -v /var/lib/ollama:/root/.ollama:rw \
+          --device /dev/dri:/dev/dri \
+          docker.io/ollama/ollama:latest
+      '';
+
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 30 ollama";
+    };
+  };
+
+  # Open WebUI for Ollama
+  systemd.services.open-webui = {
+    description = "Open WebUI for Ollama";
+    after = [ "network-online.target" "ollama.service" ];
+    wants = [ "network-online.target" ];
+    requires = [ "ollama.service" ];
+    wantedBy = [ "multi-user.target" ];
+
+    serviceConfig = {
+      Type = "simple";
+      User = "utils-podman";
+      Group = "utils-podman";
+      Restart = "always";
+      RestartSec = "10s";
+      TimeoutStartSec = "5min";
+
+      # Resource limits
+      CPUQuota = "200%";
+      MemoryMax = "4G";
+      IOWeight = 100;
+
+      # Capture stderr/stdout
+      StandardOutput = "journal";
+      StandardError = "journal";
+
+      Environment = [
+        "HOME=/var/lib/utils-podman"
+        "XDG_RUNTIME_DIR=/run/user/13107"
+        "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
+      ];
+
+      ExecStartPre = [
+        "-${pkgs.podman}/bin/podman rm -f open-webui"
+      ];
+
+      ExecStart = ''
+        ${pkgs.podman}/bin/podman run --rm --name open-webui \
+          --label io.containers.autoupdate=registry \
+          --log-driver=journald \
+          -p 3003:8080 \
+          -v /var/lib/open-webui:/app/backend/data:rw \
+          --add-host=host.containers.internal:host-gateway \
+          -e OLLAMA_BASE_URL=http://host.containers.internal:11434 \
+          ghcr.io/open-webui/open-webui:main
+      '';
+
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 open-webui";
     };
   };
 

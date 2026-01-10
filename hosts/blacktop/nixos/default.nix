@@ -19,7 +19,11 @@
     ../../common/nixos/netbird.nix
     (import ../../../modules/nixos/desktop.nix)
     (import ../../../modules/nixos/laptop.nix)
+    (import ../../../modules/nixos/development.nix)
   ];
+
+  # Enable development tools
+  development.enable = true;
 
   # Boot configuration
   boot.loader.systemd-boot.enable = true;
