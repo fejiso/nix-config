@@ -8,6 +8,17 @@
   ...
 }:
 let
+  # Common restart configuration for all podman services (serviceConfig)
+  commonRestartConfig = {
+    Restart = "always";
+    RestartSec = "15min";
+  };
+
+  # Common unit configuration for all podman services
+  commonUnitConfig = {
+    StartLimitIntervalSec = 0;
+  };
+
   # Helper function to create media service configurations
   mkMediaService = { name, port, volumes, image ? "lscr.io/linuxserver/${name}:latest" }: {
     description = lib.strings.toUpper (lib.substring 0 1 name) + lib.substring 1 (lib.stringLength name) name;
@@ -17,13 +28,13 @@ let
 
     path = [ pkgs.podman ];
 
-    serviceConfig = {
+    unitConfig = commonUnitConfig;
+
+    serviceConfig = commonRestartConfig // {
       Type = "simple";
       User = "media-podman";
       Group = "media-services";
       UMask = "0002";
-      Restart = "always";
-      RestartSec = "10s";
       TimeoutStartSec = "5min";
 
       # Resource limits for desktop usage
@@ -68,10 +79,14 @@ in
     (import ../../../modules/nixos/download-services.nix)
     (import ../../../modules/nixos/tdarr.nix)
     (import ../../../modules/nixos/development.nix)
+    (import ../../../modules/nixos/tgtg-watcher.nix)
   ];
 
   # Enable development tools
   development.enable = true;
+
+  # Enable TooGoodToGo watcher
+  services.tgtg-watcher.enable = true;
 
   # Boot configuration
   boot.loader.systemd-boot.enable = true;
@@ -570,13 +585,13 @@ in
     wants = [ "network-online.target" ];
     wantedBy = [ "multi-user.target" ];
 
-    serviceConfig = {
+    unitConfig = commonUnitConfig;
+
+    serviceConfig = commonRestartConfig // {
       Type = "simple";
       User = "emby-podman";
       Group = "media-services";
       UMask = "0002";
-      Restart = "always";
-      RestartSec = "10s";
       TimeoutStartSec = "5min";
 
       # Resource limits - low priority but access to all cores
@@ -629,12 +644,12 @@ in
 
     path = [ pkgs.podman pkgs.slirp4netns ];
 
-    serviceConfig = {
+    unitConfig = commonUnitConfig;
+
+    serviceConfig = commonRestartConfig // {
       Type = "simple";
       User = "nginx-proxy-manager";
       Group = "nginx-proxy-manager";
-      Restart = "always";
-      RestartSec = "30min";
       TimeoutStartSec = "5min";
 
       Environment = [
@@ -710,12 +725,12 @@ in
     wants = [ "network-online.target" ];
     wantedBy = [ "multi-user.target" ];
 
-    serviceConfig = {
+    unitConfig = commonUnitConfig;
+
+    serviceConfig = commonRestartConfig // {
       Type = "simple";
       User = "utils-podman";
       Group = "utils-podman";
-      Restart = "always";
-      RestartSec = "10s";
       TimeoutStartSec = "5min";
 
       # Resource limits
@@ -757,12 +772,12 @@ in
     wants = [ "network-online.target" ];
     wantedBy = [ "multi-user.target" ];
 
-    serviceConfig = {
+    unitConfig = commonUnitConfig;
+
+    serviceConfig = commonRestartConfig // {
       Type = "simple";
       User = "utils-podman";
       Group = "utils-podman";
-      Restart = "always";
-      RestartSec = "10s";
       TimeoutStartSec = "5min";
 
       # Resource limits
@@ -802,12 +817,12 @@ in
     wants = [ "network-online.target" ];
     wantedBy = [ "multi-user.target" ];
 
-    serviceConfig = {
+    unitConfig = commonUnitConfig;
+
+    serviceConfig = commonRestartConfig // {
       Type = "simple";
       User = "utils-podman";
       Group = "utils-podman";
-      Restart = "always";
-      RestartSec = "10s";
       TimeoutStartSec = "5min";
 
       # Resource limits - needs more resources for LLMs
@@ -850,12 +865,12 @@ in
     requires = [ "ollama.service" ];
     wantedBy = [ "multi-user.target" ];
 
-    serviceConfig = {
+    unitConfig = commonUnitConfig;
+
+    serviceConfig = commonRestartConfig // {
       Type = "simple";
       User = "utils-podman";
       Group = "utils-podman";
-      Restart = "always";
-      RestartSec = "10s";
       TimeoutStartSec = "5min";
 
       # Resource limits
@@ -932,6 +947,8 @@ in
 
     path = [ pkgs.qemu_kvm pkgs.curl pkgs.xz ];
 
+    unitConfig = commonUnitConfig;
+
     preStart = ''
       # Create HAOS directory if it doesn't exist
       mkdir -p /var/lib/haos
@@ -950,10 +967,8 @@ in
       fi
     '';
 
-    serviceConfig = {
+    serviceConfig = commonRestartConfig // {
       Type = "simple";
-      Restart = "always";
-      RestartSec = "10s";
 
       ExecStart = ''
         ${pkgs.qemu_kvm}/bin/qemu-system-x86_64 \

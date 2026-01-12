@@ -50,7 +50,7 @@
   system.autoUpgrade.enable = true;
 
   # Locale and timezone
-  time.timeZone = "Europe/Dublin";
+  # time.timeZone is managed by automatic-timezoned service
   i18n.defaultLocale = "en_IE.UTF-8";
   i18n.extraLocaleSettings = {
     LC_ADDRESS = "en_IE.UTF-8";

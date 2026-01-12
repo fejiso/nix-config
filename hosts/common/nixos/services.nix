@@ -35,4 +35,7 @@
   # Enable location services
   services.geoclue2.enable = true;
 
+  # Automatically update timezone based on location
+  services.automatic-timezoned.enable = true;
+
 }

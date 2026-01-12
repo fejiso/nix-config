@@ -78,7 +78,7 @@
   # Networking
   networking.networkmanager.enable = true;
 
-  # Localization  
-  time.timeZone = "Europe/Dublin";
+  # Localization
+  # time.timeZone is managed by automatic-timezoned service
   i18n.defaultLocale = "en_IE.UTF-8";
 }

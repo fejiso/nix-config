@@ -15,6 +15,7 @@
     cargo
 
     # Development tools
+    stripe-cli
 
     # Language servers
     haskell-language-server

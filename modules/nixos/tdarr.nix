@@ -10,6 +10,19 @@
 
 with lib;
 
+let
+  # Common restart configuration for podman services (serviceConfig)
+  commonRestartConfig = {
+    Restart = "always";
+    RestartSec = "15min";
+  };
+
+  # Common unit configuration for podman services
+  commonUnitConfig = {
+    StartLimitIntervalSec = 0;
+  };
+in
+
 {
   options.services.tdarr = {
     enable = mkEnableOption "Tdarr transcoding server";
@@ -109,12 +122,12 @@ with lib;
 
       path = [ pkgs.podman ];
 
-      serviceConfig = {
+      unitConfig = commonUnitConfig;
+
+      serviceConfig = commonRestartConfig // {
         Type = "simple";
         User = config.services.tdarr.user;
         Group = config.services.tdarr.group;
-        Restart = "always";
-        RestartSec = "10s";
         TimeoutStartSec = "5min";
 
         # Resource limits - low priority
@@ -173,12 +186,12 @@ with lib;
 
       path = [ pkgs.podman ];
 
-      serviceConfig = {
+      unitConfig = commonUnitConfig;
+
+      serviceConfig = commonRestartConfig // {
         Type = "simple";
         User = config.services.tdarr.user;
         Group = config.services.tdarr.group;
-        Restart = "always";
-        RestartSec = "10s";
         TimeoutStartSec = "5min";
 
         # Resource limits - low priority, can use more resources for transcoding
