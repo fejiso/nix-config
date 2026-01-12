@@ -63,6 +63,7 @@
     # Terminal and shell tools
     zellij
     fish
+    weechat
     
     # Development tools
     git

@@ -38,6 +38,9 @@
     enable = true;
     allowedTCPPorts = [ 22000 ]; # Syncthing file transfers
     allowedUDPPorts = [ 22000 21027 ]; # Syncthing discovery
+
+    # Allow connections from netbird (wt0 interface)
+    interfaces.wt0.allowedTCPPorts = [ 3333 ];
   };
 
   # Enable IPv6
