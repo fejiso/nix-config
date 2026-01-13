@@ -13,6 +13,9 @@
     per_disc_numbering: no
 
     match:
+      max_rec:
+        missing_tracks: medium
+        unmatched_tracks: medium
       ignored: album_id track_id
 
     acoustid:
