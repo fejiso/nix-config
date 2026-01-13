@@ -8,6 +8,7 @@
   home.packages = with pkgs; [
     # Programming languages
     python3
+    python3Packages.pip
     uv  # Fast Python package installer and resolver
     nodejs
     go

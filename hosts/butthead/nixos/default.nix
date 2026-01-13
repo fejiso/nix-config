@@ -190,9 +190,25 @@ in
     "Z /var/lib/npm-storage/letsencrypt 0755 100000 100000 -"
     "d /run/user/13200 0700 nginx-proxy-manager nginx-proxy-manager -"
     "d /run/user/13105 0700 emby-podman emby-podman -"
-    "d /run/user/13110 0700 prowlarr-podman prowlarr-podman -"
+    "d /run/user/13106 0700 media-podman media-services -"
+    "d /run/user/13107 0700 utils-podman utils-podman -"
     "d /var/lib/ollama 0755 utils-podman utils-podman -"
     "d /var/lib/open-webui 0755 utils-podman utils-podman -"
+    # Media service directories
+    "d /var/lib/sonarr 0755 media-podman media-services -"
+    "d /var/lib/radarr 0755 media-podman media-services -"
+    "d /var/lib/lidarr 0755 media-podman media-services -"
+    "d /var/lib/prowlarr 0755 media-podman media-services -"
+    "d /var/lib/lazylibrarian 0755 media-podman media-services -"
+    # Download service directories
+    "d /var/lib/gluetun 0755 media-podman media-services -"
+    "d /var/lib/qbittorrent 0755 media-podman media-services -"
+    "d /var/lib/sabnzbd 0755 media-podman media-services -"
+    "d /var/lib/deluge 0755 media-podman media-services -"
+    # Download directories with proper permissions
+    "d /mnt/user/download 0775 root media-services -"
+    "d /mnt/user/downloadtemp 0775 root media-services -"
+    "d /mnt/user/downloadtemp/incomplete 0775 root media-services -"
   ];
 
   hardware.graphics = {
@@ -493,7 +509,7 @@ in
 
   # Open NFS ports in firewall
   networking.firewall = {
-    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 3002 4743 8096 8080 8989 7878 8686 9696 5299 8081 8112 3344 8000 11434 3003 ];
+    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 3002 4743 8096 8080 8989 7878 8686 9696 5299 8081 8112 3344 8000 11434 3003 8084 ];
     allowedUDPPorts = [ 2049 111 20048 ];
   };
 
@@ -918,14 +934,118 @@ in
     ];
   };
 
-  systemd.services.qbittorrent = mkMediaService {
-    name = "qbittorrent";
-    port = 8081;
-    image = "lscr.io/linuxserver/qbittorrent:latest";
-    volumes = [
-      "/var/lib/qbittorrent:/config:rw"
-      "/mnt/user/download:/downloads:rw"
-    ];
+  # Gluetun VPN Service
+  systemd.services.gluetun = {
+    description = "Gluetun VPN Client";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+    path = [ pkgs.podman ];
+    unitConfig = commonUnitConfig;
+    serviceConfig = commonRestartConfig // {
+      Type = "simple";
+      User = "media-podman";
+      Group = "media-services";
+      TimeoutStartSec = "5min";
+      
+      # Resource limits
+      CPUQuota = "100%";
+      MemoryMax = "1G";
+
+      ExecStartPre = "-${pkgs.podman}/bin/podman rm -f gluetun";
+      
+      ExecStart = pkgs.writeShellScript "start-gluetun" ''
+        VPNUSER=$(sed -n "1p" /run/secrets/nordvpn-credentials | tr -d "\n\r")
+        VPNPASS=$(sed -n "2p" /run/secrets/nordvpn-credentials | tr -d "\n\r")
+        ${pkgs.podman}/bin/podman run --rm --name gluetun \
+          --cap-add=NET_ADMIN \
+          --device=/dev/net/tun:/dev/net/tun \
+          -p 8084:8080 \
+          -v /var/lib/gluetun:/gluetun:rw \
+          -e VPN_SERVICE_PROVIDER=nordvpn \
+          -e VPN_TYPE=openvpn \
+          -e OPENVPN_USER="$VPNUSER" \
+          -e OPENVPN_PASSWORD="$VPNPASS" \
+          -e SERVER_COUNTRIES=Ireland \
+          -e FIREWALL_VPN_INPUT_PORTS=8080 \
+          -e TZ=Europe/Dublin \
+          -e UPDATER_PERIOD=24h \
+          ghcr.io/qdm12/gluetun:latest
+      '';
+      
+      ExecStop = "${pkgs.podman}/bin/podman stop gluetun";
+    };
+  };
+
+  # qBittorrent Service (via Gluetun)
+  systemd.services.qbittorrent = {
+    description = "qBittorrent (via Gluetun)";
+    requires = [ "gluetun.service" ];
+    after = [ "gluetun.service" ];
+    wantedBy = [ "multi-user.target" ];
+    path = [ pkgs.podman pkgs.gnused pkgs.coreutils ];
+    unitConfig = commonUnitConfig;
+    serviceConfig = commonRestartConfig // {
+      Type = "simple";
+      User = "media-podman";
+      Group = "media-services";
+      TimeoutStartSec = "5min";
+      
+      # Resource limits
+      CPUQuota = "200%";
+      MemoryMax = "3G";
+
+      ExecStartPre = "-${pkgs.podman}/bin/podman rm -f qbittorrent";
+      
+      ExecStart = pkgs.writeShellScript "start-qbittorrent" ''
+        # Wait for Gluetun container to be ready
+        until ${pkgs.podman}/bin/podman inspect gluetun >/dev/null 2>&1; do 
+          echo "Waiting for gluetun container..."
+          sleep 1
+        done
+
+        # Ensure config
+        CONF_FILE="/var/lib/qbittorrent/qBittorrent/qBittorrent.conf"
+        mkdir -p "$(dirname "$CONF_FILE")"
+        
+        if [ ! -f "$CONF_FILE" ]; then
+            echo -e "[Preferences]\nWebUI\\HostHeaderValidation=false\nWebUI\\CSRFProtection=false" > "$CONF_FILE"
+        else
+            # Ensure [Preferences] section exists
+            if ! grep -q "^\[Preferences\]" "$CONF_FILE"; then
+                echo "[Preferences]" >> "$CONF_FILE"
+            fi
+            
+            # Set HostHeaderValidation
+            if grep -q "WebUI\\\\HostHeaderValidation" "$CONF_FILE"; then
+                sed -i 's/WebUI\\HostHeaderValidation=.*/WebUI\\HostHeaderValidation=false/' "$CONF_FILE"
+            else
+                sed -i '/^\[Preferences\]/a WebUI\\HostHeaderValidation=false' "$CONF_FILE"
+            fi
+            
+            # Set CSRFProtection
+            if grep -q "WebUI\\\\CSRFProtection" "$CONF_FILE"; then
+                sed -i 's/WebUI\\CSRFProtection=.*/WebUI\\CSRFProtection=false/' "$CONF_FILE"
+            else
+                sed -i '/^\[Preferences\]/a WebUI\\CSRFProtection=false' "$CONF_FILE"
+            fi
+        fi
+
+        ${pkgs.podman}/bin/podman run --rm --name qbittorrent \
+          --network container:gluetun \
+          --label io.containers.autoupdate=registry \
+          -v /var/lib/qbittorrent:/config:rw \
+          -v /mnt/user/download:/downloads:rw \
+          -e PUID=0 \
+          -e PGID=0 \
+          -e UMASK=002 \
+          -e TZ=Europe/Dublin \
+          -e WEBUI_PORT=8080 \
+          lscr.io/linuxserver/qbittorrent:latest
+      '';
+      
+      ExecStop = "${pkgs.podman}/bin/podman stop qbittorrent";
+    };
   };
 
   systemd.services.deluge = mkMediaService {

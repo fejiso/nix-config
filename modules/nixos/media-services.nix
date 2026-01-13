@@ -332,7 +332,7 @@ with lib;
       "d /var/lib/jellyfin 0755 13104 13104 -"
       "d /var/lib/emby 0755 13105 13105 -"
       "d ${config.services.media-stack.dataDir}/media 0775 root 13000 - -"
-      "d ${config.services.media-stack.dataDir}/downloads 0775 root 13001 - -"
+      "d ${config.services.media-stack.dataDir}/download 0775 root 13001 - -"
       "d /var/snapraid 0755 root root -"
     ];
   };

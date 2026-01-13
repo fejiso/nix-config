@@ -94,6 +94,7 @@
     telegram-desktop
     zoom-us
     libreoffice
+    logseq
   ];
 
   # Enable home-manager
@@ -276,6 +277,10 @@
         key = "git_credentials";
         path = "${config.home.homeDirectory}/.git-credentials";
         mode = "0600";
+      };
+      acoustid-apikey = {
+        sopsFile = "${inputs.self}/secrets/beets.yaml";
+        key = "acoustid_apikey";
       };
     };
   };
