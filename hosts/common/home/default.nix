@@ -110,6 +110,9 @@
   # Enable mako notification daemon
   services.mako.enable = true;
 
+  # Enable MPD music stack (ncmpcpp + mpd-sima + scrobblers)
+  services.mpd-stack.enable = true;
+
   # Swayidle configuration
   services.swayidle = lib.mkIf (!config.programs.niri.enable) {
     enable = true;

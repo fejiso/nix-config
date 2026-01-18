@@ -17,5 +17,6 @@
     ./niri.nix
     ./tidalcycles.nix
     ./android-tools.nix
+    ./mpd.nix
   ];
 }
