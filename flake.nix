@@ -6,9 +6,11 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-25.11";
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
     
-    # Home manager (following unstable)
+    nixpkgs-master.url = "github:nixos/nixpkgs/master";
+
+    # Home manager (following master to get latest neovimUtils)
     home-manager.url = "github:nix-community/home-manager/master";
-    home-manager.inputs.nixpkgs.follows = "nixpkgs-unstable";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs-master";
     
     # Hardware configurations for NixOS
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";

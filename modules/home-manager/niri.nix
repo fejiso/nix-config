@@ -8,7 +8,7 @@ with lib;
   };
 
   config = mkIf config.programs.niri.enable {
-    home.packages = with pkgs; [ niri waybar brightnessctl wireplumber hyprlock hypridle pavucontrol swww xwayland-satellite wlopm git curl ];
+    home.packages = with pkgs; [ niri waybar brightnessctl wireplumber hyprlock hypridle pavucontrol swww xwayland-satellite wlopm git curl wl-clipboard cliphist ];
 
     # Disable swayidle, use hypridle instead
     services.swayidle.enable = false;
@@ -259,6 +259,7 @@ with lib;
           Mod+Return { spawn "wezterm"; }
           Mod+D { spawn "fuzzel"; }
           Mod+P { spawn "fuzzel"; }
+          Mod+Shift+V { spawn "sh" "-c" "cliphist list | fuzzel -d | cliphist decode | wl-copy"; }
           Mod+Q repeat=false { close-window; }
           
           XF86AudioRaiseVolume allow-when-locked=true { spawn "sh" "-c" "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1+"; }
@@ -429,6 +430,8 @@ with lib;
       spawn-at-startup "${pkgs.firefox}/bin/firefox"
       spawn-at-startup "${pkgs.strawberry}/bin/strawberry"
       spawn-at-startup "${pkgs.xwayland-satellite}/bin/xwayland-satellite"
+      spawn-at-startup "${pkgs.wl-clipboard}/bin/wl-paste" "--watch" "${pkgs.cliphist}/bin/cliphist" "store"
+      spawn-at-startup "${pkgs.logseq}/bin/logseq"
     '';
   };
 }

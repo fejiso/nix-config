@@ -61,6 +61,7 @@
     usbutils
     pcsclite
     pcsc-tools
+    spotify
   ];
 
   # SSH configuration for desktop access

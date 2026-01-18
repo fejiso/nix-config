@@ -4,7 +4,7 @@
   home.packages = [ pkgs.beets ];
 
   xdg.configFile."beets/config.yaml".text = ''
-    plugins: fetchart embedart scrub replaygain lastgenre chroma web discogs lyrics bpd rewrite mbsync duplicates missing
+    plugins: fetchart embedart scrub replaygain lastgenre chroma web bpd rewrite mbsync duplicates missing
     directory: /mnt/user/Music
     library: /mnt/user/Music/musiclibrary.blb
     art_filename: albumart
@@ -12,14 +12,20 @@
     original_date: no
     per_disc_numbering: no
 
+
     match:
-      max_rec:
-        missing_tracks: medium
-        unmatched_tracks: medium
+      strong_rec_thresh: 0.04
       ignored: album_id track_id
+      max_rec:
+        missing_tracks: strong
+        unmatched_tracks: strong
 
     acoustid:
       apikey: ${config.sops.secrets.acoustid-apikey.path}
+
+    import:
+      none_rec_action: ask
+      from_scratch: yes
 
     paths:
       default: $albumartist/$album%aunique{}/$track - $title
@@ -37,6 +43,7 @@
       quiet_fallback: skip
       timid: no
       log: ~/.config/beets/beet.log
+      detail: yes
 
     bpd:
       host: 127.0.0.1
@@ -61,9 +68,6 @@
 
     scrub:
       auto: yes
-
-    lyrics:
-      auto: true
 
     missing:
       format: "$albumartist - $album - $title"

@@ -21,7 +21,7 @@
     ../../../modules/home-manager
   ];
 
-  # Don't set nixpkgs when using useGlobalPkgs
+  # Don't set nixpkgs config here - it's handled in home-manager.nix module args
   # nixpkgs = {
   #   overlays = [
   #     outputs.overlays.additions
@@ -95,6 +95,8 @@
     zoom-us
     libreoffice
     logseq
+    ncspot
+    spot
   ];
 
   # Enable home-manager
@@ -103,7 +105,6 @@
   # Enable syncthing service
   services.syncthing = {
     enable = true;
-    package = pkgs.unstable.syncthing;
   };
 
   # Enable mako notification daemon

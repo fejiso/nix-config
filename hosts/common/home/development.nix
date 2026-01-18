@@ -82,7 +82,17 @@
           { import = "lazyvim.plugins.extras.dap.core" },
           -- Enable Neotest for running tests
           { import = "lazyvim.plugins.extras.test.core" },
-          { "thgrund/tidal.nvim", 
+          { "nvim-orgmode/orgmode",
+            event = "VeryLazy",
+            ft = { "org" },
+            config = function()
+              require("orgmode").setup({
+                org_agenda_files = "~/Syncthing/Orgzly/**/*",
+                org_default_notes_file = "~/Syncthing/Orgzly/refile.org",
+              })
+            end,
+          },
+          { "thgrund/tidal.nvim",
             config = function()
               require("tidal").setup({
                 boot = {
