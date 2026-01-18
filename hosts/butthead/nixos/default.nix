@@ -341,6 +341,40 @@ in
     fileSystems = [ "/mnt/data01" "/mnt/data02" "/mnt/data03" "/mnt/data04" "/mnt/data05" "/mnt/data06" "/mnt/parity1" "/mnt/parity2" ];
   };
 
+  # Btrfs scrub timers - staggered across the month to avoid I/O contention
+  systemd.timers."btrfs-scrub@mnt-data01" = {
+    wantedBy = [ "timers.target" ];
+    timerConfig.OnCalendar = "*-*-01 02:00:00";  # 1st of month
+  };
+  systemd.timers."btrfs-scrub@mnt-data02" = {
+    wantedBy = [ "timers.target" ];
+    timerConfig.OnCalendar = "*-*-05 02:00:00";  # 5th
+  };
+  systemd.timers."btrfs-scrub@mnt-data03" = {
+    wantedBy = [ "timers.target" ];
+    timerConfig.OnCalendar = "*-*-09 02:00:00";  # 9th
+  };
+  systemd.timers."btrfs-scrub@mnt-data04" = {
+    wantedBy = [ "timers.target" ];
+    timerConfig.OnCalendar = "*-*-13 02:00:00";  # 13th
+  };
+  systemd.timers."btrfs-scrub@mnt-data05" = {
+    wantedBy = [ "timers.target" ];
+    timerConfig.OnCalendar = "*-*-17 02:00:00";  # 17th
+  };
+  systemd.timers."btrfs-scrub@mnt-data06" = {
+    wantedBy = [ "timers.target" ];
+    timerConfig.OnCalendar = "*-*-21 02:00:00";  # 21st
+  };
+  systemd.timers."btrfs-scrub@mnt-parity1" = {
+    wantedBy = [ "timers.target" ];
+    timerConfig.OnCalendar = "*-*-25 02:00:00";  # 25th
+  };
+  systemd.timers."btrfs-scrub@mnt-parity2" = {
+    wantedBy = [ "timers.target" ];
+    timerConfig.OnCalendar = "*-*-28 02:00:00";  # 28th
+  };
+
   # SSD cache migration script
   systemd.services.ssd-migrate = {
     description = "Migrate old files from SSD to HDD pool";
