@@ -112,8 +112,8 @@ with lib;
       ];
     };
 
-    # mpd-sima - Autoqueue similar tracks
-    home.packages = [ pkgs.mpd-sima ];
+    # mpd-sima and mpdscribble
+    home.packages = with pkgs; [ mpd-sima mpdscribble ];
 
     xdg.configFile."mpd-sima/mpd_sima.cfg".text = ''
       [sima]
@@ -159,32 +159,53 @@ with lib;
       };
     };
 
-    # mpdscribble - Last.fm and ListenBrainz scrobbler
-    services.mpdscribble = {
-      enable = true;
-      endpoints = {
-        "last.fm" = {
-          username = config.services.mpd-stack.lastfmUsername;
-          passwordCmd = "cat ${config.sops.secrets.lastfm-password.path}";
-        };
-        "listenbrainz" = {
-          url = "https://api.listenbrainz.org/1/submit-listens";
-          username = "listenbrainz"; # Required but not used
-          passwordCmd = "cat ${config.sops.secrets.listenbrainz-token.path}";
-        };
+    # mpdscribble config - secrets are injected at runtime via systemd
+    xdg.configFile."mpdscribble/mpdscribble.conf.template".text = ''
+      host = 127.0.0.1
+      port = 6600
+      log = /tmp/mpdscribble.log
+      verbose = 1
+
+      [last.fm]
+      url = https://post.audioscrobbler.com/
+      username = ${config.services.mpd-stack.lastfmUsername}
+      password = @LASTFM_PASSWORD@
+
+      [listenbrainz]
+      url = https://api.listenbrainz.org/1/submit-listens
+      username = token
+      password = @LISTENBRAINZ_TOKEN@
+    '';
+
+    # Systemd service for mpdscribble with secret injection
+    systemd.user.services.mpdscribble = {
+      Unit = {
+        Description = "MPD scrobbler for Last.fm and ListenBrainz";
+        After = [ "mpd.service" ];
+        Requires = [ "mpd.service" ];
+      };
+      Service = {
+        Type = "simple";
+        ExecStartPre = pkgs.writeShellScript "mpdscribble-config" ''
+          ${pkgs.coreutils}/bin/mkdir -p ${config.xdg.configHome}/mpdscribble
+          LASTFM_PW=$(${pkgs.coreutils}/bin/cat ${config.sops.secrets.lastfm-password.path} 2>/dev/null || echo "")
+          LB_TOKEN=$(${pkgs.coreutils}/bin/cat ${config.sops.secrets.listenbrainz-token.path} 2>/dev/null || echo "")
+          ${pkgs.gnused}/bin/sed \
+            -e "s|@LASTFM_PASSWORD@|$LASTFM_PW|g" \
+            -e "s|@LISTENBRAINZ_TOKEN@|$LB_TOKEN|g" \
+            ${config.xdg.configHome}/mpdscribble/mpdscribble.conf.template \
+            > ${config.xdg.configHome}/mpdscribble/mpdscribble.conf
+        '';
+        ExecStart = "${pkgs.mpdscribble}/bin/mpdscribble --no-daemon --conf ${config.xdg.configHome}/mpdscribble/mpdscribble.conf";
+        Restart = "on-failure";
+        RestartSec = 5;
+      };
+      Install = {
+        WantedBy = [ "default.target" ];
       };
     };
 
-    # SOPS secrets for scrobbling credentials
-    sops.secrets = {
-      lastfm-password = {
-        sopsFile = ../../../secrets/music.yaml;
-        key = "lastfm_password_hash";
-      };
-      listenbrainz-token = {
-        sopsFile = ../../../secrets/music.yaml;
-        key = "listenbrainz_token";
-      };
-    };
+    # Note: SOPS secrets (lastfm-password, listenbrainz-token) are defined in
+    # hosts/common/home/default.nix where inputs.self is available
   };
 }

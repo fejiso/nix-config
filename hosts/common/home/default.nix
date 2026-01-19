@@ -111,7 +111,10 @@
   services.mako.enable = true;
 
   # Enable MPD music stack (ncmpcpp + mpd-sima + scrobblers)
-  services.mpd-stack.enable = true;
+  services.mpd-stack = {
+    enable = true;
+    lastfmUsername = "fjim";
+  };
 
   # Swayidle configuration
   services.swayidle = lib.mkIf (!config.programs.niri.enable) {
@@ -285,6 +288,14 @@
       acoustid-apikey = {
         sopsFile = "${inputs.self}/secrets/beets.yaml";
         key = "acoustid_apikey";
+      };
+      lastfm-password = {
+        sopsFile = "${inputs.self}/secrets/music.yaml";
+        key = "lastfm_password_hash";
+      };
+      listenbrainz-token = {
+        sopsFile = "${inputs.self}/secrets/music.yaml";
+        key = "listenbrainz_token";
       };
     };
   };
