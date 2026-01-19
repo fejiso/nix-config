@@ -19,7 +19,17 @@
   programs.ssh.startAgent = true;
 
   # Enable CUPS for printing
-  services.printing.enable = true;
+  services.printing = {
+    enable = true;
+    drivers = with pkgs; [ gutenprint hplip ];
+  };
+
+  # Enable network printer discovery
+  services.avahi = {
+    enable = true;
+    nssmdns4 = true;
+    openFirewall = true;
+  };
 
   # Enable sound with pipewire
   services.pulseaudio.enable = false;
