@@ -20,10 +20,14 @@
     (import ../../../modules/nixos/desktop.nix)
     (import ../../../modules/nixos/laptop.nix)
     (import ../../../modules/nixos/development.nix)
+    (import ../../../modules/nixos/emulation.nix)
   ];
 
   # Enable development tools
   development.enable = true;
+
+  # Enable emulation
+  emulation.enable = true;
 
   # Boot configuration
   boot.loader.systemd-boot.enable = true;

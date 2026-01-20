@@ -109,6 +109,10 @@
     smartmontools
     vscode
     sqlite
+    python3Packages.rns
+    python3Packages.nomadnet
+    yggdrasil
+    i2pd
     inputs.home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
 

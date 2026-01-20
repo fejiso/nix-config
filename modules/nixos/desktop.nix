@@ -51,6 +51,7 @@
   environment.systemPackages = with pkgs; [
     wget
     firefox
+    chromium
     git
     alacritty
     fuzzel

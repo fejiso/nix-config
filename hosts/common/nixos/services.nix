@@ -48,4 +48,42 @@
   # Automatically update timezone based on location
   services.automatic-timezoned.enable = true;
 
+  # Yggdrasil mesh networking
+  services.yggdrasil = {
+    enable = true;
+    persistentKeys = true;
+    settings = {
+      Peers = [
+        # Public peers - add more from https://publicpeers.neilalexander.dev/
+        "tls://ygg.mkg20001.io:443"
+        "tls://ygg-uplink.thingylabs.io:443"
+      ];
+    };
+  };
+
+  # I2P daemon
+  services.i2pd = {
+    enable = true;
+    ifname4 = "eth0";
+    address = "0.0.0.0";
+    proto = {
+      http.enable = true;
+      socksProxy.enable = true;
+      httpProxy.enable = true;
+    };
+  };
+
+  # Reticulum Network Stack daemon
+  systemd.services.rnsd = {
+    description = "Reticulum Network Stack Daemon";
+    after = [ "network.target" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "simple";
+      ExecStart = "${pkgs.python3Packages.rns}/bin/rnsd";
+      Restart = "always";
+      RuntimeMaxSec = "15min";
+    };
+  };
+
 }

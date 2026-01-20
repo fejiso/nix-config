@@ -17,6 +17,8 @@
 
     # Development tools
     stripe-cli
+    arduino-ide
+    arduino-cli
 
     # Language servers
     haskell-language-server

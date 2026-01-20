@@ -9,8 +9,11 @@
 }: {
   imports = [
     ./hardware-configuration.nix
-    # Add any elitedex-specific modules here
+    (import ../../../modules/nixos/emulation.nix)
   ];
+
+  # Enable emulation
+  emulation.enable = true;
 
   # Host-specific configuration
   # Add desktop environment if this is a desktop system
@@ -31,15 +34,15 @@
     displayManager.session = [
       {
         manage = "desktop";
-        name = "ES-DE";
+        name = "RetroArch";
         start = ''
-          {pkgs.emulationstation-de}/bin/es-de &
+          ${pkgs.retroarch-full}/bin/retroarch --fullscreen &
           waitPID=$!
         '';
       }
     ];
   };
-  services.displayManager.defaultSession = "ES-DE";
+  services.displayManager.defaultSession = "RetroArch";
   services.displayManager.autoLogin.enable = true;
   services.displayManager.autoLogin.user = "z-247";
 
@@ -47,20 +50,6 @@
   
   # Host-specific packages
   environment.systemPackages = with pkgs; [
-    emulationstation-de
-    retroarch-full
-    retroarch-assets
-    retroarch-joypad-autoconfig
-    librashader
-    libretro-shaders-slang
-    dosbox-staging
-    dosbox-x
-    x16-emulator
-    dolphin-emu
-    pcsx2
-    ppsspp
-    duckstation
-    mame
     libva-utils
     lightdm
     xorg.xinit
@@ -128,8 +117,4 @@
     options = ["compress=zstd"];
   };
 
-  # Insecure packages
-  nixpkgs.config.permittedInsecurePackages = [
-    "freeimage-3.18.0-unstable-2024-04-18"
-  ];
 }

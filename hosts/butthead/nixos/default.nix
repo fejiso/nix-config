@@ -80,10 +80,14 @@ in
     (import ../../../modules/nixos/tdarr.nix)
     (import ../../../modules/nixos/development.nix)
     (import ../../../modules/nixos/tgtg-watcher.nix)
+    (import ../../../modules/nixos/emulation.nix)
   ];
 
   # Enable development tools
   development.enable = true;
+
+  # Enable emulation
+  emulation.enable = true;
 
   # Enable TooGoodToGo watcher
   services.tgtg-watcher.enable = true;
