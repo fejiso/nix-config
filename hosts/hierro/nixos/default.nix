@@ -10,6 +10,7 @@
   imports = [
     ./hardware-configuration.nix
     ../../common/nixos
+    (import ../../../modules/nixos/tdarr-worker.nix)
   ];
 
   # Boot configuration
@@ -35,6 +36,9 @@
     KbdInteractiveAuthentication = lib.mkForce true;
   };
   
+  # Tdarr worker node
+  services.tdarr-worker.enable = true;
+
   # System state version
   system.stateVersion = "25.05";
 }

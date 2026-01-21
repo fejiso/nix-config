@@ -1,0 +1,94 @@
+# Tdarr worker node module - includes all dependencies
+{
+  config,
+  lib,
+  pkgs,
+  ...
+}:
+
+with lib;
+
+{
+  imports = [ ./tdarr.nix ];
+
+  options.services.tdarr-worker = {
+    enable = mkEnableOption "Tdarr worker node with all dependencies";
+
+    serverEnabled = mkOption {
+      type = types.bool;
+      default = false;
+      description = "Also enable Tdarr server on this host";
+    };
+
+    nodeId = mkOption {
+      type = types.str;
+      default = "${config.networking.hostName}_worker";
+      description = "Node ID name";
+    };
+
+    serverIP = mkOption {
+      type = types.str;
+      default = "butthead.netbird.cloud";
+      description = "Tdarr server address";
+    };
+
+    serverPort = mkOption {
+      type = types.port;
+      default = 8266;
+      description = "Tdarr server port";
+    };
+
+    mediaDirectories = mkOption {
+      type = types.attrs;
+      default = {
+        tv = "/mnt/Series";
+        movies = "/mnt/Movies";
+      };
+      description = "Media directories to mount";
+    };
+
+    transcodeCache = mkOption {
+      type = types.str;
+      default = "/var/lib/tdarr/transcode-cache";
+      description = "Directory for transcode temporary files";
+    };
+  };
+
+  config = mkIf config.services.tdarr-worker.enable {
+    services.tdarr = {
+      enable = true;
+      server.enable = config.services.tdarr-worker.serverEnabled;
+      node = {
+        enable = true;
+        nodeId = config.services.tdarr-worker.nodeId;
+        serverIP = config.services.tdarr-worker.serverIP;
+        serverPort = config.services.tdarr-worker.serverPort;
+      };
+      mediaDirectories = config.services.tdarr-worker.mediaDirectories;
+      transcodeCache = config.services.tdarr-worker.transcodeCache;
+    };
+
+    # User/group for tdarr
+    users.users.media-podman = {
+      isSystemUser = true;
+      group = "media-services";
+      uid = 13106;
+      home = "/var/lib/media-podman";
+      createHome = true;
+      subUidRanges = [{ startUid = 300000; count = 65536; }];
+      subGidRanges = [{ startGid = 300000; count = 65536; }];
+    };
+    users.groups.media-services.gid = 13100;
+
+    # Enable podman for tdarr
+    virtualisation.podman = {
+      enable = true;
+      dockerCompat = false;
+    };
+
+    # Runtime directory for podman user
+    systemd.tmpfiles.rules = [
+      "d /run/user/13106 0700 media-podman media-services -"
+    ];
+  };
+}

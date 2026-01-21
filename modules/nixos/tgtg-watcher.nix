@@ -50,7 +50,6 @@ in
     # Create tmpfiles directory
     systemd.tmpfiles.rules = [
       "d ${config.services.tgtg-watcher.configPath} 0755 utils-podman utils-podman -"
-      "d /var/lib/tgtg-build 0755 utils-podman utils-podman -"
     ];
 
     # Build the Docker image from source using podman build
@@ -69,9 +68,7 @@ in
         ];
       };
       script = ''
-        cp ${dockerfile} /var/lib/tgtg-build/Dockerfile
-        cd /var/lib/tgtg-build
-        ${pkgs.podman}/bin/podman build -t localhost/tgtg-watcher:latest .
+        ${pkgs.podman}/bin/podman build -t localhost/tgtg-watcher:latest -f ${dockerfile} /var/empty
       '';
     };
 

@@ -80,7 +80,7 @@
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "simple";
-      ExecStart = "${pkgs.python3Packages.rns}/bin/rnsd";
+      ExecStart = "${pkgs.python3Packages.rns}/bin/rnsd --service";
       Restart = "always";
       RuntimeMaxSec = "15min";
     };

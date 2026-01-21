@@ -16,6 +16,7 @@ with lib;
     # Create mount points
     systemd.tmpfiles.rules = [
       "d /mnt/Series 0755 root root -"
+      "d /mnt/Movies 0755 root root -"
       "d /mnt/Backups 0755 root root -"
       "d /mnt/Videos 0755 root root -"
       "d /mnt/Music 0755 root root -"
@@ -26,6 +27,21 @@ with lib;
     fileSystems = {
       "/mnt/Series" = {
         device = "100.107.75.195:/mnt/user/Series";
+        fsType = "nfs";
+        options = [
+          "x-systemd.automount"
+          "x-systemd.idle-timeout=1min"
+          "async"
+          "rw"
+          "intr"
+          "hard"
+          "vers=4"
+          "noauto"
+        ];
+      };
+
+      "/mnt/Movies" = {
+        device = "100.107.75.195:/mnt/user/Movies";
         fsType = "nfs";
         options = [
           "x-systemd.automount"

@@ -77,7 +77,7 @@ in
     (import ../../../modules/nixos/systemd-nspawn.nix)
     (import ../../../modules/nixos/media-services.nix)
     (import ../../../modules/nixos/download-services.nix)
-    (import ../../../modules/nixos/tdarr.nix)
+    (import ../../../modules/nixos/tdarr-worker.nix)
     (import ../../../modules/nixos/development.nix)
     (import ../../../modules/nixos/tgtg-watcher.nix)
     (import ../../../modules/nixos/emulation.nix)
@@ -441,17 +441,10 @@ in
   #   enable = false;
   # };
 
-  # Tdarr transcoding server
-  services.tdarr = {
+  # Tdarr transcoding server and worker
+  services.tdarr-worker = {
     enable = true;
-    server = {
-      enable = true;
-      internalNode = false;  # Use separate node for better control
-    };
-    node = {
-      enable = true;
-      nodeId = "butthead_worker";
-    };
+    serverEnabled = true;
     mediaDirectories = {
       tv = "/mnt/user/Series";
       movies = "/mnt/user/Movies";
@@ -524,6 +517,7 @@ in
     # Export individual directories to Netbird network
     exports = ''
       /mnt/user/Series 100.107.0.0/16(ro,sync,no_subtree_check,fsid=1)
+      /mnt/user/Movies 100.107.0.0/16(ro,sync,no_subtree_check,fsid=6)
       /mnt/user/Videos 100.107.0.0/16(ro,sync,no_subtree_check,fsid=2)
       /mnt/user/Music 100.107.0.0/16(ro,sync,no_subtree_check,fsid=3) 100.107.6.184(rw,sync,no_subtree_check,fsid=3)
       /mnt/user/ROMs 100.107.0.0/16(ro,sync,no_subtree_check,fsid=4)
