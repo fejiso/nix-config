@@ -21,6 +21,7 @@
     (import ../../../modules/nixos/laptop.nix)
     (import ../../../modules/nixos/development.nix)
     (import ../../../modules/nixos/emulation.nix)
+    (import ../../../modules/nixos/tdarr-worker.nix)
   ];
 
   # Enable development tools
@@ -28,6 +29,9 @@
 
   # Enable emulation
   emulation.enable = true;
+
+  # Enable tdarr worker
+  services.tdarr-worker.enable = true;
 
   # Boot configuration
   boot.loader.systemd-boot.enable = true;
