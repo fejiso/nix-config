@@ -449,7 +449,7 @@ in
       tv = "/mnt/user/Series";
       movies = "/mnt/user/Movies";
     };
-    transcodeCache = "/mnt/user/downloadtemp/tdarr-cache";
+    transcodeCache = "/var/cache/tdarr";
   };
 
   # Additional packages for media server functionality
@@ -516,8 +516,8 @@ in
     enable = true;
     # Export individual directories to Netbird network
     exports = ''
-      /mnt/user/Series 100.107.0.0/16(ro,sync,no_subtree_check,fsid=1)
-      /mnt/user/Movies 100.107.0.0/16(ro,sync,no_subtree_check,fsid=6)
+      /mnt/user/Series 100.107.0.0/16(rw,sync,no_subtree_check,fsid=1)
+      /mnt/user/Movies 100.107.0.0/16(rw,sync,no_subtree_check,fsid=6)
       /mnt/user/Videos 100.107.0.0/16(ro,sync,no_subtree_check,fsid=2)
       /mnt/user/Music 100.107.0.0/16(ro,sync,no_subtree_check,fsid=3) 100.107.6.184(rw,sync,no_subtree_check,fsid=3)
       /mnt/user/ROMs 100.107.0.0/16(ro,sync,no_subtree_check,fsid=4)

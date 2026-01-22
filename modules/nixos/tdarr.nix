@@ -144,7 +144,7 @@ in
 
         ExecStartPre = [
           "+${pkgs.coreutils}/bin/mkdir -p ${config.services.tdarr.transcodeCache}"
-          "+${pkgs.coreutils}/bin/chown 13106:13100 ${config.services.tdarr.transcodeCache}"
+          "+${pkgs.coreutils}/bin/chown -R 13106:13100 ${config.services.tdarr.transcodeCache}"
           "-${pkgs.podman}/bin/podman rm -f tdarr-server"
         ];
 
@@ -158,7 +158,7 @@ in
             -v /var/lib/tdarr/server:/app/server:rw \
             -v /var/lib/tdarr/configs:/app/configs:rw \
             -v /var/lib/tdarr/logs:/app/logs:rw \
-            ${concatStringsSep " " (mapAttrsToList (name: path: "-v ${path}:/${name}:rw") config.services.tdarr.mediaDirectories)} \
+            ${concatStringsSep " " (mapAttrsToList (name: path: "-v ${path}:/${name}:rw,rslave") config.services.tdarr.mediaDirectories)} \
             -v ${config.services.tdarr.transcodeCache}:/temp:rw \
             -e serverIP=0.0.0.0 \
             -e serverPort=${toString config.services.tdarr.server.serverPort} \
@@ -208,7 +208,7 @@ in
 
         ExecStartPre = [
           "+${pkgs.coreutils}/bin/mkdir -p ${config.services.tdarr.transcodeCache}"
-          "+${pkgs.coreutils}/bin/chown 13106:13100 ${config.services.tdarr.transcodeCache}"
+          "+${pkgs.coreutils}/bin/chown -R 13106:13100 ${config.services.tdarr.transcodeCache}"
           "-${pkgs.podman}/bin/podman rm -f tdarr-node"
         ];
 
@@ -219,7 +219,7 @@ in
             -p ${toString config.services.tdarr.node.nodePort}:8267 \
             -v /var/lib/tdarr/configs:/app/configs:rw \
             -v /var/lib/tdarr/logs:/app/logs:rw \
-            ${concatStringsSep " " (mapAttrsToList (name: path: "-v ${path}:/${name}:rw") config.services.tdarr.mediaDirectories)} \
+            ${concatStringsSep " " (mapAttrsToList (name: path: "-v ${path}:/${name}:rw,rslave") config.services.tdarr.mediaDirectories)} \
             -v ${config.services.tdarr.transcodeCache}:/temp:rw \
             --device /dev/dri:/dev/dri \
             -e serverIP=${config.services.tdarr.node.serverIP} \
@@ -257,7 +257,7 @@ in
       "d /var/lib/tdarr/server 0755 13106 13100 -"
       "d /var/lib/tdarr/configs 0755 13106 13100 -"
       "d /var/lib/tdarr/logs 0755 13106 13100 -"
-      "d ${config.services.tdarr.transcodeCache} 0755 13106 13100 -"
+      "d ${config.services.tdarr.transcodeCache} 0777 13106 13100 -"
     ];
   };
 }

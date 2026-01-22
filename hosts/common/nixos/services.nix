@@ -73,17 +73,51 @@
     };
   };
 
-  # Reticulum Network Stack daemon
+  # Reticulum Network Stack daemon (shared for all users)
   systemd.services.rnsd = {
     description = "Reticulum Network Stack Daemon";
     after = [ "network.target" ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "simple";
-      ExecStart = "${pkgs.python3Packages.rns}/bin/rnsd --service";
+      ExecStart = "${pkgs.python3Packages.rns}/bin/rnsd --service --config /etc/reticulum";
       Restart = "always";
       RuntimeMaxSec = "15min";
     };
   };
+
+  # Shared Reticulum config directory
+  systemd.tmpfiles.rules = [
+    "d /etc/reticulum 0755 root root -"
+    "d /var/run/reticulum 0777 root root -"
+  ];
+
+  # Reticulum config for shared access
+  environment.etc."reticulum/config".text = ''
+    [reticulum]
+    enable_transport = True
+    share_instance = Yes
+    shared_instance_port = 37428
+    instance_control_port = 37429
+
+    [logging]
+    loglevel = 4
+
+    [interfaces]
+      [[Default Interface]]
+        type = AutoInterface
+        enabled = Yes
+
+      [[Yggdrasil Remote]]
+        type = TCPClientInterface
+        enabled = yes
+        target_host = 201:5d78:af73:5caf:a4de:a79f:3278:71e5
+        target_port = 4343
+  '';
+
+
+  # Environment variable so all apps use the shared Reticulum instance
+  environment.variables.RNS_SHARED_INSTANCE = "Yes";
+
 
 }
