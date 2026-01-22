@@ -68,6 +68,18 @@ with lib;
       transcodeCache = config.services.tdarr-worker.transcodeCache;
     };
 
+    # User/group for tdarr
+    users.users.media-podman = {
+      isSystemUser = true;
+      group = "media-services";
+      uid = 13106;
+      home = "/var/lib/media-podman";
+      createHome = true;
+      subUidRanges = [{ startUid = 300000; count = 65536; }];
+      subGidRanges = [{ startGid = 300000; count = 65536; }];
+    };
+    users.groups.media-services.gid = 13100;
+
     # Enable podman for tdarr
     virtualisation.podman = {
       enable = true;
