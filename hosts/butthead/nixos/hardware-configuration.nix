@@ -20,7 +20,12 @@
 
   boot.initrd.luks.devices."crypted" = {
     device = "/dev/disk/by-uuid/1d7380f8-9909-4f68-9e1d-c9f48e0dcba4";
-    keyFile = "/boot/luks-key";
+    keyFile = "/luks-key";
+  };
+
+  # Copy the keyfile from /boot into the initrd
+  boot.initrd.secrets = {
+    "/luks-key" = "/boot/luks-key";
   };
 
   fileSystems."/home" =

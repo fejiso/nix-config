@@ -10,35 +10,43 @@ let
       maxJobs = 8;
       speedFactor = 3;  # Desktop with good CPU
       supportedFeatures = [ "kvm" "big-parallel" ];
+      alwaysOn = true;  # Always available for cache
     };
     hierro = {
       system = "x86_64-linux";
       maxJobs = 8;
       speedFactor = 3;  # Server with good CPU
       supportedFeatures = [ "kvm" "big-parallel" ];
+      alwaysOn = true;  # Always available for cache
     };
     blacktop = {
       system = "x86_64-linux";
       maxJobs = 4;
       speedFactor = 2;  # Laptop
       supportedFeatures = [ "kvm" ];
+      alwaysOn = false;  # Laptop, not always on
     };
     elitedex = {
       system = "x86_64-linux";
       maxJobs = 4;
       speedFactor = 2;
       supportedFeatures = [ "kvm" ];
+      alwaysOn = false;  # Not always on
     };
     lenovix = {
       system = "x86_64-linux";
       maxJobs = 4;
       speedFactor = 2;
       supportedFeatures = [ "kvm" ];
+      alwaysOn = false;  # Not always on
     };
   };
 
   # Build list of other hosts (exclude current host)
   otherHosts = lib.filterAttrs (name: _: name != hostname) buildHosts;
+
+  # Only always-on hosts for substituters (exclude current host)
+  alwaysOnHosts = lib.filterAttrs (name: host: name != hostname && host.alwaysOn) buildHosts;
 
   # Convert to nix.buildMachines format
   buildMachines = lib.mapAttrsToList (name: host: {
@@ -52,8 +60,8 @@ let
     protocol = "ssh-ng";
   }) otherHosts;
 
-  # Generate substituter URLs for all other hosts
-  substituters = lib.mapAttrsToList (name: _: "http://${name}.netbird.cloud:5000") otherHosts;
+  # Generate substituter URLs only for always-on hosts
+  substituters = lib.mapAttrsToList (name: _: "http://${name}.netbird.cloud:5000") alwaysOnHosts;
 
   # Generate trusted public keys for all hosts (placeholder - will be populated after first run)
   # Each host will have its own signing key generated on first run
@@ -67,6 +75,9 @@ in
   nix.extraOptions = ''
     experimental-features = nix-command flakes
     builders-use-substitutes = true
+    connect-timeout = 1
+    http-connections = 25
+    warn-dirty = false
   '';
 
   # Configure remote builders
@@ -107,10 +118,8 @@ in
     '';
   };
 
-  # Use other hosts as binary cache substituters
-  nix.settings.substituters = lib.mkAfter substituters;
-
-  # For now, trust all substituters (you can add specific public keys later)
+  # Use all hosts as substituters
+  nix.settings.extra-substituters = substituters;
   nix.settings.trusted-substituters = substituters;
 
   # Open firewall for nix-serve
