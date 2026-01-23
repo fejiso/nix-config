@@ -449,7 +449,7 @@ in
       tv = "/mnt/user/Series";
       movies = "/mnt/user/Movies";
     };
-    transcodeCache = "/var/cache/tdarr";
+    transcodeCache = "/mnt/user/downloadtemp/tdarr-cache";
   };
 
   # Additional packages for media server functionality
@@ -522,6 +522,7 @@ in
       /mnt/user/Music 100.107.0.0/16(ro,sync,no_subtree_check,fsid=3) 100.107.6.184(rw,sync,no_subtree_check,fsid=3)
       /mnt/user/ROMs 100.107.0.0/16(ro,sync,no_subtree_check,fsid=4)
       /mnt/user/Backups 100.107.0.0/16(rw,sync,no_subtree_check,fsid=5)
+      /mnt/user/downloadtemp 100.107.0.0/16(rw,sync,no_subtree_check,fsid=7)
     '';
   };
 

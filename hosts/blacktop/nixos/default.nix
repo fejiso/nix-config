@@ -22,6 +22,7 @@
     (import ../../../modules/nixos/development.nix)
     (import ../../../modules/nixos/emulation.nix)
     (import ../../../modules/nixos/tdarr-worker.nix)
+    (import ../../../modules/nixos/nfs-mounts.nix)
   ];
 
   # Enable development tools
@@ -59,6 +60,15 @@
 
   # Host-specific services
   services.btrfs.autoScrub.enable = true;
+
+  # Enable NFS mounts
+  services.nfs-mounts.enable = true;
+
+  # Tdarr worker node
+  services.tdarr-worker = {
+    enable = true;
+    transcodeCache = "/mnt/downloadtemp/tdarr-cache";
+  };
 
   # System state version
   system.stateVersion = "25.05";

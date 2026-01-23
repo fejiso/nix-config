@@ -37,7 +37,10 @@
   };
   
   # Tdarr worker node
-  services.tdarr-worker.enable = true;
+  services.tdarr-worker = {
+    enable = true;
+    transcodeCache = "/mnt/downloadtemp/tdarr-cache";
+  };
 
   # System state version
   system.stateVersion = "25.05";

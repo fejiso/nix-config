@@ -21,6 +21,7 @@ with lib;
       "d /mnt/Videos 0755 root root -"
       "d /mnt/Music 0755 root root -"
       "d /mnt/ROMs 0755 root root -"
+      "d /mnt/downloadtemp 0755 root root -"
     ];
 
     # NFS mounts
@@ -105,6 +106,20 @@ with lib;
           "rw"
           "intr"
           "hard"
+          "noauto"
+        ];
+      };
+
+      "/mnt/downloadtemp" = {
+        device = "100.107.75.195:/mnt/user/downloadtemp";
+        fsType = "nfs";
+        options = [
+          "x-systemd.automount"
+          "x-systemd.idle-timeout=1min"
+          "rw"
+          "intr"
+          "hard"
+          "vers=4"
           "noauto"
         ];
       };
