@@ -1,24 +1,118 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, hostname, ... }:
 
+with lib;
+
+let
+  # Define all build machines with their capabilities
+  buildHosts = {
+    butthead = {
+      system = "x86_64-linux";
+      maxJobs = 8;
+      speedFactor = 3;  # Desktop with good CPU
+      supportedFeatures = [ "kvm" "big-parallel" ];
+    };
+    hierro = {
+      system = "x86_64-linux";
+      maxJobs = 8;
+      speedFactor = 3;  # Server with good CPU
+      supportedFeatures = [ "kvm" "big-parallel" ];
+    };
+    blacktop = {
+      system = "x86_64-linux";
+      maxJobs = 4;
+      speedFactor = 2;  # Laptop
+      supportedFeatures = [ "kvm" ];
+    };
+    elitedex = {
+      system = "x86_64-linux";
+      maxJobs = 4;
+      speedFactor = 2;
+      supportedFeatures = [ "kvm" ];
+    };
+    lenovix = {
+      system = "x86_64-linux";
+      maxJobs = 4;
+      speedFactor = 2;
+      supportedFeatures = [ "kvm" ];
+    };
+  };
+
+  # Build list of other hosts (exclude current host)
+  otherHosts = lib.filterAttrs (name: _: name != hostname) buildHosts;
+
+  # Convert to nix.buildMachines format
+  buildMachines = lib.mapAttrsToList (name: host: {
+    hostName = "${name}.netbird.cloud";
+    system = host.system;
+    sshUser = "z-247";
+    sshKey = "/home/z-247/.ssh/id_ed25519";
+    maxJobs = host.maxJobs;
+    speedFactor = host.speedFactor;
+    supportedFeatures = host.supportedFeatures;
+    protocol = "ssh-ng";
+  }) otherHosts;
+
+  # Generate substituter URLs for all other hosts
+  substituters = lib.mapAttrsToList (name: _: "http://${name}.netbird.cloud:5000") otherHosts;
+
+  # Generate trusted public keys for all hosts (placeholder - will be populated after first run)
+  # Each host will have its own signing key generated on first run
+  trustedPublicKeys = [
+    # These will be auto-generated - check /etc/nix/signing-key.pub on each host after first rebuild
+  ];
+
+in
 {
   # Enable experimental features for flakes and nix-command
   nix.extraOptions = ''
     experimental-features = nix-command flakes
+    builders-use-substitutes = true
   '';
 
-  # Configure remote builders (replace with actual hostnames/IPs and SSH keys)
-  # This is a placeholder. Users will need to add their specific build machines here.
-  # Example:
-  # nix.buildMachines = [
-  #   { hostName = "other-nixos-host";
-  #     system = "x86_64-linux";
-  #     sshKey = "/etc/nixos/ssh_keys/id_ed25519_nix_build";
-  #     maxJobs = 4;
-  #     speedFactor = 1;
-  #     mandatoryFeatures = [ "kvm" ]; # Example for specific features
-  #   }
-  # ];
+  # Configure remote builders
+  nix.buildMachines = buildMachines;
 
-  # Optional: Enable nix-ssh-serve for easier setup of remote builders
-  # services.nix-ssh-serve.enable = true;
+  # Distribute builds to remote machines
+  nix.distributedBuilds = true;
+
+  # Allow z-247 user to be a trusted user for remote builds
+  nix.settings.trusted-users = [ "z-247" ];
+
+  # Configure binary cache serving
+  services.nix-serve = {
+    enable = true;
+    port = 5000;
+    secretKeyFile = "/var/lib/nix-serve/cache-priv-key.pem";
+  };
+
+  # Generate signing key if it doesn't exist
+  systemd.services.nix-serve-keygen = {
+    description = "Generate nix-serve signing key";
+    wantedBy = [ "multi-user.target" ];
+    before = [ "nix-serve.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      if [ ! -f /var/lib/nix-serve/cache-priv-key.pem ]; then
+        mkdir -p /var/lib/nix-serve
+        ${pkgs.nix}/bin/nix-store --generate-binary-cache-key ${hostname}.netbird.cloud /var/lib/nix-serve/cache-priv-key.pem /var/lib/nix-serve/cache-pub-key.pem
+        chown nix-serve:nix-serve /var/lib/nix-serve/cache-*.pem
+        chmod 600 /var/lib/nix-serve/cache-priv-key.pem
+        chmod 644 /var/lib/nix-serve/cache-pub-key.pem
+        echo "Generated signing keys for ${hostname}"
+        echo "Public key: $(cat /var/lib/nix-serve/cache-pub-key.pem)"
+      fi
+    '';
+  };
+
+  # Use other hosts as binary cache substituters
+  nix.settings.substituters = lib.mkAfter substituters;
+
+  # For now, trust all substituters (you can add specific public keys later)
+  nix.settings.trusted-substituters = substituters;
+
+  # Open firewall for nix-serve
+  networking.firewall.allowedTCPPorts = [ 5000 ];
 }

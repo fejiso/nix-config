@@ -208,7 +208,7 @@ in
 
         ExecStartPre = [
           "+${pkgs.coreutils}/bin/mkdir -p ${config.services.tdarr.transcodeCache}"
-          "+${pkgs.coreutils}/bin/chown -R 13106:13100 ${config.services.tdarr.transcodeCache}"
+          "-${pkgs.coreutils}/bin/chown -R 13106:13100 ${config.services.tdarr.transcodeCache}"
           "-${pkgs.podman}/bin/podman rm -f tdarr-node"
         ];
 
