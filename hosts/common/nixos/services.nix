@@ -118,11 +118,49 @@
         target_host = 201:5d78:af73:5caf:a4de:a79f:3278:71e5
         target_port = 4343
 
+      # Public Reticulum TCP hubs (geographically distributed)
+      [[RNS Dublin]]
+        type = TCPClientInterface
+        enabled = yes
+        target_host = dublin.connect.reticulum.network
+        target_port = 4965
+
+      [[RNS Frankfurt]]
+        type = TCPClientInterface
+        enabled = yes
+        target_host = frankfurt.connect.reticulum.network
+        target_port = 5377
+
+      [[RNS BetweenTheBorders]]
+        type = TCPClientInterface
+        enabled = yes
+        target_host = betweentheborders.com
+        target_port = 4242
+
       [[TCP Server]]
         type = TCPServerInterface
         enabled = yes
         listen_ip = 0.0.0.0
         listen_port = 4242
+
+      # Netbird mesh peers
+      [[Peer hierro]]
+        type = TCPClientInterface
+        enabled = yes
+        target_host = hierro.netbird.cloud
+        target_port = 4242
+
+      [[Peer blacktop]]
+        type = TCPClientInterface
+        enabled = yes
+        target_host = blacktop.netbird.cloud
+        target_port = 4242
+
+      [[Peer butthead]]
+        type = TCPClientInterface
+        enabled = yes
+        target_host = butthead.netbird.cloud
+        target_port = 4242
   '';
 
   # Reticulum ports
