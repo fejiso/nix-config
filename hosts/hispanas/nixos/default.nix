@@ -58,8 +58,11 @@
     [Desktop Entry]
     Type=Application
     Name=Telegram
-    Exec=telegram-desktop
+    Exec=${pkgs.telegram-desktop}/bin/telegram-desktop
+    Hidden=false
+    NoDisplay=false
     X-GNOME-Autostart-enabled=true
+    X-Cinnamon-Autostart-enabled=true
   '';
 
   # Open firewall for webcam stream
