@@ -36,6 +36,12 @@
     ];
   };
 
+  # Spanish locale for emilia
+  i18n.extraLocaleSettings = {
+    LC_ALL = "es_ES.UTF-8";
+  };
+  i18n.supportedLocales = [ "es_ES.UTF-8/UTF-8" "en_IE.UTF-8/UTF-8" ];
+
   # Cinnamon desktop (Linux Mint style)
   services.xserver = {
     enable = true;
