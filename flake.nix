@@ -119,6 +119,7 @@
     nixosConfigurations = {
       elitedex = mkNixosSystem "elitedex" "x86_64-linux";
       lenovix = mkNixosSystem "lenovix" "x86_64-linux";
+      hispanas = mkNixosSystem "hispanas" "x86_64-linux";
       a8 = mkNixosSystem "a8" "x86_64-linux";
       blacktop = mkNixosSystem "blacktop" "x86_64-linux";
       hierro = mkNixosSystem "hierro" "x86_64-linux";
