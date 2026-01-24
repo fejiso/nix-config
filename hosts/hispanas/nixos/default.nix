@@ -36,11 +36,19 @@
     ];
   };
 
-  # Spanish locale for emilia
-  i18n.extraLocaleSettings = {
-    LC_ALL = "es_ES.UTF-8";
-  };
+  # Support Spanish locale
   i18n.supportedLocales = [ "es_ES.UTF-8/UTF-8" "en_IE.UTF-8/UTF-8" ];
+
+  # Set Spanish locale for emilia only
+  systemd.tmpfiles.rules = [
+    "d /home/emilia/.config/environment.d 0755 emilia users -"
+  ];
+  environment.etc."skel/.config/environment.d/locale.conf".text = "";
+  system.activationScripts.emiliaLocale = ''
+    mkdir -p /home/emilia/.config/environment.d
+    echo 'LANG=es_ES.UTF-8' > /home/emilia/.config/environment.d/locale.conf
+    chown -R emilia:users /home/emilia/.config/environment.d
+  '';
 
   # Cinnamon desktop (Linux Mint style)
   services.xserver = {

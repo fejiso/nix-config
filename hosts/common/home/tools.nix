@@ -37,14 +37,7 @@
       language-server.clangd = {
         command = "${pkgs.clang-tools}/bin/clangd";
       };
-      language-server.haskell-language-server = {
-        command = "${pkgs.haskell-language-server}/bin/haskell-language-server-wrapper";
-        args = ["--lsp"];
-      };
-      language-server.jdtls = {
-        command = "${pkgs.jdt-language-server}/bin/jdtls";
-      };
-      
+
       language = [
         {
           name = "nix";
@@ -62,12 +55,6 @@
           language-servers = ["pylsp"];
         }
         {
-          name = "haskell";
-          auto-format = true;
-          language-servers = ["haskell-language-server"];
-          file-types = ["hs" "lhs" "tidal"];
-        }
-        {
           name = "c";
           auto-format = true;
           language-servers = ["clangd"];
@@ -76,11 +63,6 @@
           name = "cpp";
           auto-format = true;
           language-servers = ["clangd"];
-        }
-        {
-          name = "java";
-          auto-format = true;
-          language-servers = ["jdtls"];
         }
       ];
     };

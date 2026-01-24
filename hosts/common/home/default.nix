@@ -93,8 +93,6 @@
     sops
     strawberry
     telegram-desktop
-    zoom-us
-    libreoffice
     logseq
     ncspot
     spot

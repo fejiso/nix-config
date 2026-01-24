@@ -22,4 +22,13 @@
 
   # Enable Android development tools
   programs.android-tools.enable = true;
+
+  # Enable heavy dev tools
+  programs.dev-heavy.enable = true;
+
+  # Desktop packages
+  home.packages = with pkgs; [
+    libreoffice
+    zoom-us
+  ];
 }

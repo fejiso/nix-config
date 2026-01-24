@@ -15,16 +15,9 @@
     rustc
     cargo
 
-    # Development tools
-    stripe-cli
-    arduino-ide
-    arduino-cli
-
-    # Language servers
-    haskell-language-server
+    # Language servers (heavy ones in dev-heavy module)
     python3Packages.python-lsp-server
     clang-tools  # includes clangd for C/C++
-    jdt-language-server  # Java
     rust-analyzer
 
     # AWS tools

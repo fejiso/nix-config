@@ -18,6 +18,9 @@
   # Enable Android development tools
   programs.android-tools.enable = true;
 
+  # Enable heavy dev tools
+  programs.dev-heavy.enable = true;
+
   # Media server specific applications
   home.packages = with pkgs; [
     # Media management tools
@@ -30,6 +33,10 @@
 
     # Container management tools
     podman-tui
+
+    # Office
+    libreoffice
+    zoom-us
   ];
 
   # Home Manager state version

@@ -18,5 +18,6 @@
     ./tidalcycles.nix
     ./android-tools.nix
     ./mpd.nix
+    ./dev-heavy.nix
   ];
 }
