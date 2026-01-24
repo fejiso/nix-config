@@ -1,4 +1,4 @@
-# Lenovix specific NixOS configuration
+# Hispanas specific NixOS configuration
 {
   inputs,
   outputs,
@@ -45,6 +45,38 @@
     group = "video";
   };
   users.groups.video = {};
+
+  # Emilia user account
+  users.users.emilia = {
+    isNormalUser = true;
+    description = "Emilia";
+    extraGroups = [ "video" "audio" "networkmanager" ];
+    packages = with pkgs; [
+      telegram-desktop
+    ];
+  };
+
+  # Cinnamon desktop (Linux Mint style)
+  services.xserver = {
+    enable = true;
+    displayManager.lightdm.enable = true;
+    desktopManager.cinnamon.enable = true;
+  };
+
+  # Autologin for emilia
+  services.displayManager.autoLogin = {
+    enable = true;
+    user = "emilia";
+  };
+
+  # Autostart telegram-desktop
+  environment.etc."xdg/autostart/telegram.desktop".text = ''
+    [Desktop Entry]
+    Type=Application
+    Name=Telegram
+    Exec=telegram-desktop
+    X-GNOME-Autostart-enabled=true
+  '';
 
   # Open firewall for webcam stream
   networking.firewall.allowedTCPPorts = [ 8080 ];
