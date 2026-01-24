@@ -43,6 +43,10 @@
     desktopManager.cinnamon.enable = true;
   };
 
+  # Disable GNOME's ssh-agent (conflicts with programs.ssh.startAgent)
+  services.gnome.gnome-keyring.enable = lib.mkForce false;
+  services.gnome.gcr-ssh-agent.enable = false;
+
   # Autologin for emilia
   services.displayManager.autoLogin = {
     enable = true;
