@@ -115,6 +115,7 @@
     i2pd
     pipx
     ssh-to-age
+    python3Packages.meshtastic
     inputs.home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
 
