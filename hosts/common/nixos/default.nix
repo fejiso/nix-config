@@ -69,6 +69,17 @@
     font = "Lat2-Terminus16";
     keyMap = "us";
   };
+
+  # kmscon - modern TTY with TrueType/emoji support
+  services.kmscon = {
+    enable = true;
+    hwRender = true;
+    fonts = [
+      { name = "FiraCode Nerd Font Mono"; package = pkgs.nerd-fonts.fira-code; }
+      { name = "Noto Color Emoji"; package = pkgs.noto-fonts-color-emoji; }
+    ];
+    extraConfig = "font-size=14";
+  };
   services.xserver.xkb = {
     layout = "us";
     variant = "alt-intl";
