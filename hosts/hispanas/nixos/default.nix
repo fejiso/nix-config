@@ -58,7 +58,7 @@
     [Desktop Entry]
     Type=Application
     Name=Telegram
-    Exec=${pkgs.telegram-desktop}/bin/telegram-desktop
+    Exec=${pkgs.telegram-desktop}/bin/Telegram
     Hidden=false
     NoDisplay=false
     X-GNOME-Autostart-enabled=true
