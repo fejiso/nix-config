@@ -110,13 +110,24 @@
       [[Default Interface]]
         type = AutoInterface
         enabled = Yes
+        group_id = reticulum
 
       [[Yggdrasil Remote]]
         type = TCPClientInterface
         enabled = yes
         target_host = 201:5d78:af73:5caf:a4de:a79f:3278:71e5
         target_port = 4343
+
+      [[TCP Server]]
+        type = TCPServerInterface
+        enabled = yes
+        listen_ip = 0.0.0.0
+        listen_port = 4242
   '';
+
+  # Reticulum ports
+  networking.firewall.allowedTCPPorts = [ 4242 ];  # TCP server
+  networking.firewall.allowedUDPPorts = [ 29716 ]; # AutoInterface multicast discovery
 
 
   # Environment variable so all apps use the shared Reticulum instance
@@ -145,6 +156,8 @@
     display_name = ${hostname}
     announce_at_start = yes
     announce_interval = 360
+    propagation_node = yes
+    propagation_limit = 256
   '';
 
 
