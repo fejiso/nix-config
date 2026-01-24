@@ -114,6 +114,7 @@
     yggdrasil
     i2pd
     pipx
+    ssh-to-age
     inputs.home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
   ];
 
