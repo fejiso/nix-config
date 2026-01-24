@@ -3,6 +3,7 @@
   config,
   lib,
   pkgs,
+  hostname,
   ...
 }: {
   # SSH server
@@ -86,10 +87,11 @@
     };
   };
 
-  # Shared Reticulum config directory
+  # Shared config directories
   systemd.tmpfiles.rules = [
     "d /etc/reticulum 0755 root root -"
     "d /var/run/reticulum 0777 root root -"
+    "d /etc/lxmf 0755 root root -"
   ];
 
   # Reticulum config for shared access
@@ -99,6 +101,7 @@
     share_instance = Yes
     shared_instance_port = 37428
     instance_control_port = 37429
+    node_name = ${hostname}
 
     [logging]
     loglevel = 4
@@ -118,6 +121,31 @@
 
   # Environment variable so all apps use the shared Reticulum instance
   environment.variables.RNS_SHARED_INSTANCE = "Yes";
+
+  # LXMF daemon for message propagation and node announcement
+  systemd.services.lxmd = {
+    description = "LXMF Propagation Daemon";
+    after = [ "network.target" "rnsd.service" ];
+    requires = [ "rnsd.service" ];
+    wantedBy = [ "multi-user.target" ];
+    environment = {
+      RNS_SHARED_INSTANCE = "Yes";
+    };
+    serviceConfig = {
+      Type = "simple";
+      ExecStart = "${pkgs.python3Packages.lxmf}/bin/lxmd --config /etc/lxmf";
+      Restart = "always";
+      RestartSec = "5";
+    };
+  };
+
+  # LXMF config
+  environment.etc."lxmf/config".text = ''
+    [lxmf]
+    display_name = ${hostname}
+    announce_at_start = yes
+    announce_interval = 360
+  '';
 
 
 }

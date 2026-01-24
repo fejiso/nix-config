@@ -96,6 +96,13 @@ in
     secretKeyFile = "/var/lib/nix-serve/cache-priv-key.pem";
   };
 
+  # Ensure nix-serve user/group exist for keygen service
+  users.users.nix-serve = {
+    isSystemUser = true;
+    group = "nix-serve";
+  };
+  users.groups.nix-serve = {};
+
   # Generate signing key if it doesn't exist
   systemd.services.nix-serve-keygen = {
     description = "Generate nix-serve signing key";
