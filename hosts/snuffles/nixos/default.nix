@@ -89,6 +89,7 @@
     environment = {
       BEASTHOST = "host.containers.internal";
       BEASTPORT = "30005";
+      FR24KEY = "b7496861b5f2137f";
       MLAT = "yes";
     };
     volumes = [ "/var/lib/fr24feed:/etc/fr24feed" ];
