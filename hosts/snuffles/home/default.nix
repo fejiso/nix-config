@@ -11,7 +11,4 @@
     ../../common/home
   ];
 
-  # ADS-B feeder specific packages
-  home.packages = with pkgs; [
-  ];
 }

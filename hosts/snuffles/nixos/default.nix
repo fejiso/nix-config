@@ -101,5 +101,5 @@
   ];
 
   # System state version
-  system.stateVersion = "25.05";
+  system.stateVersion = lib.mkForce "25.11";
 }
