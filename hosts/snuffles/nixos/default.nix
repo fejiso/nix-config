@@ -79,20 +79,19 @@
     environment = {
       BEASTHOST = "host.containers.internal";
       BEASTPORT = "30005";
-      # FEEDER_ID = "your-feeder-id";
     };
+    volumes = [ "/var/lib/piaware:/var/cache/piaware" ];
   };
 
   # FR24 Feed container (Flightradar24 feeder)
   virtualisation.oci-containers.containers.fr24feed = {
     image = "ghcr.io/sdr-enthusiasts/docker-flightradar24:latest";
-    dependsOn = [ ];
     environment = {
       BEASTHOST = "host.containers.internal";
       BEASTPORT = "30005";
-      FR24KEY = "b7496861b5f2137f";
       MLAT = "yes";
     };
+    volumes = [ "/var/lib/fr24feed:/etc/fr24feed" ];
   };
 
   # Ensure feeders start after readsb and have enough file descriptors
