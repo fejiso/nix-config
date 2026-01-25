@@ -84,14 +84,19 @@
   # FR24 Feed container (Flightradar24 feeder)
   virtualisation.oci-containers.containers.fr24feed = {
     image = "ghcr.io/sdr-enthusiasts/docker-flightradar24:latest";
+    dependsOn = [ ];
     environment = {
       BEASTHOST = "localhost";
       BEASTPORT = "30005";
-      # Set FR24KEY via sops secrets or environment file
-      # FR24KEY = "your-sharing-key";
+      FR24KEY = "b7496861b5f2137f";
+      MLAT = "yes";
     };
     extraOptions = [ "--network=host" ];
   };
+
+  # Ensure feeders start after readsb
+  systemd.services.podman-fr24feed.after = [ "readsb.service" ];
+  systemd.services.podman-piaware.after = [ "readsb.service" ];
 
   # Open firewall for ADS-B ports
   networking.firewall.allowedTCPPorts = [
