@@ -77,14 +77,10 @@
   virtualisation.oci-containers.containers.piaware = {
     image = "ghcr.io/sdr-enthusiasts/docker-piaware:latest";
     environment = {
-      BEASTHOST = "127.0.0.1";
+      BEASTHOST = "host.containers.internal";
       BEASTPORT = "30005";
-      RECEIVER_TYPE = "relay";
-      READSB_DEVICE_TYPE = "";  # Disable internal SDR
-      # Set these via sops secrets or environment file
       # FEEDER_ID = "your-feeder-id";
     };
-    extraOptions = [ "--network=host" ];
   };
 
   # FR24 Feed container (Flightradar24 feeder)
@@ -92,12 +88,11 @@
     image = "ghcr.io/sdr-enthusiasts/docker-flightradar24:latest";
     dependsOn = [ ];
     environment = {
-      BEASTHOST = "127.0.0.1";
+      BEASTHOST = "host.containers.internal";
       BEASTPORT = "30005";
       FR24KEY = "b7496861b5f2137f";
       MLAT = "yes";
     };
-    extraOptions = [ "--network=host" ];
   };
 
   # Ensure feeders start after readsb and have enough file descriptors
