@@ -79,7 +79,8 @@
     environment = {
       BEASTHOST = "127.0.0.1";
       BEASTPORT = "30005";
-      RECEIVER_TYPE = "other";  # Use external receiver, don't run dump1090
+      RECEIVER_TYPE = "relay";
+      READSB_DEVICE_TYPE = "";  # Disable internal SDR
       # Set these via sops secrets or environment file
       # FEEDER_ID = "your-feeder-id";
     };
@@ -91,7 +92,7 @@
     image = "ghcr.io/sdr-enthusiasts/docker-flightradar24:latest";
     dependsOn = [ ];
     environment = {
-      BEASTHOST = "localhost";
+      BEASTHOST = "127.0.0.1";
       BEASTPORT = "30005";
       FR24KEY = "b7496861b5f2137f";
       MLAT = "yes";
