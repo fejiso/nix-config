@@ -43,6 +43,7 @@
           --gain -10 \
           --ppm 0 \
           --net \
+          --net-bind-address 0.0.0.0 \
           --net-heartbeat 60 \
           --net-ro-size 1250 \
           --net-ro-interval 0.05 \
