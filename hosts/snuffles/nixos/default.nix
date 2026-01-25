@@ -94,9 +94,15 @@
     extraOptions = [ "--network=host" ];
   };
 
-  # Ensure feeders start after readsb
-  systemd.services.podman-fr24feed.after = [ "readsb.service" ];
-  systemd.services.podman-piaware.after = [ "readsb.service" ];
+  # Ensure feeders start after readsb and have enough file descriptors
+  systemd.services.podman-fr24feed = {
+    after = [ "readsb.service" ];
+    serviceConfig.LimitNOFILE = 65535;
+  };
+  systemd.services.podman-piaware = {
+    after = [ "readsb.service" ];
+    serviceConfig.LimitNOFILE = 65535;
+  };
 
   # Open firewall for ADS-B ports
   networking.firewall.allowedTCPPorts = [
