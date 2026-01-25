@@ -30,6 +30,9 @@
     rtl-sdr
   ];
 
+  # Prevent dump1090 from auto-starting (we use readsb instead)
+  systemd.services.dump1090-fa.enable = false;
+
   # Readsb service for RTL-SDR
   systemd.services.readsb = {
     description = "Readsb ADS-B decoder";
