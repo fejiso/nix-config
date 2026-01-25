@@ -94,6 +94,12 @@
     volumes = [ "/var/lib/fr24feed:/etc/fr24feed" ];
   };
 
+  # Create persistent directories for feeders
+  systemd.tmpfiles.rules = [
+    "d /var/lib/piaware 0755 root root -"
+    "d /var/lib/fr24feed 0755 root root -"
+  ];
+
   # Ensure feeders start after readsb and have enough file descriptors
   systemd.services.podman-fr24feed = {
     after = [ "readsb.service" ];
