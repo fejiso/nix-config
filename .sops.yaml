@@ -11,6 +11,7 @@ keys:
   - &blacktop_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINQePaMUwEu3oPfVMg/Yk9BiX6QbDmxRBC3Icnd1GkGQ
   - &butthead_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDa46hBmT7aRcNtTSKRmzTG8VBBrf9dU+GsUMgMzS7ld
   - &hispanas_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICzC0DNxw+lrSBF/lgGMKY2eZJWm1KD1FP47sdakZP9Z
+  - &snuffles_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOt+r0UbKvmpLwz13qBbxlHyuL0BZ9sg2/L83Q4FA75S
 
   # Age keys (derived from SSH host keys for sops-nix)
   - &hierro_age age1hva90d7n8xdqhus9r9r96pfs6uyrglkh7446l7hde40j4kg9pugstjczuv
@@ -18,6 +19,7 @@ keys:
   - &butthead_age age1tm9cm7cvu76dgdgrg88ws2y2zfjyzmr2rpwrl3fjczpzc3zsmyvsgkne0c
   - &lenovix_age age18hutz4xq0lk2y0vy0flk5w0qx5as8xlr9k0wd5qshjvglldceq6spxmp02
   - &hispanas_age age1za9qg39ygxc4xlda6elmmk3fq2845j3r2dv6qw3fvkjdtcklhvqsqfvvxv
+  - &snuffles_age age1t60rm2grrq3zrhpgpgxz4uc3un7wuy93j3nvp6j7uujkn5l52qasclxhdl
 
 creation_rules:
   # Home-manager secrets - use user SSH key
@@ -34,10 +36,12 @@ creation_rules:
       - *butthead_ssh
       - *lenovix_ssh
       - *hispanas_ssh
+      - *snuffles_ssh
       - *user_ssh
       - *hierro_age
       - *blacktop_age
       - *butthead_age
       - *lenovix_age
       - *hispanas_age
+      - *snuffles_age
       
