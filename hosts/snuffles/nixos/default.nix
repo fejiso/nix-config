@@ -19,6 +19,10 @@
   # RTL-SDR udev rules
   hardware.rtl-sdr.enable = true;
 
+  # Load RTL-SDR module and blacklist DVB driver
+  boot.kernelModules = [ "rtl_sdr" ];
+  boot.blacklistedKernelModules = [ "dvb_usb_rtl28xxu" "rtl2832" "rtl2830" ];
+
   # ADS-B packages
   environment.systemPackages = with pkgs; [
     readsb
