@@ -77,8 +77,9 @@
   virtualisation.oci-containers.containers.piaware = {
     image = "ghcr.io/sdr-enthusiasts/docker-piaware:latest";
     environment = {
-      BEASTHOST = "localhost";
+      BEASTHOST = "127.0.0.1";
       BEASTPORT = "30005";
+      RECEIVER_TYPE = "other";  # Use external receiver, don't run dump1090
       # Set these via sops secrets or environment file
       # FEEDER_ID = "your-feeder-id";
     };
