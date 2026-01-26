@@ -194,7 +194,6 @@ in
     "Z /var/lib/npm-storage/data 0755 100000 100000 -"
     "Z /var/lib/npm-storage/letsencrypt 0755 100000 100000 -"
     "d /run/user/13200 0700 nginx-proxy-manager nginx-proxy-manager -"
-    "d /run/user/13105 0700 emby-podman emby-podman -"
     "d /run/user/13106 0700 media-podman media-services -"
     "d /run/user/13107 0700 utils-podman utils-podman -"
     "d /var/lib/ollama 0755 utils-podman utils-podman -"
@@ -575,24 +574,23 @@ in
       RemainAfterExit = true;
       ExecStart = [
         "${pkgs.systemd}/bin/loginctl enable-linger nginx-proxy-manager"
-        "${pkgs.systemd}/bin/loginctl enable-linger emby-podman"
         "${pkgs.systemd}/bin/loginctl enable-linger media-podman"
         "${pkgs.systemd}/bin/loginctl enable-linger utils-podman"
       ];
     };
   };
 
-  # Dedicated user for emby
-  users.users.emby-podman = {
-    isSystemUser = true;
-    group = "media-services";
-    extraGroups = [ "media-services" ];
-    uid = 13105;
-    home = "/var/lib/emby-podman";
-    createHome = true;
-    subUidRanges = [{ startUid = 200000; count = 65536; }];
-    subGidRanges = [{ startGid = 200000; count = 65536; }];
-  };
+  # Emby now uses media-podman user like other media services
+  # users.users.emby-podman = {
+  #   isSystemUser = true;
+  #   group = "media-services";
+  #   extraGroups = [ "media-services" ];
+  #   uid = 13105;
+  #   home = "/var/lib/emby-podman";
+  #   createHome = true;
+  #   subUidRanges = [{ startUid = 200000; count = 65536; }];
+  #   subGidRanges = [{ startGid = 200000; count = 65536; }];
+  # };
 
   # Shared user for all media services - defined in tdarr-worker.nix
   # users.users.media-podman = {
@@ -628,7 +626,7 @@ in
     gid = 13107;
   };
 
-  # Emby container (uses host network so NPM can reach it at localhost)
+  # Emby container
   systemd.services.emby = {
     description = "Emby Media Server";
     after = [ "network-online.target" ];
@@ -639,7 +637,7 @@ in
 
     serviceConfig = commonRestartConfig // {
       Type = "simple";
-      User = "emby-podman";
+      User = "media-podman";
       Group = "media-services";
       UMask = "0002";
       TimeoutStartSec = "5min";
@@ -651,8 +649,8 @@ in
       Nice = 19;           # Lowest process priority
 
       Environment = [
-        "HOME=/var/lib/emby-podman"
-        "XDG_RUNTIME_DIR=/run/user/13105"
+        "HOME=/var/lib/media-podman"
+        "XDG_RUNTIME_DIR=/run/user/13106"
         "PATH=/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin"
       ];
 
@@ -662,7 +660,6 @@ in
 
       ExecStart = ''
         ${pkgs.podman}/bin/podman run --rm --name emby \
-          --userns=keep-id:uid=13105,gid=13100 \
           --label io.containers.autoupdate=registry \
           --log-driver=journald \
           --shm-size=1024m \
@@ -675,8 +672,8 @@ in
           -v /mnt/user/Music:/music:ro \
           -v /mnt/user/Backups/Emby:/backup:rw \
           --device /dev/dri:/dev/dri \
-          -e PUID=13105 \
-          -e PGID=13100 \
+          -e PUID=0 \
+          -e PGID=0 \
           -e UMASK=002 \
           -e TZ=Europe/Dublin \
           lscr.io/linuxserver/emby:latest

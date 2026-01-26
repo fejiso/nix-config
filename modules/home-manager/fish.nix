@@ -29,6 +29,7 @@
         history merge
       end
       zoxide init fish | source
+      set -gx GPG_TTY (tty)
       gpg-connect-agent updatestartuptty /bye >/dev/null
       bind \ct __fzf_open_file
       bind alt-backspace backward-kill-word

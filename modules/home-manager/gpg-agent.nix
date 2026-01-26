@@ -12,7 +12,6 @@
     extraConfig = ''
       allow-loopback-pinentry
       allow-preset-passphrase
-      grab
     '';
   };
 }
