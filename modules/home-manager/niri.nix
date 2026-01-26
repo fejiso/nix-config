@@ -222,6 +222,11 @@ with lib;
       }
       '' else ''
       // Blacktop: Laptop with panel + external monitors
+      output "Ancor Communications Inc VE248 H3LMQS153004" {
+          position x=0 y=0
+          mode "1920x1080@60.000"
+      }
+
       output "AU Optronics 0xA48F Unknown" {
           position x=1920 y=0
           scale 1.0
