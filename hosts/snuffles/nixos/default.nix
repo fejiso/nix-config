@@ -14,6 +14,12 @@
     ../../../modules/nixos/laptop.nix
   ];
 
+  # PiAware feeder ID secret
+  sops.secrets.piaware-feeder-id = {
+    sopsFile = "${inputs.self}/secrets/piaware.yaml";
+    key = hostname;
+  };
+
   # Host-specific networking
   networking.hostName = "snuffles";
 
@@ -75,13 +81,29 @@
   };
 
   # PiAware container (FlightAware feeder)
-  virtualisation.oci-containers.containers.piaware = {
-    image = "ghcr.io/sdr-enthusiasts/docker-piaware:latest";
-    environment = {
-      BEASTHOST = "host.containers.internal";
-      BEASTPORT = "30005";
+  systemd.services.piaware = {
+    description = "PiAware FlightAware Feeder";
+    after = [ "network-online.target" "readsb.service" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+    path = [ pkgs.podman ];
+    serviceConfig = {
+      Type = "simple";
+      Restart = "always";
+      RestartSec = "30";
+      ExecStartPre = "-${pkgs.podman}/bin/podman rm -f piaware";
+      ExecStart = pkgs.writeShellScript "start-piaware" ''
+        FEEDER_ID=$(cat ${config.sops.secrets.piaware-feeder-id.path})
+        ${pkgs.podman}/bin/podman run --rm --name piaware \
+          -e BEASTHOST=host.containers.internal \
+          -e BEASTPORT=30005 \
+          -e FEEDER_ID="$FEEDER_ID" \
+          -v /var/lib/piaware:/var/cache/piaware \
+          --add-host=host.containers.internal:host-gateway \
+          ghcr.io/sdr-enthusiasts/docker-piaware:latest
+      '';
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 piaware";
     };
-    volumes = [ "/var/lib/piaware:/var/cache/piaware" ];
   };
 
   # FR24 Feed container (Flightradar24 feeder)
@@ -102,12 +124,8 @@
     "d /var/lib/fr24feed 0755 root root -"
   ];
 
-  # Ensure feeders start after readsb and have enough file descriptors
+  # Ensure fr24feed starts after readsb
   systemd.services.podman-fr24feed = {
-    after = [ "readsb.service" ];
-    serviceConfig.LimitNOFILE = 65535;
-  };
-  systemd.services.podman-piaware = {
     after = [ "readsb.service" ];
     serviceConfig.LimitNOFILE = 65535;
   };
