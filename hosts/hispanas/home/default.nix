@@ -13,7 +13,18 @@
 
   # Laptop-specific packages
   home.packages = with pkgs; [
+    # CD ripping tools
+    cdparanoia
+    flac
+    cd-discid
+    eject
   ];
+
+  # CD ripping script
+  home.file.".local/bin/rip-cd" = {
+    source = ../../../scripts/rip-cd.sh;
+    executable = true;
+  };
 
   
 

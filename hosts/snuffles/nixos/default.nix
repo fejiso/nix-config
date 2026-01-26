@@ -20,6 +20,12 @@
     key = hostname;
   };
 
+  # FR24 sharing key secret
+  sops.secrets.fr24feed-key = {
+    sopsFile = "${inputs.self}/secrets/fr24feed.yaml";
+    key = hostname;
+  };
+
   # Host-specific networking
   networking.hostName = "snuffles";
 
@@ -107,18 +113,36 @@
   };
 
   # FR24 Feed container (Flightradar24 feeder)
-  virtualisation.oci-containers.containers.fr24feed = {
-    image = "ghcr.io/sdr-enthusiasts/docker-flightradar24:latest";
-    environment = {
-      BEASTHOST = "host.containers.internal";
-      BEASTPORT = "30005";
-      FR24KEY = "b7496861b5f2137f";
-      FR24USER = "fr24@fjim.fastmail.jp";
-      MLAT = "yes";
-      LAT = "40.2444";
-      LON = "-3.6971";
+  # To register a new feeder, use:
+  # curl "http://feed.flightradar24.com/self-service.php?action=register&latitude=LAT&longitude=LON&altitude=ALT_IN_FEET&email=EMAIL&feed_type=adsb&sw=1.0.54-0"
+  # Radar ID: T-LEGT56
+  systemd.services.fr24feed = {
+    description = "FR24 Feed FlightRadar24 Feeder";
+    after = [ "network-online.target" "readsb.service" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+    path = [ pkgs.podman ];
+    serviceConfig = {
+      Type = "simple";
+      Restart = "always";
+      RestartSec = "30";
+      ExecStartPre = "-${pkgs.podman}/bin/podman rm -f fr24feed";
+      ExecStart = pkgs.writeShellScript "start-fr24feed" ''
+        FR24KEY=$(cat ${config.sops.secrets.fr24feed-key.path})
+        ${pkgs.podman}/bin/podman run --rm --name fr24feed \
+          -e BEASTHOST=host.containers.internal \
+          -e BEASTPORT=30005 \
+          -e FR24KEY="$FR24KEY" \
+          -e FR24USER=fr24@fjim.fastmail.jp \
+          -e MLAT=yes \
+          -e LAT=40.2444 \
+          -e LON=-3.6971 \
+          -v /var/lib/fr24feed:/etc/fr24feed \
+          --add-host=host.containers.internal:host-gateway \
+          ghcr.io/sdr-enthusiasts/docker-flightradar24:latest
+      '';
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 fr24feed";
     };
-    volumes = [ "/var/lib/fr24feed:/etc/fr24feed" ];
   };
 
   # Create persistent directories for feeders
@@ -127,11 +151,6 @@
     "d /var/lib/fr24feed 0755 root root -"
   ];
 
-  # Ensure fr24feed starts after readsb
-  systemd.services.podman-fr24feed = {
-    after = [ "readsb.service" ];
-    serviceConfig.LimitNOFILE = 65535;
-  };
 
   # Open firewall for ADS-B ports
   networking.firewall.allowedTCPPorts = [
