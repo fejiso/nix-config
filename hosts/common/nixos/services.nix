@@ -16,8 +16,8 @@
     };
   };
 
-  # Enable SSH agent
-  programs.ssh.startAgent = true;
+  # Disable NixOS SSH agent - GPG agent handles SSH via enableSshSupport
+  programs.ssh.startAgent = false;
 
   # Enable CUPS for printing
   services.printing = {
