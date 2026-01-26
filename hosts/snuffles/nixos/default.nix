@@ -112,11 +112,11 @@
     environment = {
       BEASTHOST = "host.containers.internal";
       BEASTPORT = "30005";
-      # FR24KEY = "b7496861b5f2137f";  # Commented out to trigger signup
+      FR24KEY = "b7496861b5f2137f";
       FR24USER = "fr24@fjim.fastmail.jp";
       MLAT = "yes";
-      LAT = "40.2444";  # Add your latitude here
-      LON = "-3.6971";  # Add your longitude here
+      LAT = "40.2444";
+      LON = "-3.6971";
     };
     volumes = [ "/var/lib/fr24feed:/etc/fr24feed" ];
   };
