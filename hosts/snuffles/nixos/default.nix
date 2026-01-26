@@ -11,6 +11,7 @@
   imports = [
     ./hardware-configuration.nix
     ../../common/nixos
+    ../../../modules/nixos/laptop.nix
   ];
 
   # Host-specific networking
