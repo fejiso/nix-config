@@ -54,12 +54,13 @@ let
 
       ExecStart = ''
         ${pkgs.podman}/bin/podman run --rm --name ${name} \
+          --userns=keep-id:uid=13106,gid=13100 \
           --label io.containers.autoupdate=registry \
           --log-driver=journald \
           -p ${toString port}:${toString port} \
           ${lib.concatMapStringsSep " " (v: "-v ${v}") volumes} \
-          -e PUID=0 \
-          -e PGID=0 \
+          -e PUID=13106 \
+          -e PGID=13100 \
           -e UMASK=002 \
           -e TZ=Europe/Dublin \
           ${image}
@@ -661,6 +662,7 @@ in
 
       ExecStart = ''
         ${pkgs.podman}/bin/podman run --rm --name emby \
+          --userns=keep-id:uid=13105,gid=13100 \
           --label io.containers.autoupdate=registry \
           --log-driver=journald \
           --shm-size=1024m \
@@ -673,8 +675,8 @@ in
           -v /mnt/user/Music:/music:ro \
           -v /mnt/user/Backups/Emby:/backup:rw \
           --device /dev/dri:/dev/dri \
-          -e PUID=0 \
-          -e PGID=0 \
+          -e PUID=13105 \
+          -e PGID=13100 \
           -e UMASK=002 \
           -e TZ=Europe/Dublin \
           lscr.io/linuxserver/emby:latest
@@ -1065,12 +1067,13 @@ in
         fi
 
         ${pkgs.podman}/bin/podman run --rm --name qbittorrent \
+          --userns=keep-id:uid=13106,gid=13100 \
           --network container:gluetun \
           --label io.containers.autoupdate=registry \
           -v /var/lib/qbittorrent:/config:rw \
           -v /mnt/user/download:/downloads:rw \
-          -e PUID=0 \
-          -e PGID=0 \
+          -e PUID=13106 \
+          -e PGID=13100 \
           -e UMASK=002 \
           -e TZ=Europe/Dublin \
           -e WEBUI_PORT=8080 \
