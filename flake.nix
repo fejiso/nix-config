@@ -124,7 +124,7 @@
       mkColmena = name: {
         deployment = {
           targetHost = name;
-          targetUser = "root";
+          targetUser = "z-247";
         };
         imports = commonModules.nixos ++ [ ./hosts/${name}/nixos ];
         _module.args.hostname = name;
