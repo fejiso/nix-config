@@ -71,7 +71,6 @@
     ports = [ 22 ];
     settings = {
       PasswordAuthentication = lib.mkForce true;
-      UseDns = true;
       X11Forwarding = false;
       PermitRootLogin = lib.mkForce "yes";
     };
