@@ -1,4 +1,10 @@
-{ config, pkgs, ... }:
+{
+  config,
+  pkgs,
+  lib,
+  hostname ? "",
+  ...
+}:
 
 {
   programs.fish = {
@@ -48,7 +54,7 @@
       set -Ua fish_user_paths /var/lib/flatpak/exports/bin
       set -U fish_user_paths $HOME/.cargo/bin $fish_user_paths
       set -U fish_user_paths $HOME/bin $fish_user_paths
-      set -U fish_user_paths $HOME/.toolbox/bin $fish_user_paths
+      ${lib.optionalString (pkgs.stdenv.isDarwin || hostname == "devdesktop") "set -U fish_user_paths $HOME/.toolbox/bin $fish_user_paths"}
       export ANT_ARGS='-logger org.apache.tools.ant.listener.AnsiColorLogger'
     '';
     plugins = [
