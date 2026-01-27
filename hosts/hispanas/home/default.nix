@@ -18,7 +18,7 @@
     # CD ripping tools
     cdparanoia
     flac
-    cd-discid
+    cddiscid
     eject
   ];
 
