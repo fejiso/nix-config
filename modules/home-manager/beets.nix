@@ -5,8 +5,8 @@
 
   xdg.configFile."beets/config.yaml".text = ''
     plugins: fetchart embedart scrub replaygain lastgenre chroma web bpd rewrite mbsync duplicates missing
-    directory: /mnt/user/Music
-    library: /mnt/user/Music/musiclibrary.blb
+    directory: /mnt/Music
+    library: /mnt/Music/musiclibrary.blb
     art_filename: albumart
     threaded: yes
     original_date: no
