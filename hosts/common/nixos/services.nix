@@ -195,7 +195,8 @@
     announce_at_start = yes
     announce_interval = 360
     propagation_node = yes
-    propagation_limit = 256
+    propagation_limit = 16384
+    storage_limit = 1073741824
   '';
 
 
