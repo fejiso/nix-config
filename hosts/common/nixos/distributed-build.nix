@@ -63,7 +63,9 @@ let
     supportedFeatures = host.supportedFeatures;
     protocol = "ssh-ng";
   } // (lib.optionalAttrs ((keys.${name}.hostPublicKey or "") != "") {
-    publicHostKey = keys.${name}.hostPublicKey;
+    publicHostKey = if lib.hasPrefix "ssh-ed25519 " keys.${name}.hostPublicKey
+      then lib.substring 12 (-1) keys.${name}.hostPublicKey
+      else keys.${name}.hostPublicKey;
   })) otherHosts;
 
   # Generate substituter URLs only for always-on hosts
