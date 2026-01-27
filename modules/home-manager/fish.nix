@@ -46,11 +46,17 @@
       set SHELL (which fish)
       set HELIX_RUNTIME $HOME/dev/runtime
 
-      # Clean up legacy universal variable if it exists to avoid persistence issues
+      # Clean up legacy universal variable to avoid persistence issues and root path pollution
       if set -q fish_user_paths
-        while set -l index (contains -i $HOME/.toolbox/bin $fish_user_paths)
-          set -e fish_user_paths[$index]
+        set -l new_paths
+        for path in $fish_user_paths
+          if not string match -q "/root*" -- $path
+            if test "$path" != "$HOME/.toolbox/bin"
+              set -a new_paths $path
+            end
+          end
         end
+        set -U fish_user_paths $new_paths
       end
 
       fish_add_path --path --append $HOME/.nix-profile/bin
