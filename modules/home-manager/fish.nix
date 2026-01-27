@@ -45,16 +45,27 @@
       set -Ux FZF_DEFAULT_COMMAND "rg --files -g '!.git'"
       set SHELL (which fish)
       set HELIX_RUNTIME $HOME/dev/runtime
-      set PATH $PATH /home/z-247/.nix-profile/bin
-      set PATH $PATH /home/z-247/.local/bin
-      set PATH $PATH /home/superfer/.local/bin
-      set PATH $PATH ~/.nix-profile/bin
-      set PATH $PATH /opt/homebrew/opt/libpq/bin
-      set -Ua fish_user_paths $HOME/.local/share/flatpak/exports/bin
-      set -Ua fish_user_paths /var/lib/flatpak/exports/bin
-      set -U fish_user_paths $HOME/.cargo/bin $fish_user_paths
-      set -U fish_user_paths $HOME/bin $fish_user_paths
-      ${lib.optionalString (pkgs.stdenv.isDarwin || hostname == "devdesktop") "set -U fish_user_paths $HOME/.toolbox/bin $fish_user_paths"}
+
+      # Clean up legacy universal variable if it exists to avoid persistence issues
+      if set -q fish_user_paths
+        while set -l index (contains -i $HOME/.toolbox/bin $fish_user_paths)
+          set -e fish_user_paths[$index]
+        end
+      end
+
+      fish_add_path --path --append $HOME/.nix-profile/bin
+      fish_add_path --path --append $HOME/.local/bin
+      fish_add_path --path --append ~/.nix-profile/bin
+      fish_add_path --path --append /opt/homebrew/opt/libpq/bin
+      fish_add_path --path --append $HOME/.local/share/flatpak/exports/bin
+      fish_add_path --path --append /var/lib/flatpak/exports/bin
+      fish_add_path --path --prepend $HOME/.cargo/bin
+      fish_add_path --path --prepend $HOME/bin
+      
+      if test "$USER" != "root"
+        ${lib.optionalString (pkgs.stdenv.isDarwin || hostname == "devdesktop") "fish_add_path --path --prepend $HOME/.toolbox/bin"}
+      end
+
       export ANT_ARGS='-logger org.apache.tools.ant.listener.AnsiColorLogger'
     '';
     plugins = [
