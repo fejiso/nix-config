@@ -118,6 +118,21 @@
         enabled = yes
         target_host = 201:5d78:af73:5caf:a4de:a79f:3278:71e5
         target_port = 4343
+      [[rothbard_RNS_transport_ZA_ygg]]
+        type = TCPClientInterface
+        enabled = true
+        target_host = 200:73eb:2e4:14be:aac7:90b3:784b:71a3
+        target_port = 4242
+      [[0rbit-yggdrasil]]
+        type = TCPClientInterface
+        enabled = true
+        target_host = 200:978c:6347:8b49:f73e:ac69:daa:f71a
+        target_port = 4242
+      [[Int32 Pi(Ygg)]]
+        type = TCPClientInterface
+        enabled = true
+        target_host = 200:b55c:7e7a:80fe:9e32:cded:55d2:91
+        target_port = 4242
 
       # Public Reticulum TCP hubs (geographically distributed)
       [[RNS Dublin]]
@@ -147,6 +162,7 @@
         type = I2PInterface
         enabled = yes
         peers = mrwqlsioq4hoo2lmeeud7dkfscnm7yxak7dmiyvsrnpfag3z5tsq.b32.i2p
+
 
       # Netbird mesh peers
       [[Peer hierro]]
