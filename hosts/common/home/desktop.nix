@@ -11,10 +11,14 @@
     logseq
     libreoffice
     zoom-us
+    
 
     # Music players
     strawberry
     ncspot
     spot
+
+# Music ripping
+    whipper
   ];
 }
