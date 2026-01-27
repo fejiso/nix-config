@@ -64,7 +64,7 @@ let
     protocol = "ssh-ng";
   } // (lib.optionalAttrs ((keys.${name}.hostPublicKey or "") != "") {
     publicHostKey = if lib.hasPrefix "ssh-ed25519 " keys.${name}.hostPublicKey
-      then lib.substring 12 (-1) keys.${name}.hostPublicKey
+      then lib.substring 12 (lib.stringLength keys.${name}.hostPublicKey) keys.${name}.hostPublicKey
       else keys.${name}.hostPublicKey;
   })) otherHosts;
 
