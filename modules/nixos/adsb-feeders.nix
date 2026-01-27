@@ -91,15 +91,23 @@ with lib;
               cfg = config.services.adsb-feeders;
             in
             pkgs.writeShellScript "start-piaware" ''
-              ${optionalString (cfg.piaware.feederIdSecretFile != null)
-                ''FEEDER_ID=$(cat ${cfg.piaware.feederIdSecretFile})''}
-              ${pkgs.podman}/bin/podman run --rm --name piaware \
-                -e BEASTHOST=${cfg.beastHost} \
-                -e BEASTPORT=${cfg.beastPort} \
-                ${optionalString (cfg.piaware.feederIdSecretFile != null) ''-e FEEDER_ID="$FEEDER_ID" \''} \
-                -v /var/lib/piaware:/var/cache/piaware \
-                --add-host=host.containers.internal:host-gateway \
-                ghcr.io/sdr-enthusiasts/docker-piaware:latest
+              ${if cfg.piaware.feederIdSecretFile != null then ''
+                FEEDER_ID=$(cat ${cfg.piaware.feederIdSecretFile})
+                ${pkgs.podman}/bin/podman run --rm --name piaware \
+                  -e BEASTHOST=${cfg.beastHost} \
+                  -e BEASTPORT=${cfg.beastPort} \
+                  -e FEEDER_ID="$FEEDER_ID" \
+                  -v /var/lib/piaware:/var/cache/piaware \
+                  --add-host=host.containers.internal:host-gateway \
+                  ghcr.io/sdr-enthusiasts/docker-piaware:latest
+              '' else ''
+                ${pkgs.podman}/bin/podman run --rm --name piaware \
+                  -e BEASTHOST=${cfg.beastHost} \
+                  -e BEASTPORT=${cfg.beastPort} \
+                  -v /var/lib/piaware:/var/cache/piaware \
+                  --add-host=host.containers.internal:host-gateway \
+                  ghcr.io/sdr-enthusiasts/docker-piaware:latest
+              ''}
             '';
           ExecStop = "${pkgs.podman}/bin/podman stop -t 10 piaware";
         };

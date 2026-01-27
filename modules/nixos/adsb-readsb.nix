@@ -144,14 +144,15 @@ with lib;
         ExecStart =
           let
             cfg = config.services.adsb-readsb.tar1090;
+            latArg = optionalString (cfg.latitude != null) "-e LAT=${cfg.latitude}";
+            lonArg = optionalString (cfg.longitude != null) "-e LON=${cfg.longitude}";
           in
           pkgs.writeShellScript "start-tar1090" ''
             ${pkgs.podman}/bin/podman run --rm --name tar1090 \
               -p ${toString cfg.port}:80 \
               -e BEASTHOST=host.containers.internal \
               -e BEASTPORT=30005 \
-              ${optionalString (cfg.latitude != null) "-e LAT=${cfg.latitude}"} \
-              ${optionalString (cfg.longitude != null) "-e LON=${cfg.longitude}"} \
+              ${latArg} ${lonArg} \
               --add-host=host.containers.internal:host-gateway \
               ghcr.io/sdr-enthusiasts/docker-tar1090:latest
           '';
