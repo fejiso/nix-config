@@ -9,6 +9,8 @@
 }: {
   imports = [
     ../../../hosts/common/home
+    ../../../hosts/common/home/development.nix
+    ../../../hosts/common/home/desktop.nix
   ];
 
   # Laptop-specific packages

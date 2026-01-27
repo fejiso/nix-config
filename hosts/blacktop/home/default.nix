@@ -9,6 +9,8 @@
 }: {
   imports = [
     ../../common/home
+    ../../common/home/development.nix
+    ../../common/home/desktop.nix
   ];
 
   # Disable Sway
@@ -26,9 +28,4 @@
   # Enable heavy dev tools
   programs.dev-heavy.enable = true;
 
-  # Desktop packages
-  home.packages = with pkgs; [
-    libreoffice
-    zoom-us
-  ];
 }

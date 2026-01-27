@@ -100,7 +100,6 @@
     ripgrep
     fd
     fzf
-    firefox
     gnupg
     nix-index
     fish

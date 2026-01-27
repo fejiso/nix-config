@@ -22,6 +22,9 @@
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
 
+    # Colmena for deployment
+    colmena.url = "github:zhaofengli/colmena";
+
     # Airspy ADS-B source
     airspy-adsb-bin.url = "github:fejiso/airspy_adsb/master";
     #airspy-adsb-bin.follows = "nixpkgs";
@@ -36,6 +39,7 @@
     nixos-hardware,
     nix-darwin,
     sops-nix,
+    colmena,
     airspy-adsb-bin,
     ...
   } @ inputs: let
@@ -114,6 +118,34 @@
     # Modules
     nixosModules = import ./modules/nixos;
     darwinModules = import ./modules/darwin;
+
+    # Colmena configuration
+    colmena = let
+      mkColmena = name: {
+        deployment = {
+          targetHost = name;
+          targetUser = "root";
+        };
+        imports = commonModules.nixos ++ [ ./hosts/${name}/nixos ];
+        _module.args.hostname = name;
+      };
+    in {
+      meta = {
+        nixpkgs = import nixpkgs {
+          system = "x86_64-linux";
+        };
+        specialArgs = { inherit inputs outputs; };
+      };
+
+      elitedex = mkColmena "elitedex";
+      lenovix = mkColmena "lenovix";
+      hispanas = mkColmena "hispanas";
+      a8 = mkColmena "a8";
+      blacktop = mkColmena "blacktop";
+      hierro = mkColmena "hierro";
+      butthead = mkColmena "butthead";
+      snuffles = mkColmena "snuffles";
+    };
     
     # NixOS configurations
     nixosConfigurations = {

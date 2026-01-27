@@ -12,7 +12,6 @@
   imports = [
     ./shell.nix
     ./git.nix
-    ./development.nix
     ./terminal.nix
     ./tools.nix
     ./user-personal
@@ -70,6 +69,7 @@
     git
     gh
     direnv
+    colmena
 
     # Text editors
     vim
@@ -92,11 +92,6 @@
     nixd
     rmlint
     sops
-    strawberry
-    telegram-desktop
-    logseq
-    ncspot
-    spot
   ];
 
   # Enable home-manager

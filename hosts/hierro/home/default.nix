@@ -9,6 +9,7 @@
 }: {
   imports = [
     ../../common/home
+    ../../common/home/development.nix
   ];
 
   # Disable desktop/GUI programs for server
