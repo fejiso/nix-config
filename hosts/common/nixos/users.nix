@@ -15,6 +15,11 @@
         "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICQ5a7p+8LrnKTch/UUAJ3YpAYT6PS8fM+0FKtSspZ5U"
       ];
     };
+    root = {
+      openssh.authorizedKeys.keys = [
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICQ5a7p+8LrnKTch/UUAJ3YpAYT6PS8fM+0FKtSspZ5U"
+      ];
+    };
   };
 
   # Enable shells system-wide
