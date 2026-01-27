@@ -143,6 +143,10 @@
         enabled = yes
         listen_ip = 0.0.0.0
         listen_port = 4242
+      [[RNS Testnet I2P Hub A]]
+        type = I2PInterface
+        enabled = yes
+        peers = mrwqlsioq4hoo2lmeeud7dkfscnm7yxak7dmiyvsrnpfag3z5tsq.b32.i2p
 
       # Netbird mesh peers
       [[Peer hierro]]

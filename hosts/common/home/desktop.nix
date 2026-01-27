@@ -21,4 +21,10 @@
 # Music ripping
     whipper
   ];
+
+  # Enable MPD music stack (ncmpcpp + mpd-sima + scrobblers)
+  services.mpd-stack = {
+    enable = true;
+    lastfmUsername = "fjim";
+  };
 }
