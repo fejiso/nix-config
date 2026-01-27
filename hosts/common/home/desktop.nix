@@ -12,6 +12,8 @@
     libreoffice
     zoom-us
     
+    # Document processing
+    texlive.combined.scheme-full
 
     # Music players
     strawberry

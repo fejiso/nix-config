@@ -75,8 +75,6 @@
     vim
     nano
 
-    # Document processing
-    texlive.combined.scheme-full
 
     # Added imperatively installed packages
     lshw
