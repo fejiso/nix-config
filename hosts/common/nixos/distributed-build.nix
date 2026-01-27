@@ -3,6 +3,10 @@
 with lib;
 
 let
+  # Import build keys
+  buildKeys = import ./build-keys.nix { inherit lib; };
+  keys = buildKeys.keys;
+
   # Define all build machines with their capabilities
   buildHosts = {
     butthead = {
@@ -58,16 +62,17 @@ let
     speedFactor = host.speedFactor;
     supportedFeatures = host.supportedFeatures;
     protocol = "ssh-ng";
-  }) otherHosts;
+  } // (lib.optionalAttrs ((keys.${name}.hostPublicKey or "") != "") {
+    publicHostKey = keys.${name}.hostPublicKey;
+  })) otherHosts;
 
   # Generate substituter URLs only for always-on hosts
   substituters = lib.mapAttrsToList (name: _: "http://${name}.netbird.cloud:5000") alwaysOnHosts;
 
-  # Generate trusted public keys for all hosts (placeholder - will be populated after first run)
-  # Each host will have its own signing key generated on first run
-  trustedPublicKeys = [
-    # These will be auto-generated - check /etc/nix/signing-key.pub on each host after first rebuild
-  ];
+  # Generate trusted public keys for all hosts
+  trustedPublicKeys = lib.flatten (lib.mapAttrsToList (name: _: 
+    if (keys.${name}.nixPublicKey or "") != "" then [ keys.${name}.nixPublicKey ] else []
+  ) buildHosts);
 
 in
 {
@@ -128,6 +133,7 @@ in
   # Use all hosts as substituters
   nix.settings.extra-substituters = substituters;
   nix.settings.trusted-substituters = substituters;
+  nix.settings.trusted-public-keys = trustedPublicKeys;
 
   # Open firewall for nix-serve
   networking.firewall.allowedTCPPorts = [ 5000 ];
