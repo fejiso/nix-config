@@ -14,6 +14,7 @@
     ./sway.nix
     ./gpg.nix
     ./gpg-agent.nix
+    ./keychain.nix
     ./niri.nix
     ./tidalcycles.nix
     ./android-tools.nix
