@@ -383,5 +383,31 @@
     storage_limit = 1073741824
   '';
 
+  # iperf3 server listening on wt0 interface for network performance testing
+  systemd.services.iperf3-wt0 = {
+    description = "iperf3 network performance server on wt0";
+    after = [ "network-online.target" "sys-subsystem-net-devices-wt0.device" ];
+    wants = [ "network-online.target" ];
+    bindsTo = [ "sys-subsystem-net-devices-wt0.device" ];
+    wantedBy = [ "multi-user.target" ];
+    path = [ pkgs.iproute2 pkgs.gawk ];
+    script = ''
+      IP=$(ip -4 addr show wt0 | awk '/inet / {print $2}' | cut -d/ -f1 | head -1)
+      if [ -n "$IP" ]; then
+        exec ${pkgs.iperf3}/bin/iperf3 -s -B "$IP"
+      else
+        echo "Could not get IP for wt0 interface"
+        exit 1
+      fi
+    '';
+    serviceConfig = {
+      Type = "simple";
+      Restart = "always";
+      RestartSec = "10";
+    };
+  };
+
+  # iperf3 port (only on wt0 via binding, but firewall needs to allow it)
+  networking.firewall.interfaces.wt0.allowedTCPPorts = [ 5201 ];
 
 }
