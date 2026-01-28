@@ -437,6 +437,8 @@ with lib;
       spawn-at-startup "${pkgs.xwayland-satellite}/bin/xwayland-satellite"
       spawn-at-startup "${pkgs.wl-clipboard}/bin/wl-paste" "--watch" "${pkgs.cliphist}/bin/cliphist" "store"
       spawn-at-startup "${pkgs.logseq}/bin/logseq"
+      spawn-at-startup "sleep 1 && ${pkgs.niri}/bin/niri msg output \"Ancor Communications Inc VE248 H3LMQS153004\" position set 0 0"
+      spawn-at-startup "sleep 1 && ${pkgs.niri}/bin/niri msg output \"AU Optronics 0xA48F Unknown\" position set 1920 0"
     '';
   };
 }
