@@ -151,7 +151,7 @@ with lib;
               -e BEASTHOST=host.containers.internal \
               -e BEASTPORT=30005 \
               ${optionalString (cfg.latitude != null) "-e LAT=${cfg.latitude}"} \
-              ${optionalString (cfg.longitude != null) "-e LON=${cfg.longitude}"} \
+              ${optionalString (cfg.longitude != null) "-e LONG=${cfg.longitude}"} \
               --add-host=host.containers.internal:host-gateway \
               ghcr.io/sdr-enthusiasts/docker-tar1090:latest
           '';
