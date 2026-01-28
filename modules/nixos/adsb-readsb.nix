@@ -130,6 +130,10 @@ with lib;
     };
 
     # tar1090 web interface
+    systemd.tmpfiles.rules = mkIf config.services.adsb-readsb.tar1090.enable [
+      "d /var/lib/tar1090 0755 root root -"
+    ];
+
     systemd.services.tar1090 = mkIf config.services.adsb-readsb.tar1090.enable {
       description = "tar1090 ADS-B Web Interface";
       after = [ "network-online.target" "readsb.service" ];
@@ -152,6 +156,7 @@ with lib;
               -e BEASTPORT=30005 \
               ${optionalString (cfg.latitude != null) "-e LAT=${cfg.latitude}"} \
               ${optionalString (cfg.longitude != null) "-e LONG=${cfg.longitude}"} \
+              -v /var/lib/tar1090:/var/lib/collectd \
               --add-host=host.containers.internal:host-gateway \
               ghcr.io/sdr-enthusiasts/docker-tar1090:latest
           '';
