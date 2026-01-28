@@ -519,7 +519,7 @@ in
       /mnt/user/Series 100.107.0.0/16(rw,sync,no_subtree_check,fsid=1)
       /mnt/user/Movies 100.107.0.0/16(rw,sync,no_subtree_check,fsid=6)
       /mnt/user/Videos 100.107.0.0/16(ro,sync,no_subtree_check,fsid=2)
-      /mnt/user/Music 100.107.0.0/16(ro,sync,no_subtree_check,fsid=3) 100.107.6.184(rw,sync,no_subtree_check,fsid=3)
+      /mnt/user/Music 100.107.0.0/16(ro,sync,no_subtree_check,fsid=3) 100.107.6.184(rw,sync,no_subtree_check,fsid=3) 100.107.75.195(rw,sync,no_subtree_check,fsid=3) 100.107.206.129(rw,sync,no_subtree_check,fsid=3)
       /mnt/user/ROMs 100.107.0.0/16(ro,sync,no_subtree_check,fsid=4)
       /mnt/user/Backups 100.107.0.0/16(rw,sync,no_subtree_check,fsid=5)
       /mnt/user/downloadtemp 100.107.0.0/16(rw,sync,no_subtree_check,fsid=7)
