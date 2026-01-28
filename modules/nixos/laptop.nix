@@ -9,8 +9,21 @@
   ...
 }: {
   # Laptop-specific power management
-  services.logind.settings.Login.HandleLidSwitchExternalPower = "ignore";
-  
+  services.logind = {
+    lidSwitch = "suspend";
+    lidSwitchExternalPower = "ignore";
+    lidSwitchDocked = "ignore";
+  };
+
+  # Screen timeout and DPMS
+  services.xserver.displayManager.sessionCommands = lib.mkIf config.services.xserver.enable ''
+    ${pkgs.xorg.xset}/bin/xset dpms 300 600 900
+    ${pkgs.xorg.xset}/bin/xset s 300 300
+  '';
+
+  # Console blanking (for kmscon/tty)
+  boot.kernelParams = [ "consoleblank=300" ];
+
   # Battery management and power saving
   services.upower.enable = true;
   services.thermald.enable = true;
