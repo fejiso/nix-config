@@ -42,6 +42,14 @@
     alsa.support32Bit = true;
     pulse.enable = true;
     jack.enable = true;
+
+    # Support high sample rates, default to 192kHz if supported
+    extraConfig.pipewire."92-high-sample-rate" = {
+      "context.properties" = {
+        "default.clock.rate" = 192000;
+        "default.clock.allowed-rates" = [ 44100 48000 88200 96000 176400 192000 ];
+      };
+    };
   };
 
   # Enable location services
