@@ -20,9 +20,6 @@
     slack
     spotify
     
-    # Development tools
-    jetbrains.idea-ultimate
-    postman
   ];
 
   # Desktop-specific services

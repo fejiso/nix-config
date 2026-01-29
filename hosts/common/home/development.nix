@@ -14,6 +14,9 @@
     go
     rustc
     cargo
+    # Development tools
+    jetbrains.idea
+    postman
 
     # Language servers (heavy ones in dev-heavy module)
     python3Packages.python-lsp-server
