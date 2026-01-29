@@ -338,46 +338,15 @@ in
     sync.interval = "04:00";  # Daily sync at 4am
   };
 
-  # Enable btrfs automatic scrubbing
-  services.btrfs.autoScrub = {
-    enable = true;
-    interval = "monthly";
-    fileSystems = [ "/mnt/data01" "/mnt/data02" "/mnt/data03" "/mnt/data04" "/mnt/data05" "/mnt/data06" "/mnt/parity1" "/mnt/parity2" ];
-  };
-
-  # Btrfs scrub timers - staggered across the month to avoid I/O contention
-  systemd.timers."btrfs-scrub@mnt-data01" = {
-    wantedBy = [ "timers.target" ];
-    timerConfig.OnCalendar = "*-*-01 02:00:00";  # 1st of month
-  };
-  systemd.timers."btrfs-scrub@mnt-data02" = {
-    wantedBy = [ "timers.target" ];
-    timerConfig.OnCalendar = "*-*-05 02:00:00";  # 5th
-  };
-  systemd.timers."btrfs-scrub@mnt-data03" = {
-    wantedBy = [ "timers.target" ];
-    timerConfig.OnCalendar = "*-*-09 02:00:00";  # 9th
-  };
-  systemd.timers."btrfs-scrub@mnt-data04" = {
-    wantedBy = [ "timers.target" ];
-    timerConfig.OnCalendar = "*-*-13 02:00:00";  # 13th
-  };
-  systemd.timers."btrfs-scrub@mnt-data05" = {
-    wantedBy = [ "timers.target" ];
-    timerConfig.OnCalendar = "*-*-17 02:00:00";  # 17th
-  };
-  systemd.timers."btrfs-scrub@mnt-data06" = {
-    wantedBy = [ "timers.target" ];
-    timerConfig.OnCalendar = "*-*-21 02:00:00";  # 21st
-  };
-  systemd.timers."btrfs-scrub@mnt-parity1" = {
-    wantedBy = [ "timers.target" ];
-    timerConfig.OnCalendar = "*-*-25 02:00:00";  # 25th
-  };
-  systemd.timers."btrfs-scrub@mnt-parity2" = {
-    wantedBy = [ "timers.target" ];
-    timerConfig.OnCalendar = "*-*-28 02:00:00";  # 28th
-  };
+  # Override autoScrub timers with staggered schedules for data/parity drives
+  systemd.timers."btrfs-scrub-mnt-data01".timerConfig.OnCalendar = lib.mkForce "*-*-01 02:00:00";
+  systemd.timers."btrfs-scrub-mnt-data02".timerConfig.OnCalendar = lib.mkForce "*-*-05 02:00:00";
+  systemd.timers."btrfs-scrub-mnt-data03".timerConfig.OnCalendar = lib.mkForce "*-*-09 02:00:00";
+  systemd.timers."btrfs-scrub-mnt-data04".timerConfig.OnCalendar = lib.mkForce "*-*-13 02:00:00";
+  systemd.timers."btrfs-scrub-mnt-data05".timerConfig.OnCalendar = lib.mkForce "*-*-17 02:00:00";
+  systemd.timers."btrfs-scrub-mnt-data06".timerConfig.OnCalendar = lib.mkForce "*-*-21 02:00:00";
+  systemd.timers."btrfs-scrub-mnt-parity1".timerConfig.OnCalendar = lib.mkForce "*-*-25 02:00:00";
+  systemd.timers."btrfs-scrub-mnt-parity2".timerConfig.OnCalendar = lib.mkForce "*-*-28 02:00:00";
 
   # SSD cache migration script
   systemd.services.ssd-migrate = {

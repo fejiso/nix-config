@@ -54,9 +54,6 @@
   # Host-specific networking
   networking.hostName = "blacktop";
 
-  # Host-specific services
-  services.btrfs.autoScrub.enable = true;
-
   # Tdarr worker node
   services.tdarr-worker = {
     enable = true;

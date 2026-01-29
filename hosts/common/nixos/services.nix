@@ -418,4 +418,7 @@
   # iperf3 port (only on wt0 via binding, but firewall needs to allow it)
   networking.firewall.interfaces.wt0.allowedTCPPorts = [ 5201 ];
 
+  # Btrfs automatic scrubbing - safe no-op on non-btrfs hosts
+  services.btrfs.autoScrub.enable = true;
+
 }
