@@ -106,6 +106,16 @@
         }
       ];
     };
+
+    # Helper function to create SD image configurations
+    mkSdImageSystem = hostname: system: baseConfig: nixpkgs.lib.nixosSystem {
+      inherit system;
+      specialArgs = {inherit inputs outputs hostname;};
+      modules = commonModules.nixos ++ [
+        baseConfig
+        ./hosts/${hostname}/nixos/sd-image.nix
+      ];
+    };
     
   in {
     
@@ -137,6 +147,7 @@
         specialArgs = { inherit inputs outputs; };
       };
 
+      # x86_64 hosts
       elitedex = mkColmena "elitedex";
       lenovix = mkColmena "lenovix";
       hispanas = mkColmena "hispanas";
@@ -145,10 +156,15 @@
       hierro = mkColmena "hierro";
       butthead = mkColmena "butthead";
       snuffles = mkColmena "snuffles";
+
+      # ARM hosts
+      rpi3 = mkColmena "rpi3";
+      pine64 = mkColmena "pine64";
     };
     
     # NixOS configurations
     nixosConfigurations = {
+      # x86_64 hosts
       elitedex = mkNixosSystem "elitedex" "x86_64-linux";
       lenovix = mkNixosSystem "lenovix" "x86_64-linux";
       hispanas = mkNixosSystem "hispanas" "x86_64-linux";
@@ -157,13 +173,23 @@
       hierro = mkNixosSystem "hierro" "x86_64-linux";
       butthead = mkNixosSystem "butthead" "x86_64-linux";
       snuffles = mkNixosSystem "snuffles" "x86_64-linux";
+
+      # ARM hosts
+      rpi3 = mkNixosSystem "rpi3" "aarch64-linux";
+      pine64 = mkNixosSystem "pine64" "aarch64-linux";
     };
     
     # Standalone home-manager configurations (for non-NixOS systems)
     homeConfigurations = {
       "superfer@devdesktop" = mkHomeConfiguration "devdesktop" "superfer" "x86_64-linux";
     };
-    
+
+    # SD card images for ARM devices
+    images = {
+      rpi3 = (mkSdImageSystem "rpi3" "aarch64-linux" ./hosts/rpi3/nixos).config.system.build.sdImage;
+      pine64 = (mkSdImageSystem "pine64" "aarch64-linux" ./hosts/pine64/nixos).config.system.build.sdImage;
+    };
+
     # Darwin configurations (macOS)
     darwinConfigurations = {
       work-laptop = mkDarwinSystem "work-laptop" "aarch64-darwin";

@@ -6,6 +6,9 @@
   };
 
   config = lib.mkIf config.development.enable {
+    # Enable QEMU emulation for aarch64 (ARM64) to build SD card images
+    boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+
     # Install PlatformIO and related tools
     environment.systemPackages = with pkgs; [
       platformio

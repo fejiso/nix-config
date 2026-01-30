@@ -28,7 +28,10 @@
   
   # Network configuration
   networking.hostName = "hierro";
-  
+
+  # Enable development tools and aarch64 emulation
+  development.enable = true;
+
   # Override SSH settings for server access
   services.openssh.settings = {
     PermitRootLogin = lib.mkForce "yes";
