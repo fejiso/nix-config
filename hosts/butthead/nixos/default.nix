@@ -84,6 +84,9 @@ in
     (import ../../../modules/nixos/emulation.nix)
   ];
 
+  # Enable Kopia server
+  services.backup.server = true;
+
   # Enable development tools
   development.enable = true;
 

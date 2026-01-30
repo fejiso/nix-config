@@ -20,7 +20,11 @@
     ./netbird.nix
     inputs.home-manager.nixosModules.home-manager
     ../../../modules/nixos/nfs-mounts.nix
+    ../../../modules/nixos/backup.nix
   ];
+
+  # Enable backups on all nodes
+  services.backup.enable = true;
 
   nixpkgs = {
     overlays = [
