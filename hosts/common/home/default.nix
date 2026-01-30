@@ -87,6 +87,7 @@
     pfetch
     hyfetch
     neofetch
+    fastfetch
     iperf3
     rclone
     
