@@ -11,9 +11,16 @@
   imports = [
     ./hardware-configuration.nix
     ../../common/nixos
+    ../../../modules/nixos/adsb-readsb.nix
     # Add appropriate nixos-hardware module for your specific Lenovo model
     # inputs.nixos-hardware.nixosModules.lenovo-thinkpad-x1-carbon-gen11
   ];
+
+  # ADS-B configuration
+  services.adsb-readsb = {
+    enable = false;
+    enableRtlSdrHardware = true;
+  };
 
   # Host-specific networking
   networking.hostName = "hispanas";
