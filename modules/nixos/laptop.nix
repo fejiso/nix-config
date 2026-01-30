@@ -9,10 +9,10 @@
   ...
 }: {
   # Laptop-specific power management
-  services.logind = {
-    lidSwitch = "suspend";
-    lidSwitchExternalPower = "ignore";
-    lidSwitchDocked = "ignore";
+  services.logind.settings.Login = {
+    HandleLidSwitch = "suspend";
+    HandleLidSwitchExternalPower = "ignore";
+    HandleLidSwitchDocked = "ignore";
   };
 
   # Screen timeout and DPMS
