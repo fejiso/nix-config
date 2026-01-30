@@ -3,7 +3,7 @@
 {
   programs.zsh = {
     enable = true;
-    initExtra = ''
+    initContent = ''
       # Update GPG_TTY for each new shell
       export GPG_TTY=$(tty)
 
