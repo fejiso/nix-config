@@ -28,6 +28,25 @@
     key = hostname;
   };
 
+  # ADS-B Location secrets
+  sops.secrets.adsb-lat = {
+    sopsFile = "${inputs.self}/secrets/adsb-location.yaml";
+    key = "${hostname}/latitude";
+  };
+  sops.secrets.adsb-lon = {
+    sopsFile = "${inputs.self}/secrets/adsb-location.yaml";
+    key = "${hostname}/longitude";
+  };
+  sops.secrets.adsb-alt = {
+    sopsFile = "${inputs.self}/secrets/adsb-location.yaml";
+    key = "${hostname}/altitude";
+  };
+  
+  sops.secrets.adsb-uuid = {
+    sopsFile = "${inputs.self}/secrets/adsbfi.yaml";
+    key = "${hostname}";
+  };
+
   # Host-specific networking
   networking.hostName = "snuffles";
 
@@ -61,6 +80,15 @@
       latitude = "40.2444";
       longitude = "-3.6971";
       sharingKeySecretFile = config.sops.secrets.fr24feed-key.path;
+      mlat = true;
+    };
+
+    adsbfi = {
+      enable = true;
+      uuidSecretFile = config.sops.secrets.adsb-uuid.path;
+      latitude = "$(cat ${config.sops.secrets.adsb-lat.path})";
+      longitude = "$(cat ${config.sops.secrets.adsb-lon.path})";
+      altitude = "$(cat ${config.sops.secrets.adsb-alt.path})";
       mlat = true;
     };
   };
