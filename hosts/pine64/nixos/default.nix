@@ -5,6 +5,7 @@
     ./hardware-configuration.nix
     ../../common/nixos
     ../../../modules/nixos/embedded.nix
+    ../../../modules/nixos/btrfs-convert-firstboot.nix
   ];
 
   # Host identification
@@ -14,6 +15,13 @@
   embedded = {
     enable = true;
     serialConsole = "ttyS0";  # Pine64 serial console
+  };
+
+  # Enable automatic ext4 to btrfs conversion on first boot
+  services.btrfs-convert-firstboot = {
+    enable = true;
+    rootDevice = "/dev/disk/by-label/NIXOS_SD";
+    subvolume = "@";
   };
 
   # Disable x86-specific graphics - causes issues with Intel packages on ARM

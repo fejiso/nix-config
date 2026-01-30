@@ -5,6 +5,7 @@
     ./hardware-configuration.nix
     ../../common/nixos
     ../../../modules/nixos/embedded.nix
+    ../../../modules/nixos/btrfs-convert-firstboot.nix
     inputs.nixos-hardware.nixosModules.raspberry-pi-3
   ];
 
@@ -15,6 +16,13 @@
   embedded = {
     enable = true;
     serialConsole = "ttyAMA0";  # Raspberry Pi 3 serial console
+  };
+
+  # Enable automatic ext4 to btrfs conversion on first boot
+  services.btrfs-convert-firstboot = {
+    enable = true;
+    rootDevice = "/dev/disk/by-label/NIXOS_SD";
+    subvolume = "@";
   };
 
   # Disable x86-specific graphics - causes issues with Intel packages on ARM
