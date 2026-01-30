@@ -80,7 +80,7 @@
       latitude = "40.2444";
       longitude = "-3.6971";
       sharingKeySecretFile = config.sops.secrets.fr24feed-key.path;
-      mlat = false;
+      mlat = true;
     };
 
     adsbfi = {
