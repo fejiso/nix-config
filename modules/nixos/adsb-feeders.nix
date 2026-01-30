@@ -201,6 +201,7 @@ with lib;
     (mkIf config.services.adsb-feeders.adsbfi.enable {
       systemd.tmpfiles.rules = [
         "d /var/lib/adsbfi 0755 root root -"
+        "d /var/lib/graphs1090 0755 root root -"
       ];
 
       systemd.services.adsbfi = {
@@ -237,6 +238,7 @@ with lib;
                 -e ALT=${cfg.altitude} \
                 -e FEEDER_NAME="${cfg.name}" \
                 -v /var/lib/adsbfi:/var/globe_history \
+                -v /var/lib/graphs1090:/var/lib/collectd \
                 --add-host=host.containers.internal:host-gateway \
                 ghcr.io/sdr-enthusiasts/docker-adsb-ultrafeeder:latest
             '';
