@@ -80,6 +80,15 @@
     lshw
     jq
     pciutils
+
+    f3
+    e2fsprogs # badblocks
+    mtr
+    pfetch
+    hyfetch
+    neofetch
+    iperf3
+    rclone
     
     git-filter-repo
     git-crypt
