@@ -47,6 +47,37 @@ with lib;
       };
     };
 
+    adsbfi = {
+      enable = mkEnableOption "adsb.fi feeder";
+
+      uuidSecretFile = mkOption {
+        type = types.path;
+        description = "Path to file containing adsb.fi UUID";
+      };
+      
+      mlat = mkOption {
+        type = types.bool;
+        default = true;
+        description = "Enable MLAT";
+      };
+
+      latitude = mkOption {
+        type = types.str;
+        description = "Antenna latitude (DD.DDDD format)";
+      };
+
+      longitude = mkOption {
+        type = types.str;
+        description = "Antenna longitude (DDD.DDDD format)";
+      };
+
+      altitude = mkOption {
+        type = types.str;
+        default = "0";
+        description = "Antenna altitude in meters";
+      };
+    };
+
     beastHost = mkOption {
       type = types.str;
       default = "host.containers.internal";
@@ -62,7 +93,7 @@ with lib;
 
   config = mkMerge [
     # Enable podman if any feeder is enabled
-    (mkIf (config.services.adsb-feeders.piaware.enable || config.services.adsb-feeders.fr24feed.enable) {
+    (mkIf (config.services.adsb-feeders.piaware.enable || config.services.adsb-feeders.fr24feed.enable || config.services.adsb-feeders.adsbfi.enable) {
       virtualisation.podman = {
         enable = true;
         dockerCompat = true;
@@ -150,6 +181,52 @@ with lib;
                 ghcr.io/sdr-enthusiasts/docker-flightradar24:latest
             '';
           ExecStop = "${pkgs.podman}/bin/podman stop -t 10 fr24feed";
+        };
+      };
+    })
+
+    # adsb.fi Feeder
+    (mkIf config.services.adsb-feeders.adsbfi.enable {
+      systemd.tmpfiles.rules = [
+        "d /var/lib/adsbfi 0755 root root -"
+      ];
+
+      systemd.services.adsbfi = {
+        description = "adsb.fi Feeder (Ultrafeeder)";
+        after = [ "network-online.target" "readsb.service" ];
+        wants = [ "network-online.target" ];
+        wantedBy = [ "multi-user.target" ];
+        path = [ pkgs.podman ];
+        serviceConfig = {
+          Type = "simple";
+          Restart = "always";
+          RestartSec = "30";
+          ExecStartPre = "-${pkgs.podman}/bin/podman rm -f adsbfi";
+          ExecStart =
+            let
+              cfg = config.services.adsb-feeders.adsbfi;
+              beastHost = config.services.adsb-feeders.beastHost;
+              beastPort = config.services.adsb-feeders.beastPort;
+            in
+            pkgs.writeShellScript "start-adsbfi" ''
+              UUID=$(cat ${cfg.uuidSecretFile})
+              # Ultrafeeder config for adsb.fi
+              # We use ultrafeeder in 'net' mode to pull from local readsb
+              
+              ${pkgs.podman}/bin/podman run --rm --name adsbfi \
+                -e READSB_DEVICE_TYPE=net \
+                -e READSB_NET_CONNECTOR=${beastHost},${beastPort},beast_in \
+                -e ULTRAFEEDER_CONFIG="adsb,feed.adsb.fi,30004,beast_reduce_plus_out;mlat,feed.adsb.fi,31090" \
+                -e UUID=$UUID \
+                -e MLAT_USER=$UUID \
+                -e LAT=${cfg.latitude} \
+                -e LONG=${cfg.longitude} \
+                -e ALT=${cfg.altitude} \
+                -v /var/lib/adsbfi:/var/globe_history \
+                --add-host=host.containers.internal:host-gateway \
+                ghcr.io/sdr-enthusiasts/docker-adsb-ultrafeeder:latest
+            '';
+          ExecStop = "${pkgs.podman}/bin/podman stop -t 10 adsbfi";
         };
       };
     })
