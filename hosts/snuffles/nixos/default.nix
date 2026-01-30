@@ -52,17 +52,12 @@
 
   # ADS-B Readsb decoder with RTL-SDR
   services.adsb-readsb = {
-    enable = true;
+    enable = false;
     deviceType = "rtlsdr";
     gain = "-10";  # Auto gain
     ppm = 0;
-
-    tar1090 = {
-      enable = false;
-      port = 8080;
-      latitude = "40.2444";
-      longitude = "-3.6971";
-    };
+    
+    tar1090.enable = false;
   };
 
   # ADS-B Feeders
@@ -91,6 +86,11 @@
       altitude = "$(cat ${config.sops.secrets.adsb-alt.path})";
       mlat = true;
       webPort = 8080;
+      
+      # Handle SDR decoding directly
+      deviceType = "rtlsdr";
+      gain = "-10";
+      exposeBeastPort = true;
     };
   };
 

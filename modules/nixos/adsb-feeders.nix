@@ -100,6 +100,37 @@ with lib;
         default = null;
         description = "Port to expose the internal tar1090 web interface";
       };
+
+      # SDR Configuration for Ultrafeeder (when handling decoding)
+      deviceType = mkOption {
+        type = types.enum [ "rtlsdr" "airspy" "sdr-ifile" "modesbeast" "none" ];
+        default = "none";
+        description = "SDR device type (set to rtlsdr/airspy to handle decoding)";
+      };
+
+      deviceIndex = mkOption {
+        type = types.str;
+        default = "0";
+        description = "SDR device index or serial number";
+      };
+
+      gain = mkOption {
+        type = types.str;
+        default = "autogain";
+        description = "SDR gain setting";
+      };
+
+      ppm = mkOption {
+        type = types.int;
+        default = 0;
+        description = "SDR PPM correction";
+      };
+
+      exposeBeastPort = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Expose Beast (30005) port to host";
+      };
     };
 
     beastHost = mkOption {
@@ -238,13 +269,16 @@ with lib;
             in
             pkgs.writeShellScript "start-adsbfi" ''
               UUID=$(cat ${cfg.uuidSecretFile})
-              # Ultrafeeder config for adsb.fi
-              # We use ultrafeeder in 'net' mode to pull from local readsb
               
               ${pkgs.podman}/bin/podman run --rm --name adsbfi \
+                --privileged \
                 ${optionalString (cfg.webPort != null) "-p ${toString cfg.webPort}:80"} \
-                -e READSB_DEVICE_TYPE=none \
-                -e READSB_NET_CONNECTOR=${beastHost},${beastPort},beast_in \
+                ${optionalString cfg.exposeBeastPort "-p 30005:30005"} \
+                -e READSB_DEVICE_TYPE=${cfg.deviceType} \
+                ${optionalString (cfg.deviceType == "rtlsdr") "-e READSB_RTLSDR_DEVICE=${cfg.deviceIndex}"} \
+                ${optionalString (cfg.deviceType == "rtlsdr") "-e READSB_RTLSDR_PPM=${toString cfg.ppm}"} \
+                ${optionalString (cfg.deviceType == "rtlsdr") "-e READSB_GAIN=${cfg.gain}"} \
+                ${optionalString (cfg.deviceType == "none") "-e READSB_NET_CONNECTOR=${beastHost},${beastPort},beast_in"} \
                 -e ULTRAFEEDER_CONFIG="adsb,feed.adsb.fi,30004,beast_reduce_plus_out;mlat,feed.adsb.fi,31090" \
                 -e UUID=$UUID \
                 -e MLAT_USER=$UUID \
@@ -252,6 +286,7 @@ with lib;
                 -e LONG=${cfg.longitude} \
                 -e ALT=${cfg.altitude} \
                 -e FEEDER_NAME="${cfg.name}" \
+                -v /dev/bus/usb:/dev/bus/usb \
                 -v /var/lib/ultrafeeder:/var/globe_history \
                 -v /var/lib/graphs1090:/var/lib/collectd \
                 --add-host=host.containers.internal:host-gateway \
