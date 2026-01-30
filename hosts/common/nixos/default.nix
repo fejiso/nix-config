@@ -150,6 +150,15 @@
     memoryPercent = 10;
   };
 
+  # Journald optimization for SSD longevity
+  # Embedded systems override this with volatile storage
+  services.journald.extraConfig = lib.mkDefault ''
+    Compress=yes
+    SystemMaxUse=500M
+    SystemMaxFileSize=50M
+    MaxRetentionSec=1month
+  '';
+
   # Services
   services.dbus.enable = true;
   services.openssh.enable = true;

@@ -83,7 +83,10 @@ in
     experimental-features = nix-command flakes
     builders-use-substitutes = true
     connect-timeout = 1
+    stalled-download-timeout = 5
     http-connections = 25
+    fallback = true
+    narinfo-cache-negative-ttl = 10
     warn-dirty = false
   '';
 

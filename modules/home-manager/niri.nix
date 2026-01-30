@@ -116,8 +116,8 @@ with lib;
           keyboard {
               xkb {
                   layout "us,ru"
-                  variant "altgr-intl,,"
-                  options "grp:lalt_lshift_toggle,compose:ralt,nodeadkeys"
+                  variant "altgr-intl,"
+                  options "grp:lalt_lshift_toggle,lv3:ralt_switch"
               }
           }
 
