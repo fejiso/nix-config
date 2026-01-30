@@ -71,6 +71,7 @@ with lib;
       boot.kernelModules = [ "rtl_sdr" ];
       boot.blacklistedKernelModules = [
         "dvb_usb_rtl28xxu"
+        "dvb_usb_v2"
         "rtl2832"
         "rtl2830"
       ];
