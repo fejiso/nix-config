@@ -214,7 +214,7 @@ with lib;
               # We use ultrafeeder in 'net' mode to pull from local readsb
               
               ${pkgs.podman}/bin/podman run --rm --name adsbfi \
-                -e READSB_DEVICE_TYPE=net \
+                -e READSB_DEVICE_TYPE=none \
                 -e READSB_NET_CONNECTOR=${beastHost},${beastPort},beast_in \
                 -e ULTRAFEEDER_CONFIG="adsb,feed.adsb.fi,30004,beast_reduce_plus_out;mlat,feed.adsb.fi,31090" \
                 -e UUID=$UUID \
