@@ -58,7 +58,7 @@
     ppm = 0;
 
     tar1090 = {
-      enable = true;
+      enable = false;
       port = 8080;
       latitude = "40.2444";
       longitude = "-3.6971";
@@ -80,7 +80,7 @@
       latitude = "40.2444";
       longitude = "-3.6971";
       sharingKeySecretFile = config.sops.secrets.fr24feed-key.path;
-      mlat = true;
+      mlat = false;
     };
 
     adsbfi = {
@@ -90,6 +90,7 @@
       longitude = "$(cat ${config.sops.secrets.adsb-lon.path})";
       altitude = "$(cat ${config.sops.secrets.adsb-alt.path})";
       mlat = true;
+      webPort = 8080;
     };
   };
 

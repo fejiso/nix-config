@@ -82,6 +82,12 @@ with lib;
         default = "${hostname}";
         description = "Feeder name displayed on maps";
       };
+
+      webPort = mkOption {
+        type = types.nullOr types.port;
+        default = null;
+        description = "Port to expose the internal tar1090 web interface";
+      };
     };
 
     beastHost = mkOption {
@@ -220,6 +226,7 @@ with lib;
               # We use ultrafeeder in 'net' mode to pull from local readsb
               
               ${pkgs.podman}/bin/podman run --rm --name adsbfi \
+                ${optionalString (cfg.webPort != null) "-p ${toString cfg.webPort}:80"} \
                 -e READSB_DEVICE_TYPE=none \
                 -e READSB_NET_CONNECTOR=${beastHost},${beastPort},beast_in \
                 -e ULTRAFEEDER_CONFIG="adsb,feed.adsb.fi,30004,beast_reduce_plus_out;mlat,feed.adsb.fi,31090" \
