@@ -124,8 +124,8 @@
     X-Cinnamon-Autostart-enabled=true
   '';
 
-  # Open firewall for webcam stream
-  networking.firewall.allowedTCPPorts = [ 8080 ];
+  # Open firewall for webcam stream and adsbfi map
+  networking.firewall.allowedTCPPorts = [ 8080 8081 ];
 
   # System state version
   system.stateVersion = "25.05";
