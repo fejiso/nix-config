@@ -22,7 +22,14 @@
     (import ../../../modules/nixos/development.nix)
     (import ../../../modules/nixos/emulation.nix)
     (import ../../../modules/nixos/tdarr-worker.nix)
+    ../../../modules/nixos/adsb-readsb.nix
   ];
+
+  # ADS-B configuration (Hardware support only)
+  services.adsb-readsb = {
+    enable = false;
+    enableRtlSdrHardware = true;
+  };
 
   # Enable development tools
   development.enable = true;
