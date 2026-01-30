@@ -63,7 +63,7 @@
     zellij
     fish
     weechat
-    gemini-cli  # Google Gemini AI CLI
+    kiro
     
     # Development tools
     git

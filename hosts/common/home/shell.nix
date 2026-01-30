@@ -145,6 +145,10 @@ in {
   programs.claude-code = {
   	enable = true;
   };
+
+  programs.gemini-cli = {
+    enable = true;
+  };
   
   # Starship prompt
   programs.starship = {
