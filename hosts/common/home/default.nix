@@ -63,7 +63,6 @@
     zellij
     fish
     weechat
-    kiro-cli
     
     # Development tools
     git
