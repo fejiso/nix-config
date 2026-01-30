@@ -76,6 +76,12 @@ with lib;
         default = "0";
         description = "Antenna altitude in meters";
       };
+
+      name = mkOption {
+        type = types.str;
+        default = "${hostname}";
+        description = "Feeder name displayed on maps";
+      };
     };
 
     beastHost = mkOption {
@@ -222,6 +228,7 @@ with lib;
                 -e LAT=${cfg.latitude} \
                 -e LONG=${cfg.longitude} \
                 -e ALT=${cfg.altitude} \
+                -e FEEDER_NAME="${cfg.name}" \
                 -v /var/lib/adsbfi:/var/globe_history \
                 --add-host=host.containers.internal:host-gateway \
                 ghcr.io/sdr-enthusiasts/docker-adsb-ultrafeeder:latest
