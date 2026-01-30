@@ -15,6 +15,12 @@ with lib;
         default = null;
         description = "Path to file containing PiAware feeder ID (optional)";
       };
+
+      webPort = mkOption {
+        type = types.nullOr types.port;
+        default = 8081;
+        description = "Port to expose PiAware web interface";
+      };
     };
 
     fr24feed = {
@@ -44,6 +50,12 @@ with lib;
         type = types.bool;
         default = true;
         description = "Enable MLAT (multilateration)";
+      };
+
+      webPort = mkOption {
+        type = types.nullOr types.port;
+        default = 8082;
+        description = "Port to expose FR24Feed web interface";
       };
     };
 
@@ -137,6 +149,7 @@ with lib;
               ${if cfg.piaware.feederIdSecretFile != null then ''
                 FEEDER_ID=$(cat ${cfg.piaware.feederIdSecretFile})
                 ${pkgs.podman}/bin/podman run --rm --name piaware \
+                  ${optionalString (cfg.piaware.webPort != null) "-p ${toString cfg.piaware.webPort}:8080"} \
                   -e BEASTHOST=${cfg.beastHost} \
                   -e BEASTPORT=${cfg.beastPort} \
                   -e FEEDER_ID="$FEEDER_ID" \
@@ -145,6 +158,7 @@ with lib;
                   ghcr.io/sdr-enthusiasts/docker-piaware:latest
               '' else ''
                 ${pkgs.podman}/bin/podman run --rm --name piaware \
+                  ${optionalString (cfg.piaware.webPort != null) "-p ${toString cfg.piaware.webPort}:8080"} \
                   -e BEASTHOST=${cfg.beastHost} \
                   -e BEASTPORT=${cfg.beastPort} \
                   -v /var/lib/piaware:/var/cache/piaware \
@@ -181,6 +195,7 @@ with lib;
             pkgs.writeShellScript "start-fr24feed" ''
               FR24KEY=$(cat ${cfg.sharingKeySecretFile})
               ${pkgs.podman}/bin/podman run --rm --name fr24feed \
+                ${optionalString (cfg.webPort != null) "-p ${toString cfg.webPort}:8754"} \
                 -e BEASTHOST=${config.services.adsb-feeders.beastHost} \
                 -e BEASTPORT=${config.services.adsb-feeders.beastPort} \
                 -e FR24KEY="$FR24KEY" \
