@@ -63,7 +63,7 @@
     zellij
     fish
     weechat
-    kiro
+    unstable.kiro-cli
     
     # Development tools
     git

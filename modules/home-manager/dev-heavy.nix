@@ -12,6 +12,7 @@ with lib;
     home.packages = with pkgs; [
       # IDEs
       vscode
+      kiro
 
       # Haskell development
       haskell-language-server
