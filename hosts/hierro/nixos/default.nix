@@ -25,7 +25,6 @@
   services.displayManager.sddm.enable = lib.mkForce false;
   services.pulseaudio.enable = lib.mkForce false;
   services.pipewire.enable = lib.mkForce false;
-  hardware.bluetooth.enable = lib.mkForce false;
   
   # Network configuration
   networking.hostName = "hierro";

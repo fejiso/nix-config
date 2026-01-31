@@ -38,7 +38,7 @@
     # Disable unnecessary hardware support by default
     hardware.graphics.enable = lib.mkDefault false;
     hardware.graphics.enable32Bit = lib.mkForce false;  # Not supported on ARM
-    hardware.bluetooth.enable = lib.mkDefault false;
+    hardware.bluetooth.enable = lib.mkDefault true;
 
     # Disable ZFS (not needed on embedded, may be broken on latest kernels)
     boot.supportedFilesystems = lib.mkForce [ "btrfs" "ext4" "vfat" "f2fs" "xfs" "ntfs" "cifs" "nfs" ];
