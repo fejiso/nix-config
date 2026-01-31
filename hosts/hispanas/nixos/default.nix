@@ -12,6 +12,7 @@
     ./hardware-configuration.nix
     ../../common/nixos
     ../../../modules/nixos/openwebrx.nix
+    (import ../../../modules/nixos/development.nix)
     # Add appropriate nixos-hardware module for your specific Lenovo model
     # inputs.nixos-hardware.nixosModules.lenovo-thinkpad-x1-carbon-gen11
   ];
