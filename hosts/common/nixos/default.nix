@@ -18,6 +18,7 @@
     ./distributed-build.nix
     ./home-manager.nix
     ./netbird.nix
+    ./podman.nix
     inputs.home-manager.nixosModules.home-manager
     ../../../modules/nixos/nfs-mounts.nix
     ../../../modules/nixos/backup.nix

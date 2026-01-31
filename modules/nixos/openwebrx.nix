@@ -55,6 +55,7 @@ in {
           ADMIN_PASS=$(cat ${config.sops.secrets.openwebrx_admin_password.path})
           ${pkgs.podman}/bin/podman run --rm --name openwebrx-plus \
             --privileged \
+            --label io.containers.autoupdate=registry \
             -p ${toString cfg.port}:8073 \
             -e OPENWEBRX_ADMIN_USER=${cfg.adminUser} \
             -e OPENWEBRX_ADMIN_PASSWORD="$ADMIN_PASS" \

@@ -180,6 +180,7 @@ with lib;
               ${if cfg.piaware.feederIdSecretFile != null then ''
                 FEEDER_ID=$(cat ${cfg.piaware.feederIdSecretFile})
                 ${pkgs.podman}/bin/podman run --rm --name piaware \
+                  --label io.containers.autoupdate=registry \
                   ${optionalString (cfg.piaware.webPort != null) "-p ${toString cfg.piaware.webPort}:8080"} \
                   -e BEASTHOST=${cfg.beastHost} \
                   -e BEASTPORT=${cfg.beastPort} \
@@ -189,6 +190,7 @@ with lib;
                   ghcr.io/sdr-enthusiasts/docker-piaware:latest
               '' else ''
                 ${pkgs.podman}/bin/podman run --rm --name piaware \
+                  --label io.containers.autoupdate=registry \
                   ${optionalString (cfg.piaware.webPort != null) "-p ${toString cfg.piaware.webPort}:8080"} \
                   -e BEASTHOST=${cfg.beastHost} \
                   -e BEASTPORT=${cfg.beastPort} \
@@ -226,6 +228,7 @@ with lib;
             pkgs.writeShellScript "start-fr24feed" ''
               FR24KEY=$(cat ${cfg.sharingKeySecretFile})
               ${pkgs.podman}/bin/podman run --rm --name fr24feed \
+                --label io.containers.autoupdate=registry \
                 ${optionalString (cfg.webPort != null) "-p ${toString cfg.webPort}:8754"} \
                 -e BEASTHOST=${config.services.adsb-feeders.beastHost} \
                 -e BEASTPORT=${config.services.adsb-feeders.beastPort} \
@@ -272,6 +275,7 @@ with lib;
               
               ${pkgs.podman}/bin/podman run --rm --name adsbfi \
                 --privileged \
+                --label io.containers.autoupdate=registry \
                 ${optionalString (cfg.webPort != null) "-p ${toString cfg.webPort}:80"} \
                 ${optionalString cfg.exposeBeastPort "-p 30005:30005"} \
                 -e READSB_DEVICE_TYPE=${cfg.deviceType} \

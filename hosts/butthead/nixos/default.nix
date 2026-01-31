@@ -153,34 +153,6 @@ in
     };
   };
 
-  # Daily container image updates using podman auto-update
-  systemd.timers.podman-auto-update = {
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnCalendar = "daily";
-      RandomizedDelaySec = "2h";
-      Persistent = true;
-    };
-  };
-
-  systemd.services.podman-auto-update = {
-    description = "Update container images and restart if needed";
-    serviceConfig = {
-      Type = "oneshot";
-    };
-    script = ''
-      # Update containers for all users with XDG_RUNTIME_DIR
-      for runtime_dir in /run/user/*; do
-        if [ -d "$runtime_dir" ]; then
-          uid=$(basename "$runtime_dir")
-          username=$(id -un "$uid" 2>/dev/null) || continue
-          echo "Checking containers for user $username (UID $uid)"
-          sudo -u "$username" XDG_RUNTIME_DIR="$runtime_dir" ${pkgs.podman}/bin/podman auto-update || true
-        fi
-      done
-    '';
-  };
-
   # Configure containers.conf for pasta networking
   virtualisation.containers.containersConf.settings = {
     network = {
