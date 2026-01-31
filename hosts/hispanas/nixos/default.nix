@@ -11,21 +11,19 @@
   imports = [
     ./hardware-configuration.nix
     ../../common/nixos
-    ../../../modules/nixos/openwebrx.nix
-    (import ../../../modules/nixos/development.nix)
+    ../../../modules/nixos/phantomsdr-plus.nix
     # Add appropriate nixos-hardware module for your specific Lenovo model
     # inputs.nixos-hardware.nixosModules.lenovo-thinkpad-x1-carbon-gen11
   ];
 
-  # OpenWebRX+ Configuration
-  services.openwebrx-plus = {
+  # PhantomSDR-Plus Configuration
+  services.phantomsdr-plus = {
     enable = true;
-    port = 8073;
+    port = 9002;
   };
 
   # Host-specific networking
   networking.hostName = "hispanas";
-  development.enable = true;
 
 
   # Create mjpg-streamer user
@@ -88,8 +86,8 @@
     X-Cinnamon-Autostart-enabled=true
   '';
 
-  # Open firewall for webcam stream and openwebrx
-  networking.firewall.allowedTCPPorts = [ 8080 8073 ];
+  # Open firewall for webcam stream and phantomsdr-plus
+  networking.firewall.allowedTCPPorts = [ 8080 9002 ];
 
   # System state version
   system.stateVersion = "25.05";
