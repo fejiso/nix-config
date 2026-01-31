@@ -25,6 +25,7 @@
 
   # Host-specific networking
   networking.hostName = "hispanas";
+  development.enable = true;
 
 
   # Create mjpg-streamer user
