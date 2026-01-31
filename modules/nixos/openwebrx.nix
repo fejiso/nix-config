@@ -38,6 +38,8 @@ in {
 
     systemd.tmpfiles.rules = [
       "d /var/lib/openwebrx 0755 root root -"
+      "d /var/lib/openwebrx/etc 0755 root root -"
+      "d /var/lib/openwebrx/var 0755 root root -"
     ];
 
     systemd.services.openwebrx-plus = {
