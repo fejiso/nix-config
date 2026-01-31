@@ -56,10 +56,11 @@ in {
       };
       script = ''
         if [ ! -d "source" ]; then
-          git clone ${cfg.repoUrl} source
+          git clone --recursive ${cfg.repoUrl} source
         else
           cd source
           git pull
+          git submodule update --init --recursive
           cd ..
         fi
         
