@@ -35,7 +35,7 @@ in {
       "d /var/lib/openwebrx 0755 root root -"
     ];
 
-    systemd.services.openwebrx = {
+    systemd.services.openwebrx-plus = {
       description = "OpenWebRX+ Container";
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
@@ -45,10 +45,10 @@ in {
         Type = "simple";
         Restart = "always";
         RestartSec = "30";
-        ExecStartPre = "-${pkgs.podman}/bin/podman rm -f openwebrx";
+        ExecStartPre = "-${pkgs.podman}/bin/podman rm -f openwebrx-plus";
         ExecStart = pkgs.writeShellScript "start-openwebrx" ''
           ADMIN_PASS=$(cat ${config.sops.secrets.openwebrx_admin_password.path})
-          ${pkgs.podman}/bin/podman run --rm --name openwebrx \
+          ${pkgs.podman}/bin/podman run --rm --name openwebrx-plus \
             --privileged \
             -p ${toString cfg.port}:8073 \
             -e OPENWEBRX_ADMIN_USER=${cfg.adminUser} \
@@ -59,7 +59,7 @@ in {
             -v /dev/bus/usb:/dev/bus/usb \
             docker.io/slechev/openwebrxplus-softmbe:latest
         '';
-        ExecStop = "${pkgs.podman}/bin/podman stop -t 10 openwebrx";
+        ExecStop = "${pkgs.podman}/bin/podman stop -t 10 openwebrx-plus";
       };
     };
 
