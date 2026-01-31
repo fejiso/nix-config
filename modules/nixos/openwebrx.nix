@@ -57,7 +57,7 @@ in {
             -v /var/lib/openwebrx/etc:/etc/openwebrx \
             -v /var/lib/openwebrx/var:/var/lib/openwebrx \
             -v /dev/bus/usb:/dev/bus/usb \
-            slechev/openwebrxplus-softmbe:latest
+            docker.io/slechev/openwebrxplus-softmbe:latest
         '';
         ExecStop = "${pkgs.podman}/bin/podman stop -t 10 openwebrx";
       };
