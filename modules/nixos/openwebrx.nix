@@ -26,6 +26,11 @@ in {
     hardware.rtl-sdr.enable = true;
     boot.blacklistedKernelModules = [ "dvb_usb_rtl28xxu" ];
 
+    virtualisation.podman = {
+      enable = true;
+      dockerCompat = true;
+    };
+
     sops.secrets.openwebrx_admin_password = {
       sopsFile = "${inputs.self}/secrets/openwebrx.yaml";
       key = "admin_password";
