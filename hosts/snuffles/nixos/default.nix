@@ -89,7 +89,7 @@
       
       # Handle SDR decoding directly
       deviceType = "rtlsdr";
-      gain = "44";
+      gain = "auto-verbose";
       exposeBeastPort = true;
     };
   };
