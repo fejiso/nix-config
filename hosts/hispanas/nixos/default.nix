@@ -11,13 +11,13 @@
   imports = [
     ./hardware-configuration.nix
     ../../common/nixos
-    ../../../modules/nixos/phantomsdr-plus.nix
+    ../../../modules/nixos/novasdr.nix
     # Add appropriate nixos-hardware module for your specific Lenovo model
     # inputs.nixos-hardware.nixosModules.lenovo-thinkpad-x1-carbon-gen11
   ];
 
-  # PhantomSDR-Plus Configuration
-  services.phantomsdr-plus = {
+  # NovaSDR Configuration
+  services.novasdr = {
     enable = true;
     port = 9002;
   };
@@ -86,7 +86,7 @@
     X-Cinnamon-Autostart-enabled=true
   '';
 
-  # Open firewall for webcam stream and phantomsdr-plus
+  # Open firewall for webcam stream and novasdr
   networking.firewall.allowedTCPPorts = [ 8080 9002 ];
 
   # System state version
