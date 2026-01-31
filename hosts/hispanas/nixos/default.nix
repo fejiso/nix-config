@@ -17,7 +17,7 @@
   ];
 
   # OpenWebRX+ Configuration
-  services.openwebrx = {
+  services.openwebrx-plus = {
     enable = true;
     port = 8073;
   };

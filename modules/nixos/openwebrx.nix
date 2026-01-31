@@ -3,9 +3,9 @@
 with lib;
 
 let
-  cfg = config.services.openwebrx;
+  cfg = config.services.openwebrx-plus;
 in {
-  options.services.openwebrx = {
+  options.services.openwebrx-plus = {
     enable = mkEnableOption "OpenWebRX+ service";
     
     port = mkOption {
