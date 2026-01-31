@@ -25,4 +25,15 @@
   # Enable shells system-wide
   programs.zsh.enable = true;
   programs.fish.enable = true;
+
+  # Enable lingering for z-247 user
+  systemd.services.user-linger-z-247 = {
+    description = "Enable lingering for z-247 user";
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${pkgs.systemd}/bin/loginctl enable-linger z-247";
+    };
+  };
 }
