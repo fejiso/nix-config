@@ -66,6 +66,7 @@
     
     # Development tools
     git
+    git-annex
     gh
     direnv
     colmena
