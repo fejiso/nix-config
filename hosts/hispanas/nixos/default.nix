@@ -11,53 +11,15 @@
   imports = [
     ./hardware-configuration.nix
     ../../common/nixos
-    ../../../modules/nixos/adsb-readsb.nix
-    ../../../modules/nixos/adsb-feeders.nix
+    ../../../modules/nixos/openwebrx.nix
     # Add appropriate nixos-hardware module for your specific Lenovo model
     # inputs.nixos-hardware.nixosModules.lenovo-thinkpad-x1-carbon-gen11
   ];
 
-  # ADS-B configuration
-  # Standalone readsb disabled, using Ultrafeeder
-  services.adsb-readsb = {
-    enable = false;
-    enableRtlSdrHardware = true;
-  };
-
-  # ADS-B Location secrets
-  sops.secrets.adsb-lat = {
-    sopsFile = "${inputs.self}/secrets/adsb-location.yaml";
-    key = "${hostname}/latitude";
-  };
-  sops.secrets.adsb-lon = {
-    sopsFile = "${inputs.self}/secrets/adsb-location.yaml";
-    key = "${hostname}/longitude";
-  };
-  sops.secrets.adsb-alt = {
-    sopsFile = "${inputs.self}/secrets/adsb-location.yaml";
-    key = "${hostname}/altitude";
-  };
-  
-  sops.secrets.adsb-uuid = {
-    sopsFile = "${inputs.self}/secrets/adsbfi.yaml";
-    key = "${hostname}";
-  };
-
-  services.adsb-feeders = {
-    adsbfi = {
-      enable = true;
-      uuidSecretFile = config.sops.secrets.adsb-uuid.path;
-      latitude = "$(cat ${config.sops.secrets.adsb-lat.path})";
-      longitude = "$(cat ${config.sops.secrets.adsb-lon.path})";
-      altitude = "$(cat ${config.sops.secrets.adsb-alt.path})";
-      mlat = true;
-      webPort = 8081; # 8080 used by webcam
-      
-      # Handle SDR decoding directly
-      deviceType = "rtlsdr";
-      gain = "auto-verbose";
-      exposeBeastPort = true;
-    };
+  # OpenWebRX+ Configuration
+  services.openwebrx = {
+    enable = true;
+    port = 8073;
   };
 
   # Host-specific networking
@@ -124,8 +86,8 @@
     X-Cinnamon-Autostart-enabled=true
   '';
 
-  # Open firewall for webcam stream and adsbfi map
-  networking.firewall.allowedTCPPorts = [ 8080 8081 ];
+  # Open firewall for webcam stream and openwebrx
+  networking.firewall.allowedTCPPorts = [ 8080 8073 ];
 
   # System state version
   system.stateVersion = "25.05";
