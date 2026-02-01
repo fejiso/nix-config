@@ -131,6 +131,12 @@ with lib;
         default = false;
         description = "Expose Beast (30005) port to host";
       };
+
+      exposeSbsPort = mkOption {
+        type = types.bool;
+        default = false;
+        description = "Expose SBS (30003) port to host";
+      };
     };
 
     beastHost = mkOption {
@@ -278,6 +284,7 @@ with lib;
                 --label io.containers.autoupdate=registry \
                 ${optionalString (cfg.webPort != null) "-p ${toString cfg.webPort}:80"} \
                 ${optionalString cfg.exposeBeastPort "-p 30005:30005"} \
+                ${optionalString cfg.exposeSbsPort "-p 30003:30003"} \
                 -e READSB_DEVICE_TYPE=${cfg.deviceType} \
                 ${optionalString (cfg.deviceType == "rtlsdr") "-e READSB_RTLSDR_DEVICE=${cfg.deviceIndex}"} \
                 ${optionalString (cfg.deviceType == "rtlsdr") "-e READSB_RTLSDR_PPM=${toString cfg.ppm}"} \
@@ -299,6 +306,10 @@ with lib;
           ExecStop = "${pkgs.podman}/bin/podman stop -t 10 adsbfi";
         };
       };
+
+      networking.firewall.interfaces.wt0.allowedTCPPorts = 
+        (optional config.services.adsb-feeders.adsbfi.exposeBeastPort 30005) ++
+        (optional config.services.adsb-feeders.adsbfi.exposeSbsPort 30003);
     })
   ];
 }
