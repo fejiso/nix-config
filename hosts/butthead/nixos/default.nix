@@ -309,8 +309,8 @@ in
       olderThan = 10;  # Prioritize blocks older than 10 days
     };
 
-    # Sync configuration
-    sync.interval = "04:00";  # Daily sync at 4am
+    # Sync configuration - DISABLED during backup restore to preserve parity
+    # sync.interval = "04:00";  # Daily sync at 4am
   };
 
   # Override autoScrub timers with staggered schedules for data/parity drives
@@ -322,6 +322,24 @@ in
   systemd.timers."btrfs-scrub-mnt-data06".timerConfig.OnCalendar = lib.mkForce "*-*-21 02:00:00";
   systemd.timers."btrfs-scrub-mnt-parity1".timerConfig.OnCalendar = lib.mkForce "*-*-25 02:00:00";
   systemd.timers."btrfs-scrub-mnt-parity2".timerConfig.OnCalendar = lib.mkForce "*-*-28 02:00:00";
+
+  # Wrap scrub services with flock to guarantee no two scrubs run simultaneously
+  systemd.services."btrfs-scrub-mnt-data01".serviceConfig.ExecStart = lib.mkForce
+    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data01";
+  systemd.services."btrfs-scrub-mnt-data02".serviceConfig.ExecStart = lib.mkForce
+    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data02";
+  systemd.services."btrfs-scrub-mnt-data03".serviceConfig.ExecStart = lib.mkForce
+    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data03";
+  systemd.services."btrfs-scrub-mnt-data04".serviceConfig.ExecStart = lib.mkForce
+    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data04";
+  systemd.services."btrfs-scrub-mnt-data05".serviceConfig.ExecStart = lib.mkForce
+    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data05";
+  systemd.services."btrfs-scrub-mnt-data06".serviceConfig.ExecStart = lib.mkForce
+    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data06";
+  systemd.services."btrfs-scrub-mnt-parity1".serviceConfig.ExecStart = lib.mkForce
+    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/parity1";
+  systemd.services."btrfs-scrub-mnt-parity2".serviceConfig.ExecStart = lib.mkForce
+    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/parity2";
 
   # SSD cache migration script
   systemd.services.ssd-migrate = {
