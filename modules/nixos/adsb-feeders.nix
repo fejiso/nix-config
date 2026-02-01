@@ -291,12 +291,13 @@ with lib;
                 ${optionalString (cfg.deviceType == "rtlsdr") "-e READSB_GAIN=${cfg.gain}"} \
                 ${optionalString (cfg.deviceType == "none") "-e READSB_NET_CONNECTOR=${beastHost},${beastPort},beast_in"} \
                 -e ULTRAFEEDER_CONFIG="adsb,feed.adsb.fi,30004,beast_reduce_plus_out;mlat,feed.adsb.fi,31090" \
-                -e UUID=$UUID \
+                -e ULTRAFEEDER_UUID=$UUID \
                 -e MLAT_USER=$UUID \
                 -e LAT=${cfg.latitude} \
                 -e LONG=${cfg.longitude} \
                 -e ALT=${cfg.altitude} \
                 -e FEEDER_NAME="${cfg.name}" \
+                -e ADSB_FEEDER_NAME="${cfg.name}" \
                 -v /dev/bus/usb:/dev/bus/usb \
                 -v /var/lib/ultrafeeder:/var/globe_history \
                 -v /var/lib/graphs1090:/var/lib/collectd \
