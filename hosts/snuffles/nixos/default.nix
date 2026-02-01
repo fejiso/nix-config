@@ -91,6 +91,7 @@
       deviceType = "rtlsdr";
       gain = "auto-verbose";
       exposeBeastPort = true;
+      exposeSbsPort = true;
     };
   };
 
