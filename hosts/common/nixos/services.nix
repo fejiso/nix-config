@@ -92,7 +92,6 @@
       Type = "simple";
       ExecStart = "${pkgs.python3Packages.rns}/bin/rnsd --service --config /etc/reticulum";
       Restart = "always";
-      RuntimeMaxSec = "15min";
     };
   };
 
@@ -374,7 +373,7 @@
     };
     serviceConfig = {
       Type = "simple";
-      ExecStart = "${pkgs.python3Packages.lxmf}/bin/lxmd --config /etc/lxmf";
+      ExecStart = "${pkgs.python3Packages.lxmf}/bin/lxmd -p -s --config /etc/lxmf";
       Restart = "always";
       RestartSec = "5";
     };
@@ -382,13 +381,17 @@
 
   # LXMF config
   environment.etc."lxmf/config".text = ''
+    [propagation]
+    enable_node = yes
+    node_name = ${hostname}
+    announce_at_start = yes
+    announce_interval = 360
+    autopeer = yes
+    message_storage_limit = 1024
+
     [lxmf]
     display_name = ${hostname}
     announce_at_start = yes
-    announce_interval = 360
-    propagation_node = yes
-    propagation_limit = 16384
-    storage_limit = 1073741824
   '';
 
   # iperf3 server listening on wt0 interface for network performance testing
