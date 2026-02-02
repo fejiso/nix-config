@@ -4,7 +4,7 @@ keys:
   - &user_age age1pylg5fzewum5jk3z64s7pqkffu4ljjnr3mkm0n8z3rl4upsrp4rsszw4gk
 
   # SSH host keys for NixOS system secrets
-  - &elitedx_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for elitedx
+  - &elitedx_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIjL5IsHvPwtZhjj3VYpcKMoA68f7MlHvayhakVwdG+E
   - &lenovix_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKjSXKkOBTwOny1O6ssb4yFOuntAKh07qiDjhJnVRXV2
   - &a8_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... # TODO: Get SSH host key for a8
   - &hierro_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBgTN8rJvs9tZlSA0t3lNQX4MY15aJWUjxASTz32NdHt
@@ -31,6 +31,7 @@ creation_rules:
   # System/host secrets - use host SSH keys and age keys
   - path_regex: 'secrets/.*$'
     age:
+      - *elitedx_ssh
       - *blacktop_ssh
       - *hierro_ssh
       - *butthead_ssh

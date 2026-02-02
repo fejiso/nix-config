@@ -38,4 +38,33 @@
       ExecStart = "${pkgs.systemd}/bin/systemctl restart netbird.service";
     };
   };
+
+  # Watchdog: restart netbird when DNS resolution is broken
+  systemd.services.netbird-dns-watchdog = {
+    description = "Restart NetBird if DNS resolution fails";
+    after = [ "network-online.target" "netbird.service" ];
+    wants = [ "network-online.target" ];
+
+    serviceConfig = {
+      Type = "oneshot";
+    };
+
+    script = ''
+      if ! ${pkgs.host}/bin/host -W 5 cloudflare.com 127.0.0.53 > /dev/null 2>&1; then
+        echo "DNS resolution failed, restarting netbird and flushing resolved"
+        ${pkgs.systemd}/bin/systemctl restart netbird.service
+        ${pkgs.systemd}/bin/resolvectl flush-caches
+        ${pkgs.systemd}/bin/resolvectl reset-server-features
+      fi
+    '';
+  };
+
+  systemd.timers.netbird-dns-watchdog = {
+    description = "Periodically check DNS for netbird health";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "5min";
+      OnUnitActiveSec = "15min";
+    };
+  };
 }
