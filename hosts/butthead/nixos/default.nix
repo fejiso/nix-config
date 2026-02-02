@@ -385,7 +385,7 @@ in
 
   systemd.timers.ssd-migrate = {
     description = "Daily SSD to HDD migration at 3am";
-    wantedBy = [ "timers.target" ];
+    wantedBy = []; # disabled
     timerConfig = {
       OnCalendar = "03:00";
       Persistent = true;
