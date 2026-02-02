@@ -302,16 +302,33 @@ in
       "/mnt/data05/.snapraid.content"
       "/mnt/data06/.snapraid.content"
     ];
+  };
 
-    # Scrub configuration - DISABLED during snapraid recovery
-    # scrub = {
-    #   interval = "02:00";  # Daily scrub at 2am
-    #   plan = 5;  # Scrub 5% of array
-    #   olderThan = 10;  # Prioritize blocks older than 10 days
-    # };
+  # Disable the NixOS snapraid module's built-in timers
+  systemd.timers.snapraid-sync.enable = lib.mkForce false;
+  systemd.timers.snapraid-scrub.enable = lib.mkForce false;
 
-    # Sync configuration - DISABLED during backup restore to preserve parity
-    # sync.interval = "04:00";  # Daily sync at 4am
+  # SnapRAID maintenance via zackreed script (replaces built-in sync/scrub)
+  systemd.services.snapraid-maintenance = {
+    description = "SnapRAID maintenance (diff/sync/scrub/SMART)";
+    after = [ "local-fs.target" ];
+    path = with pkgs; [ snapraid mutt curl coreutils gawk gnused gnugrep inetutils util-linux findutils ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.bash}/bin/bash ${../../../scripts/zackreed-snapraid.sh}";
+      Nice = 19;
+      IOSchedulingPriority = 7;
+      CPUSchedulingPolicy = "batch";
+    };
+  };
+
+  systemd.timers.snapraid-maintenance = {
+    description = "Daily SnapRAID maintenance at 4am";
+    wantedBy = [];  # DISABLED for now
+    timerConfig = {
+      OnCalendar = "04:00";
+      Persistent = true;
+    };
   };
 
   # Override autoScrub timers with staggered schedules for data/parity drives

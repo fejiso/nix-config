@@ -45,22 +45,22 @@ SPINDOWN_DISKS=0
 # Log SMART info.
 SMART_LOG=1
 
-SNAPRAID_BIN="/usr/local/bin/snapraid"
-MAIL_BIN="/usr/bin/mutt"
-DOCKER_BIN="/usr/bin/docker"
+SNAPRAID_BIN="snapraid"
+MAIL_BIN="mutt"
+DOCKER_BIN="docker"
 
 SNAPRAID_CONF="/etc/snapraid.conf"
 
 # Docker services control (pause containers by name).
-MANAGE_SERVICES=1
-SERVICES=(sabnzbd sonarr radarr lidarr)
+MANAGE_SERVICES=0
+SERVICES=()
 PAUSED_SERVICES=()
 
 # Where to keep the warning counter (persistent across runs)
-SYNC_WARN_FILE="/tmp/snapRAID.warnCount"
+SYNC_WARN_FILE="/var/lib/snapraid/snapRAID.warnCount"
 
 # Optional: prevent overlapping runs (recommended for cron)
-LOCK_FILE="/tmp/snapraid-sync.lock"
+LOCK_FILE="/var/lib/snapraid/snapraid-sync.lock"
 
 # Exit-code policy:
 # 0 = continue on failures (but warn and block downstream risky steps)
@@ -172,15 +172,15 @@ format_duration() {
 
 # Verify all required binaries are present and executable
 require_bins() {
-  [[ -x "$SNAPRAID_BIN" ]] || die "snapraid binary not found/executable at: $SNAPRAID_BIN"
+  have_cmd "$SNAPRAID_BIN" || die "snapraid binary not found in PATH: $SNAPRAID_BIN"
   [[ -f "$SNAPRAID_CONF" ]] || die "snapraid config not found at: $SNAPRAID_CONF"
 
   if [[ -n "${EMAIL_ADDRESS:-}" ]]; then
-    [[ -x "$MAIL_BIN" ]] || die "mail binary not found/executable at: $MAIL_BIN"
+    have_cmd "$MAIL_BIN" || die "mail binary not found in PATH: $MAIL_BIN"
   fi
 
   if (( MANAGE_SERVICES == 1 )); then
-    [[ -x "$DOCKER_BIN" ]] || die "docker binary not found/executable at: $DOCKER_BIN"
+    have_cmd "$DOCKER_BIN" || die "docker binary not found in PATH: $DOCKER_BIN"
   fi
 
   for b in awk sed grep hostname date tee mkdir mktemp; do
