@@ -139,6 +139,13 @@
         imports = commonModules.nixos ++ [ ./hosts/${name}/nixos ];
         _module.args.hostname = name;
       };
+      mkColmenaBuildOnly = name: {
+        deployment = {
+          targetHost = null;
+        };
+        imports = commonModules.nixos ++ [ ./hosts/${name}/nixos ];
+        _module.args.hostname = name;
+      };
     in {
       meta = {
         nixpkgs = import nixpkgs {
@@ -157,7 +164,10 @@
       butthead = mkColmena "butthead";
       snuffles = mkColmena "snuffles";
 
-      # ARM hosts are image-only targets, not colmena deployment targets
+      # ARM hosts (build-only, no deployment)
+      rpi3 = mkColmenaBuildOnly "rpi3";
+      pine64 = mkColmenaBuildOnly "pine64";
+      xpi-s905x3 = mkColmenaBuildOnly "xpi-s905x3";
     };
     
     # NixOS configurations
