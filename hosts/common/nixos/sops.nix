@@ -18,6 +18,16 @@
         key = "credentials";
         mode = "0444";  # Make it readable by all so podman containers can access it
       };
+
+      pushover-app-token = {
+        sopsFile = "${inputs.self}/secrets/pushover.yaml";
+        key = "app_token";
+      };
+
+      pushover-user-key = {
+        sopsFile = "${inputs.self}/secrets/pushover.yaml";
+        key = "user_key";
+      };
     };
   };
 }

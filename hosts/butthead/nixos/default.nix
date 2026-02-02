@@ -312,7 +312,7 @@ in
   systemd.services.snapraid-maintenance = {
     description = "SnapRAID maintenance (diff/sync/scrub/SMART)";
     after = [ "local-fs.target" ];
-    path = with pkgs; [ snapraid mutt curl coreutils gawk gnused gnugrep inetutils util-linux findutils ];
+    path = with pkgs; [ snapraid curl coreutils gawk gnused gnugrep inetutils util-linux findutils ];
     serviceConfig = {
       Type = "oneshot";
       ExecStart = "${pkgs.bash}/bin/bash ${../../../scripts/zackreed-snapraid.sh}";

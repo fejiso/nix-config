@@ -21,7 +21,10 @@
 # USER CONFIGURATION  #
 #######################
 
-EMAIL_ADDRESS="youremail@gmail.com"
+# Pushover notification config
+PUSHOVER_APP_TOKEN_FILE="/run/secrets/pushover-app-token"
+PUSHOVER_USER_KEY_FILE="/run/secrets/pushover-user-key"
+PUSHOVER_ENABLED=1
 
 # Set the threshold of deleted files to stop the sync job from running.
 DEL_THRESHOLD=100
@@ -46,7 +49,6 @@ SPINDOWN_DISKS=0
 SMART_LOG=1
 
 SNAPRAID_BIN="snapraid"
-MAIL_BIN="mutt"
 DOCKER_BIN="docker"
 
 SNAPRAID_CONF="/etc/snapraid.conf"
@@ -175,8 +177,10 @@ require_bins() {
   have_cmd "$SNAPRAID_BIN" || die "snapraid binary not found in PATH: $SNAPRAID_BIN"
   [[ -f "$SNAPRAID_CONF" ]] || die "snapraid config not found at: $SNAPRAID_CONF"
 
-  if [[ -n "${EMAIL_ADDRESS:-}" ]]; then
-    have_cmd "$MAIL_BIN" || die "mail binary not found in PATH: $MAIL_BIN"
+  if (( PUSHOVER_ENABLED == 1 )); then
+    have_cmd curl || die "curl not found (required for Pushover notifications)"
+    [[ -f "$PUSHOVER_APP_TOKEN_FILE" ]] || die "Pushover app token file not found: $PUSHOVER_APP_TOKEN_FILE"
+    [[ -f "$PUSHOVER_USER_KEY_FILE" ]] || die "Pushover user key file not found: $PUSHOVER_USER_KEY_FILE"
   fi
 
   if (( MANAGE_SERVICES == 1 )); then
@@ -1292,10 +1296,54 @@ beautify_email_output() {
   ' "$EMAIL_OUTPUT" > "$tmp" && mv -f "$tmp" "$EMAIL_OUTPUT"
 }
 
-# Send the formatted email
-send_mail() {
-  if ! "$MAIL_BIN" -s "$SUBJECT" "$EMAIL_ADDRESS" < "$EMAIL_OUTPUT"; then
-    log "ERROR: Failed to send email to $EMAIL_ADDRESS"
+# Send Pushover notification with concise summary
+send_pushover() {
+  (( PUSHOVER_ENABLED == 1 )) || return 0
+
+  local token user priority body duration_str
+
+  token="$(< "$PUSHOVER_APP_TOKEN_FILE")"
+  user="$(< "$PUSHOVER_USER_KEY_FILE")"
+
+  # Set priority based on status (-1=quiet, 0=normal, 1=high)
+  priority=0
+  if (( CHK_FAIL == 1 )); then
+    priority=1
+  elif (( HAD_FAILURE == 1 )); then
+    priority=1
+  fi
+
+  # Build concise message body (Pushover limit: 1024 chars)
+  duration_str="$(format_duration "$SECONDS")"
+  body="$(printf '%s\n' \
+    "Host: $(hostname)" \
+    "Duration: ${duration_str}" \
+    "Jobs: ${JOBS_DONE:-none}" \
+    "" \
+    "Added: ${ADD_COUNT:-0}  Removed: ${DEL_COUNT:-0}" \
+    "Updated: ${UPDATE_COUNT:-0}  Moved: ${MOVE_COUNT:-0}" \
+    "Copied: ${COPY_COUNT:-0}  Restored: ${RESTORED_COUNT:-0}")"
+
+  if (( CHK_FAIL == 1 && DO_SYNC == 0 )); then
+    body="$(printf '%s\n\n%s' "$body" \
+      "THRESHOLD EXCEEDED - sync skipped, manual review needed")"
+  fi
+
+  if [[ -n "${FULL_LOG_FILE:-}" ]]; then
+    body="$(printf '%s\n\n%s' "$body" "Log: ${FULL_LOG_FILE}")"
+  fi
+
+  # Truncate to Pushover limit
+  body="${body:0:1024}"
+
+  if ! curl -s --max-time 15 \
+    --form-string "token=${token}" \
+    --form-string "user=${user}" \
+    --form-string "title=${SUBJECT}" \
+    --form-string "message=${body}" \
+    --form-string "priority=${priority}" \
+    https://api.pushover.net/1/messages.json >/dev/null; then
+    log "ERROR: Failed to send Pushover notification"
     return 1
   fi
 }
@@ -1394,12 +1442,8 @@ main() {
     log "**ERROR** Failed to extract change counts from DIFF output. Unable to proceed safely."
     persist_full_log
     
-    if [[ -n "${EMAIL_ADDRESS:-}" ]]; then
-      SUBJECT="${EMAIL_SUBJECT_PREFIX} WARNING - Unable to proceed with SYNC/SCRUB job(s). Check DIFF job output."
-      summarize_diff_for_email
-      beautify_email_output
-      send_mail
-    fi
+    SUBJECT="${EMAIL_SUBJECT_PREFIX} WARNING - Unable to proceed with SYNC/SCRUB job(s). Check DIFF job output."
+    send_pushover
     
     hc_finish_fail 2
     exit 1
@@ -1518,13 +1562,9 @@ main() {
   # Save full log to disk
   persist_full_log
 
-  # Prepare and send email if configured
-  if [[ -n "${EMAIL_ADDRESS:-}" ]]; then
-    prepare_mail_subject
-    summarize_diff_for_email
-    beautify_email_output
-    send_mail
-  fi
+  # Send Pushover notification
+  prepare_mail_subject
+  send_pushover
 
   # Send healthcheck ping
   if [[ "${SUBJECT:-}" == *"[WARNING]"* || $HAD_FAILURE -eq 1 || $CHK_FAIL -eq 1 ]]; then
