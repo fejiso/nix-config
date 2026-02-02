@@ -78,6 +78,7 @@ in
     (import ../../../modules/nixos/systemd-nspawn.nix)
     (import ../../../modules/nixos/media-services.nix)
     (import ../../../modules/nixos/download-services.nix)
+    (import ../../../modules/nixos/media-podman.nix)
     (import ../../../modules/nixos/tdarr-worker.nix)
     (import ../../../modules/nixos/development.nix)
     (import ../../../modules/nixos/tgtg-watcher.nix)
@@ -522,10 +523,7 @@ in
     gid = 13200;
   };
 
-  # Shared group for media services - defined in tdarr-worker.nix
-  # users.groups.media-services = {
-  #   gid = 13100;
-  # };
+  # Shared group for media services - defined in media-podman.nix
 
   # Enable lingering for podman users to create /run/user/UID directories
   systemd.services.enable-linger-podman-users = {
@@ -554,21 +552,7 @@ in
   #   subGidRanges = [{ startGid = 200000; count = 65536; }];
   # };
 
-  # Shared user for all media services - defined in tdarr-worker.nix
-  # users.users.media-podman = {
-  #   isSystemUser = true;
-  #   group = "media-services";
-  #   extraGroups = [ "media-services" ];
-  #   uid = 13106;
-  #   home = "/var/lib/media-podman";
-  #   createHome = true;
-  #   subUidRanges = [
-  #     { startUid = 300000; count = 65536; }
-  #   ];
-  #   subGidRanges = [
-  #     { startGid = 300000; count = 65536; }
-  #   ];
-  # };
+  # Shared user for all media services - defined in media-podman.nix
 
   # User for utility services (uptime-kuma, restic, etc)
   users.users.utils-podman = {
