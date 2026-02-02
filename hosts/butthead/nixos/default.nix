@@ -302,12 +302,12 @@ in
       "/mnt/data06/.snapraid.content"
     ];
 
-    # Scrub configuration
-    scrub = {
-      interval = "02:00";  # Daily scrub at 2am
-      plan = 5;  # Scrub 5% of array
-      olderThan = 10;  # Prioritize blocks older than 10 days
-    };
+    # Scrub configuration - DISABLED during snapraid recovery
+    # scrub = {
+    #   interval = "02:00";  # Daily scrub at 2am
+    #   plan = 5;  # Scrub 5% of array
+    #   olderThan = 10;  # Prioritize blocks older than 10 days
+    # };
 
     # Sync configuration - DISABLED during backup restore to preserve parity
     # sync.interval = "04:00";  # Daily sync at 4am
@@ -405,7 +405,7 @@ in
 
   # Tdarr transcoding server and worker
   services.tdarr-worker = {
-    enable = true;
+    enable = false; # disabled during snapraid recovery
     serverEnabled = true;
     mediaDirectories = {
       tv = "/mnt/user/Series";
@@ -680,6 +680,7 @@ in
   };
 
   # Media services (all run under single media-podman user)
+  # Disabled during snapraid recovery (wantedBy = [])
   systemd.services.sonarr = mkMediaService {
     name = "sonarr";
     port = 8989;
@@ -688,7 +689,7 @@ in
       "/mnt/user/download:/downloads:rw"
       "/mnt/user/Series:/tv:rw"
     ];
-  };
+  } // { wantedBy = lib.mkForce []; };
 
   systemd.services.radarr = mkMediaService {
     name = "radarr";
@@ -698,7 +699,7 @@ in
       "/mnt/user/download:/downloads:rw"
       "/mnt/user/Movies:/movies:rw"
     ];
-  };
+  } // { wantedBy = lib.mkForce []; };
 
   systemd.services.lidarr = mkMediaService {
     name = "lidarr";
@@ -708,7 +709,7 @@ in
       "/mnt/user/download:/downloads:rw"
       "/mnt/user/Music:/music:rw"
     ];
-  };
+  } // { wantedBy = lib.mkForce []; };
 
   systemd.services.prowlarr = mkMediaService {
     name = "prowlarr";
@@ -926,7 +927,7 @@ in
       "/mnt/user/download:/downloads:rw"
       "/mnt/user/downloadtemp/incomplete:/incomplete-downloads:rw"
     ];
-  };
+  } // { wantedBy = lib.mkForce []; };
 
   # Gluetun VPN Service
   systemd.services.gluetun = {
