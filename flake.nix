@@ -157,9 +157,7 @@
       butthead = mkColmena "butthead";
       snuffles = mkColmena "snuffles";
 
-      # ARM hosts
-      rpi3 = mkColmena "rpi3";
-      pine64 = mkColmena "pine64";
+      # ARM hosts are image-only targets, not colmena deployment targets
     };
     
     # NixOS configurations
@@ -177,6 +175,7 @@
       # ARM hosts
       rpi3 = mkNixosSystem "rpi3" "aarch64-linux";
       pine64 = mkNixosSystem "pine64" "aarch64-linux";
+      xpi-s905x3 = mkNixosSystem "xpi-s905x3" "aarch64-linux";
     };
     
     # Standalone home-manager configurations (for non-NixOS systems)
@@ -188,6 +187,7 @@
     images = {
       rpi3 = (mkSdImageSystem "rpi3" "aarch64-linux" ./hosts/rpi3/nixos).config.system.build.sdImage;
       pine64 = (mkSdImageSystem "pine64" "aarch64-linux" ./hosts/pine64/nixos).config.system.build.sdImage;
+      xpi-s905x3 = (mkSdImageSystem "xpi-s905x3" "aarch64-linux" ./hosts/xpi-s905x3/nixos).config.system.build.sdImage;
     };
 
     # Darwin configurations (macOS)
