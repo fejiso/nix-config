@@ -11,7 +11,10 @@
     ./hardware-configuration.nix
   ];
 
-  
+  # Disable graphics (headless server, saves mesa ~500M)
+  hardware.graphics.enable = lib.mkForce false;
+  hardware.graphics.enable32Bit = lib.mkForce false;
+
   # Additional server packages
   environment.systemPackages = with pkgs; [
   ];

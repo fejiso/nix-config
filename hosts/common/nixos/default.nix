@@ -115,7 +115,6 @@
     mpv
     file
     pinentry-curses
-    wine
     wl-clipboard
     lsof
     nmap

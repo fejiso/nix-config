@@ -369,7 +369,7 @@ in
 
         # Find files on SSD older than 24h, not currently open, and move to HDD pool
         ${pkgs.findutils}/bin/find /mnt/data01 -type f -mtime +1 -size +1M \
-          ! -name "*.partial" ! -name "*.tmp" ! -path "*/.snapraid.content" ! -path "*/Trash/*" \
+          ! -name "*.partial" ! -name "*.tmp" ! -path "*/.snapraid.content" ! -path "*/Trash/*" ! -path "*downloadtemp*" \
           -print0 | while IFS= read -r -d "" file; do
 
           # First check if file is open

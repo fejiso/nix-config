@@ -5,69 +5,6 @@
   pkgs,
   ...
 }: {
-  # Helix editor configuration
-  programs.helix = {
-    enable = true;
-    settings = {
-      theme = "gruvbox_dark_hard";
-      editor = {
-        true-color = true;
-        line-number = "relative";
-        mouse = true;
-        cursor-shape = {
-          insert = "bar";
-          normal = "block";
-          select = "underline";
-        };
-        file-picker = {
-          hidden = false;
-        };
-        auto-save = true;
-        auto-format = true;
-        idle-timeout = 50;
-      };
-    };
-    languages = {
-      language-server.pylsp = {
-        command = "${pkgs.python3Packages.python-lsp-server}/bin/pylsp";
-      };
-      language-server.rust-analyzer = {
-        command = "${pkgs.rust-analyzer}/bin/rust-analyzer";
-      };
-      language-server.clangd = {
-        command = "${pkgs.clang-tools}/bin/clangd";
-      };
-
-      language = [
-        {
-          name = "nix";
-          auto-format = true;
-          formatter.command = "${pkgs.alejandra}/bin/alejandra";
-        }
-        {
-          name = "rust";
-          auto-format = true;
-          language-servers = ["rust-analyzer"];
-        }
-        {
-          name = "python";
-          auto-format = true;
-          language-servers = ["pylsp"];
-        }
-        {
-          name = "c";
-          auto-format = true;
-          language-servers = ["clangd"];
-        }
-        {
-          name = "cpp";
-          auto-format = true;
-          language-servers = ["clangd"];
-        }
-      ];
-    };
-  };
-
   # Bat configuration
   programs.bat = {
     enable = true;

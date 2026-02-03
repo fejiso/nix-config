@@ -45,6 +45,32 @@
     transcodeCache = "/mnt/downloadtemp/tdarr-cache";
   };
 
+  # Hourly flake builder — builds all host closures so nix-serve can distribute them
+  systemd.services.nix-builder = {
+    description = "Build all NixOS host configurations from flake";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    path = with pkgs; [ config.nix.package colmena gitMinimal openssh jq ];
+    serviceConfig = {
+      Type = "oneshot";
+      StateDirectory = "nix-builder";
+      ExecStart = "${pkgs.bash}/bin/bash ${../../../scripts/nix-builder.sh}";
+      Nice = 19;
+      IOSchedulingPriority = 7;
+      CPUSchedulingPolicy = "batch";
+    };
+  };
+
+  systemd.timers.nix-builder = {
+    description = "Hourly NixOS flake build";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "hourly";
+      Persistent = true;
+      RandomizedDelaySec = "5min";
+    };
+  };
+
   # System state version
   system.stateVersion = "25.05";
 }

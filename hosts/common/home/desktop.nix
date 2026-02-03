@@ -11,6 +11,7 @@
     logseq
     libreoffice
     zoom-us
+    wine
     
     # Document processing
     texlive.combined.scheme-full

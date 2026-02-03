@@ -93,7 +93,6 @@
     
     git-filter-repo
     git-crypt
-    localsend
     nil
     nix
     nix-index
