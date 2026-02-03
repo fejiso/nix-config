@@ -143,6 +143,15 @@ in {
     enable = true;
     nix-direnv.enable = true;
   };
+
+  # Atuin shell history
+  programs.atuin = {
+    enable = true;
+    enableFishIntegration = true;
+    enableBashIntegration = true;
+    enableZshIntegration = true;
+  };
+
   programs.claude-code = {
   	enable = true;
   };
