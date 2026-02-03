@@ -292,6 +292,10 @@
         sopsFile = "${inputs.self}/secrets/music.yaml";
         key = "listenbrainz_token";
       };
+      atuin-key = {
+        sopsFile = "${inputs.self}/secrets/atuin.yaml";
+        key = "atuin_key";
+      };
     };
   };
 }

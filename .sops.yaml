@@ -24,7 +24,7 @@ keys:
 
 creation_rules:
   # Home-manager secrets - use user SSH key
-  - path_regex: 'secrets/(git-credentials-age|beets|music)\.yaml$'
+  - path_regex: 'secrets/(git-credentials-age|beets|music|atuin)\.yaml$'
     age:
       - *user_ssh
       - *user_age
