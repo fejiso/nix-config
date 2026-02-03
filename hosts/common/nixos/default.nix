@@ -179,6 +179,9 @@
   # Users
   programs.fish.enable = true;
 
+  # dconf - needed for home-manager gtk/dconf settings to apply during activation
+  programs.dconf.enable = true;
+
   # https://nixos.wiki/wiki/FAQ/When_do_I_update_stateVersion
   system.stateVersion = "25.05";
 }
