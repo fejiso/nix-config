@@ -46,4 +46,7 @@
 
   # macOS specific programs
   programs.alacritty.settings.window.decorations = "buttonless";
+
+  # Disable atuin
+  programs.atuin.enable = lib.mkForce false;
 }

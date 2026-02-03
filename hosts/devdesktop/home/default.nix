@@ -54,4 +54,7 @@
     userName = lib.mkForce "superfer";
     userEmail = lib.mkForce "superfer@amazon.com"; # Adjust as needed
   };
+
+  # Disable atuin
+  programs.atuin.enable = lib.mkForce false;
 }
