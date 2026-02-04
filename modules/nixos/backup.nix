@@ -41,37 +41,48 @@ in {
 
     # Server Configuration
     (mkIf (cfg.enable && cfg.server) {
+      systemd.tmpfiles.rules = [
+        "d ${cfg.repoPath} 0700 root root -"
+      ];
+
       systemd.services.kopia-server = {
         description = "Kopia Repository Server";
         wantedBy = [ "multi-user.target" ];
-        environment = {
-          KOPIA_PASSWORD_FILE = config.sops.secrets.kopia_repo_password.path;
-        };
+        after = [ "sops-nix.service" "systemd-tmpfiles-setup.service" ];
         path = [ kopia ];
         serviceConfig = {
           Type = "simple";
           Restart = "always";
           RestartSec = "10";
+          CacheDirectory = "kopia";
+          StateDirectory = "kopia";
+        };
+        environment = {
+          HOME = "/var/lib/kopia";
         };
         script = ''
-          # Initialize repo if config doesn't exist
-          if [ ! -f /root/.config/kopia/repository.config ]; then
-            echo "Initializing Kopia repository at ${cfg.repoPath}..."
-            mkdir -p ${cfg.repoPath}
-            ${kopia}/bin/kopia repository create filesystem --path ${cfg.repoPath}
-            
-            # Add default user
+          export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_repo_password.path})"
+
+          # Connect to or create repository
+          if [ ! -f "$HOME/.config/kopia/repository.config" ]; then
+            # Check if repo data exists at path
+            if [ -f "${cfg.repoPath}/kopia.repository.f" ]; then
+              echo "Found existing repository at ${cfg.repoPath}, connecting..."
+              ${kopia}/bin/kopia repository connect filesystem --path ${cfg.repoPath}
+            else
+              echo "Creating new repository at ${cfg.repoPath}..."
+              ${kopia}/bin/kopia repository create filesystem --path ${cfg.repoPath}
+            fi
+
+            # Add server user (ignore if exists)
             SERVER_PASS=$(cat ${config.sops.secrets.kopia_server_password.path})
-            ${kopia}/bin/kopia server user add backup-user@${hostname} --user-password="$SERVER_PASS"
+            ${kopia}/bin/kopia server user add backup-user@${hostname} --user-password="$SERVER_PASS" || true
           fi
-          
-          # Start server
-          # We use --insecure because we are behind a secure mesh (Netbird) or will handle certs later
-          # Actually Kopia server insists on TLS. We let it generate one.
+
           exec ${kopia}/bin/kopia server start --address 0.0.0.0:51515 --tls-generate-cert --tls-print-server-cert
         '';
       };
-      
+
       networking.firewall.allowedTCPPorts = [ 51515 ];
     })
 

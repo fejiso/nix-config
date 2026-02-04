@@ -86,7 +86,11 @@ in
   ];
 
   # Enable Kopia server
-  services.backup.server = true;
+  services.backup =
+  {
+    server = true;
+    repoPath = "/mnt/user/Backups/Kopia";
+  };
 
   # Enable development tools
   development.enable = true;
@@ -282,7 +286,7 @@ in
   services.snapraid = {
     enable = true;
     dataDisks = {
-      d1 = "/mnt/data01";
+      #d1 = "/mnt/data01";  # Keep until snapraid sync removes its entries
       d2 = "/mnt/data02";
       d3 = "/mnt/data03";
       d4 = "/mnt/data04";
@@ -295,7 +299,7 @@ in
     ];
     contentFiles = [
       "/var/snapraid/snapraid.content"
-      "/mnt/data01/.snapraid.content"
+      #"/mnt/data01/.snapraid.content"  # Keep until snapraid sync removes d1 entries
       "/mnt/data02/.snapraid.content"
       "/mnt/data03/.snapraid.content"
       "/mnt/data04/.snapraid.content"
@@ -309,9 +313,11 @@ in
   systemd.timers.snapraid-scrub.enable = lib.mkForce false;
 
   # SnapRAID maintenance via zackreed script (replaces built-in sync/scrub)
+  # Runs after ssd-migrate to ensure files are settled before parity sync
   systemd.services.snapraid-maintenance = {
     description = "SnapRAID maintenance (diff/sync/scrub/SMART)";
-    after = [ "local-fs.target" ];
+    after = [ "local-fs.target" "ssd-migrate.service" ];
+    wants = [ "ssd-migrate.service" ];
     path = with pkgs; [ snapraid curl coreutils gawk gnused gnugrep inetutils util-linux findutils ];
     serviceConfig = {
       Type = "oneshot";
@@ -367,33 +373,29 @@ in
       ExecStart = pkgs.writeShellScript "ssd-migrate" ''
         set -e
 
-        # Find files on SSD older than 24h, not currently open, and move to HDD pool
-        ${pkgs.findutils}/bin/find /mnt/data01 -type f -mtime +1 -size +1M \
-          ! -name "*.partial" ! -name "*.tmp" ! -path "*/.snapraid.content" ! -path "*/Trash/*" ! -path "*downloadtemp*" \
-          -print0 | while IFS= read -r -d "" file; do
+        FILELIST=$(mktemp)
+        OPENFILES=$(mktemp)
+        trap "rm -f $FILELIST $OPENFILES" EXIT
 
-          # First check if file is open
-          if ! ${pkgs.lsof}/bin/lsof "$file" >/dev/null 2>&1; then
-            # Get relative path
-            relpath="''${file#/mnt/data01/}"
-            targetdir="/mnt/storage/$(dirname "$relpath")"
+        # Get all open files under /mnt/data01 in one lsof call
+        ${pkgs.lsof}/bin/lsof +D /mnt/data01 2>/dev/null | ${pkgs.gawk}/bin/awk 'NR>1 {print $9}' | sort -u > "$OPENFILES"
 
-            # Create target directory if needed
-            mkdir -p "$targetdir"
-
-            # Double-check file is not open right before transfer
-            if ! ${pkgs.lsof}/bin/lsof "$file" >/dev/null 2>&1; then
-              # Move file (rsync for safety, then remove source)
-              if ${pkgs.rsync}/bin/rsync -a --remove-source-files "$file" "$targetdir/"; then
-                echo "Migrated: $relpath"
-              else
-                echo "Failed to migrate: $relpath" >&2
-              fi
-            else
-              echo "Skipped (opened during check): $relpath"
-            fi
+        # Build list of files to migrate (older than 24h, not open)
+        while IFS= read -r -d "" file; do
+          if ! grep -qxF "$file" "$OPENFILES"; then
+            echo "''${file#/mnt/data01/}" >> "$FILELIST"
           fi
-        done
+        done < <(${pkgs.findutils}/bin/find /mnt/data01 -type f -mtime +1 \
+          ! -name "*.partial" ! -name "*.tmp" ! -path "*/.snapraid.content" ! -path "*/Trash/*" ! -path "*downloadtemp*" \
+          -print0)
+
+        if [ -s "$FILELIST" ]; then
+          echo "Migrating $(wc -l < "$FILELIST") files..."
+          ${pkgs.rsync}/bin/rsync -av --remove-source-files --files-from="$FILELIST" /mnt/data01/ /mnt/storage/
+          echo "Migration complete"
+        else
+          echo "No files to migrate"
+        fi
 
         # Remove empty directories on SSD
         ${pkgs.findutils}/bin/find /mnt/data01 -type d -empty -delete 2>/dev/null || true
@@ -401,14 +403,15 @@ in
     };
   };
 
-  systemd.timers.ssd-migrate = {
-    description = "Daily SSD to HDD migration at 3am";
-    wantedBy = []; # disabled
-    timerConfig = {
-      OnCalendar = "03:00";
-      Persistent = true;
-    };
-  };
+  # ssd-migrate timer disabled - triggered by snapraid-maintenance via wants dependency
+  # systemd.timers.ssd-migrate = {
+  #   description = "Daily SSD to HDD migration at 3am";
+  #   wantedBy = [];
+  #   timerConfig = {
+  #     OnCalendar = "03:00";
+  #     Persistent = true;
+  #   };
+  # };
 
   # Enable media and download services in containers
   # Disabled - using podman services defined below instead
@@ -681,7 +684,6 @@ in
   };
 
   # Media services (all run under single media-podman user)
-  # Disabled during snapraid recovery (wantedBy = [])
   systemd.services.sonarr = mkMediaService {
     name = "sonarr";
     port = 8989;
@@ -690,7 +692,7 @@ in
       "/mnt/user/download:/downloads:rw"
       "/mnt/user/Series:/tv:rw"
     ];
-  } // { wantedBy = lib.mkForce []; };
+  };
 
   systemd.services.radarr = mkMediaService {
     name = "radarr";
@@ -700,7 +702,7 @@ in
       "/mnt/user/download:/downloads:rw"
       "/mnt/user/Movies:/movies:rw"
     ];
-  } // { wantedBy = lib.mkForce []; };
+  };
 
   systemd.services.lidarr = mkMediaService {
     name = "lidarr";
@@ -710,7 +712,7 @@ in
       "/mnt/user/download:/downloads:rw"
       "/mnt/user/Music:/music:rw"
     ];
-  } // { wantedBy = lib.mkForce []; };
+  };
 
   systemd.services.prowlarr = mkMediaService {
     name = "prowlarr";
@@ -928,7 +930,7 @@ in
       "/mnt/user/download:/downloads:rw"
       "/mnt/user/downloadtemp/incomplete:/incomplete-downloads:rw"
     ];
-  } // { wantedBy = lib.mkForce []; };
+  };
 
   # Gluetun VPN Service
   systemd.services.gluetun = {
