@@ -20,5 +20,6 @@
     ./android-tools.nix
     ./mpd.nix
     ./dev-heavy.nix
+    ./atuin-server.nix
   ];
 }

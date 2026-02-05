@@ -47,6 +47,6 @@
   # macOS specific programs
   programs.alacritty.settings.window.decorations = "buttonless";
 
-  # Disable atuin
-  programs.atuin.enable = lib.mkForce false;
+  # Configure atuin client to sync with devdesktop server
+  programs.atuin.settings.sync_address = "http://superfer.aka.corp.amazon.com:8888";
 }

@@ -150,6 +150,11 @@ in {
     enableFishIntegration = true;
     enableBashIntegration = true;
     enableZshIntegration = true;
+    settings = {
+      auto_sync = true;
+      sync_frequency = "5m";
+      key_path = config.sops.secrets.atuin-key.path;
+    };
   };
 
   programs.claude-code = {

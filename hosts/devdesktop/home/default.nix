@@ -35,9 +35,15 @@
     amazon-ecr-credential-helper
   ];
 
-  # Disable systemd services (not available on Amazon Linux)
-  systemd.user.startServices = lib.mkForce false;
-  
+  # Enable atuin server
+  services.atuin-server = {
+    enable = true;
+    openRegistration = true;  # Set to false after initial registration
+  };
+
+  # Configure atuin client to use local server
+  programs.atuin.settings.sync_address = "http://localhost:8888";
+
   # Amazon Linux specific shell configuration
   programs.zsh.initExtra = ''
     # Amazon Linux specific environment
@@ -55,6 +61,4 @@
     userEmail = lib.mkForce "superfer@amazon.com"; # Adjust as needed
   };
 
-  # Disable atuin
-  programs.atuin.enable = lib.mkForce false;
 }
