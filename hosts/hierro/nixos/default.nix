@@ -12,6 +12,7 @@
     ../../common/nixos
     (import ../../../modules/nixos/development.nix)
     (import ../../../modules/nixos/tdarr-worker.nix)
+    (import ../../../modules/nixos/openclaw.nix)
   ];
 
   # Boot configuration
@@ -43,6 +44,13 @@
   services.tdarr-worker = {
     enable = true;
     transcodeCache = "/mnt/downloadtemp/tdarr-cache";
+  };
+
+  # OpenClaw AI assistant
+  services.openclaw = {
+    enable = true;
+    port = 3080;
+    dataDir = "/var/lib/openclaw";
   };
 
   # Hourly flake builder — builds all host closures so nix-serve can distribute them

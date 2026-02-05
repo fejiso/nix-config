@@ -50,6 +50,7 @@ let
 
       ExecStartPre = [
         "-${pkgs.podman}/bin/podman rm -f ${name}"
+        "${pkgs.podman}/bin/podman pull ${image}"
       ];
 
       ExecStart = ''
@@ -78,8 +79,7 @@ in
     (import ../../../modules/nixos/systemd-nspawn.nix)
     (import ../../../modules/nixos/media-services.nix)
     (import ../../../modules/nixos/download-services.nix)
-    (import ../../../modules/nixos/media-podman.nix)
-    (import ../../../modules/nixos/tdarr-worker.nix)
+    (import ../../../modules/nixos/tdarr-worker.nix)  # imports media-podman.nix
     (import ../../../modules/nixos/development.nix)
     (import ../../../modules/nixos/tgtg-watcher.nix)
     (import ../../../modules/nixos/emulation.nix)
@@ -265,6 +265,13 @@ in
       "cache.files=partial"
       "dropcacheonclose=true"
       "category.create=ff"
+      # Metadata caching (3h) to prevent drive spinup
+      "cache.symlinks=true"
+      "cache.readdir=true"
+      "cache.attr=10800"
+      "cache.entry=10800"
+      "cache.negative_entry=300"
+      "cache.statfs=10800"
     ];
   };
 
@@ -279,6 +286,13 @@ in
       "cache.files=partial"
       "dropcacheonclose=true"
       "category.create=epmfs"
+      # Metadata caching (3h) to prevent drive spinup
+      "cache.symlinks=true"
+      "cache.readdir=true"
+      "cache.attr=10800"
+      "cache.entry=10800"
+      "cache.negative_entry=300"
+      "cache.statfs=10800"
     ];
   };
 
@@ -321,7 +335,9 @@ in
     path = with pkgs; [ snapraid curl coreutils gawk gnused gnugrep inetutils util-linux findutils ];
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = "${pkgs.bash}/bin/bash ${../../../scripts/zackreed-snapraid.sh}";
+      ExecStart = "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.bash}/bin/bash ${../../../scripts/zackreed-snapraid.sh}";
+      StandardOutput = "append:/var/log/snapraid-run.log";
+      StandardError = "append:/var/log/snapraid-run.log";
       Nice = 19;
       IOSchedulingPriority = 7;
       CPUSchedulingPolicy = "batch";
@@ -330,7 +346,7 @@ in
 
   systemd.timers.snapraid-maintenance = {
     description = "Daily SnapRAID maintenance at 4am";
-    wantedBy = [];  # DISABLED for now
+    wantedBy = [ "timers.target" ];
     timerConfig = {
       OnCalendar = "04:00";
       Persistent = true;
@@ -338,32 +354,32 @@ in
   };
 
   # Override autoScrub timers with staggered schedules for data/parity drives
-  systemd.timers."btrfs-scrub-mnt-data01".timerConfig.OnCalendar = lib.mkForce "*-*-01 02:00:00";
-  systemd.timers."btrfs-scrub-mnt-data02".timerConfig.OnCalendar = lib.mkForce "*-*-05 02:00:00";
-  systemd.timers."btrfs-scrub-mnt-data03".timerConfig.OnCalendar = lib.mkForce "*-*-09 02:00:00";
-  systemd.timers."btrfs-scrub-mnt-data04".timerConfig.OnCalendar = lib.mkForce "*-*-13 02:00:00";
-  systemd.timers."btrfs-scrub-mnt-data05".timerConfig.OnCalendar = lib.mkForce "*-*-17 02:00:00";
-  systemd.timers."btrfs-scrub-mnt-data06".timerConfig.OnCalendar = lib.mkForce "*-*-21 02:00:00";
-  systemd.timers."btrfs-scrub-mnt-parity1".timerConfig.OnCalendar = lib.mkForce "*-*-25 02:00:00";
-  systemd.timers."btrfs-scrub-mnt-parity2".timerConfig.OnCalendar = lib.mkForce "*-*-28 02:00:00";
+  systemd.timers."btrfs-scrub-mnt-data01".timerConfig.OnCalendar = lib.mkForce "*-*-01 07:00:00";
+  systemd.timers."btrfs-scrub-mnt-data02".timerConfig.OnCalendar = lib.mkForce "*-*-05 07:00:00";
+  systemd.timers."btrfs-scrub-mnt-data03".timerConfig.OnCalendar = lib.mkForce "*-*-09 07:00:00";
+  systemd.timers."btrfs-scrub-mnt-data04".timerConfig.OnCalendar = lib.mkForce "*-*-13 07:00:00";
+  systemd.timers."btrfs-scrub-mnt-data05".timerConfig.OnCalendar = lib.mkForce "*-*-17 07:00:00";
+  systemd.timers."btrfs-scrub-mnt-data06".timerConfig.OnCalendar = lib.mkForce "*-*-21 07:00:00";
+  systemd.timers."btrfs-scrub-mnt-parity1".timerConfig.OnCalendar = lib.mkForce "*-*-25 07:00:00";
+  systemd.timers."btrfs-scrub-mnt-parity2".timerConfig.OnCalendar = lib.mkForce "*-*-28 07:00:00";
 
   # Wrap scrub services with flock to guarantee no two scrubs run simultaneously
   systemd.services."btrfs-scrub-mnt-data01".serviceConfig.ExecStart = lib.mkForce
-    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data01";
+    "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data01";
   systemd.services."btrfs-scrub-mnt-data02".serviceConfig.ExecStart = lib.mkForce
-    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data02";
+    "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data02";
   systemd.services."btrfs-scrub-mnt-data03".serviceConfig.ExecStart = lib.mkForce
-    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data03";
+    "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data03";
   systemd.services."btrfs-scrub-mnt-data04".serviceConfig.ExecStart = lib.mkForce
-    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data04";
+    "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data04";
   systemd.services."btrfs-scrub-mnt-data05".serviceConfig.ExecStart = lib.mkForce
-    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data05";
+    "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data05";
   systemd.services."btrfs-scrub-mnt-data06".serviceConfig.ExecStart = lib.mkForce
-    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data06";
+    "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data06";
   systemd.services."btrfs-scrub-mnt-parity1".serviceConfig.ExecStart = lib.mkForce
-    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/parity1";
+    "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/parity1";
   systemd.services."btrfs-scrub-mnt-parity2".serviceConfig.ExecStart = lib.mkForce
-    "${pkgs.util-linux}/bin/flock /var/lock/btrfs-scrub.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/parity2";
+    "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/parity2";
 
   # SSD cache migration script
   systemd.services.ssd-migrate = {
@@ -372,6 +388,10 @@ in
       Type = "oneshot";
       ExecStart = pkgs.writeShellScript "ssd-migrate" ''
         set -e
+
+        # Acquire exclusive lock for disk operations
+        exec 200>/var/lock/disk-maintenance.lock
+        ${pkgs.util-linux}/bin/flock 200
 
         FILELIST=$(mktemp)
         OPENFILES=$(mktemp)
@@ -399,6 +419,16 @@ in
 
         # Remove empty directories on SSD
         ${pkgs.findutils}/bin/find /mnt/data01 -type d -empty -delete 2>/dev/null || true
+
+        # Delete files in Trash older than 7 days
+        echo "Cleaning up Trash..."
+        ${pkgs.findutils}/bin/find /mnt/user/Trash -type f -mtime +7 -delete 2>/dev/null || true
+        ${pkgs.findutils}/bin/find /mnt/user/Trash -type d -empty -delete 2>/dev/null || true
+
+        # Invalidate mergerfs metadata cache after moving files
+        echo "Refreshing mergerfs cache..."
+        ${pkgs.util-linux}/bin/mount -o remount /mnt/user
+        ${pkgs.util-linux}/bin/mount -o remount /mnt/storage
       '';
     };
   };
@@ -426,7 +456,7 @@ in
 
   # Tdarr transcoding server and worker
   services.tdarr-worker = {
-    enable = false; # disabled during snapraid recovery
+    enable = true;
     serverEnabled = true;
     mediaDirectories = {
       tv = "/mnt/user/Series";

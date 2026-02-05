@@ -37,7 +37,7 @@ SYNC_WARN_THRESHOLD=-1
 
 # Set percentage of array to scrub if it is in sync.
 # 0 disables scrub. 100 scrubs the full array in one run (can take a long time).
-SCRUB_PERCENT=3
+SCRUB_PERCENT=5
 SCRUB_AGE=10
 
 # Spindown disks after jobs complete.

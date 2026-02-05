@@ -9,8 +9,8 @@
     uid = 13106;
     home = "/var/lib/media-podman";
     createHome = true;
-    subUidRanges = [{ startUid = 300000; count = 65536; }];
-    subGidRanges = [{ startGid = 300000; count = 65536; }];
+    subUidRanges = [{ startUid = 300000; count = 165536; }];
+    subGidRanges = [{ startGid = 300000; count = 165536; }];
   };
 
   users.groups.media-services.gid = 13100;
