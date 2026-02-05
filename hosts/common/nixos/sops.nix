@@ -28,6 +28,12 @@
         sopsFile = "${inputs.self}/secrets/pushover.yaml";
         key = "user_key";
       };
+
+      openclaw-gateway-token = {
+        sopsFile = "${inputs.self}/secrets/openclaw.yaml";
+        key = "gateway_token";
+        mode = "0444";
+      };
     };
   };
 }

@@ -5,6 +5,7 @@ with lib;
 
 let
   cfg = config.services.openclaw;
+  tokenFile = config.sops.secrets.openclaw-gateway-token.path;
 in {
   options.services.openclaw = {
     enable = mkEnableOption "OpenClaw AI assistant";
@@ -38,26 +39,29 @@ in {
     # OpenClaw systemd service using podman
     systemd.services.openclaw = {
       description = "OpenClaw AI Assistant";
-      after = [ "network-online.target" ];
+      after = [ "network-online.target" "sops-nix.service" ];
       wants = [ "network-online.target" ];
       wantedBy = [ "multi-user.target" ];
 
       path = [ pkgs.podman ];
+
+      script = ''
+        GATEWAY_TOKEN=$(cat ${tokenFile})
+        exec ${pkgs.podman}/bin/podman run --rm --name openclaw \
+          --label io.containers.autoupdate=registry \
+          -p ${toString cfg.port}:3080 \
+          -v ${cfg.dataDir}:/root/.openclaw:rw \
+          -e OPENCLAW_GATEWAY_PORT=3080 \
+          -e OPENCLAW_GATEWAY_TOKEN="$GATEWAY_TOKEN" \
+          -e OPENCLAW_AGENT_MODEL=${cfg.model} \
+          ghcr.io/openclaw/openclaw:latest
+      '';
 
       serviceConfig = {
         Type = "simple";
         Restart = "always";
         RestartSec = "30";
         ExecStartPre = "-${pkgs.podman}/bin/podman rm -f openclaw";
-        ExecStart = ''
-          ${pkgs.podman}/bin/podman run --rm --name openclaw \
-            --label io.containers.autoupdate=registry \
-            -p ${toString cfg.port}:3080 \
-            -v ${cfg.dataDir}:/root/.openclaw:rw \
-            -e OPENCLAW_GATEWAY_PORT=3080 \
-            -e OPENCLAW_AGENT_MODEL=${cfg.model} \
-            ghcr.io/openclaw/openclaw:latest
-        '';
         ExecStop = "${pkgs.podman}/bin/podman stop -t 10 openclaw";
       };
     };
