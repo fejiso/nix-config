@@ -80,7 +80,7 @@ in
           environments = {
             TZ = "Europe/Dublin";
           };
-          podmanArgs = [ "--log-driver=journald" ];
+          logDriver = "journald";
           exec = "watch";
         };
         serviceConfig = {

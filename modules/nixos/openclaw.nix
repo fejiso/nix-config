@@ -105,8 +105,8 @@ in {
             OPENCLAW_AGENT_MODEL = cfg.model;
           };
           environmentFiles = [ "/run/secrets/openclaw-env" ];
-          labels = [ "io.containers.autoupdate=registry" ];
-          podmanArgs = [ "--log-driver=journald" ];
+          autoUpdate = "registry";
+          logDriver = "journald";
         };
         serviceConfig = {
           Restart = "always";

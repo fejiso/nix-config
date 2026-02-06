@@ -21,8 +21,8 @@ let
       UMASK = "002";
       TZ = "Europe/Dublin";
     };
-    labels = [ "io.containers.autoupdate=registry" ];
-    podmanArgs = [ "--log-driver=journald" ];
+    autoUpdate = "registry";
+    logDriver = "journald";
   };
 
   # Helper to merge container configs
@@ -157,9 +157,9 @@ in {
                 TZ = "Europe/Dublin";
               };
               labels = [ "io.containers.autoupdate=registry" ];
-              addDevices = [ "/dev/dri:/dev/dri" ];
+              devices = [ "/dev/dri:/dev/dri" ];
               shmSize = "1024m";
-              podmanArgs = [ "--log-driver=journald" ];
+              logDriver = "journald";
             };
             serviceConfig = {
               Restart = "always";
@@ -186,8 +186,8 @@ in {
               };
               environmentFiles = [ "/run/secrets/nordvpn-credentials-env" ];
               addCapabilities = [ "NET_ADMIN" ];
-              addDevices = [ "/dev/net/tun:/dev/net/tun" ];
-              podmanArgs = [ "--log-driver=journald" ];
+              devices = [ "/dev/net/tun:/dev/net/tun" ];
+              logDriver = "journald";
             };
             serviceConfig = {
               Restart = "always";
@@ -201,7 +201,7 @@ in {
             containerConfig = {
               image = "lscr.io/linuxserver/qbittorrent:latest";
               userns = "keep-id:uid=13106,gid=13100";
-              network = "container:gluetun";
+              networks = [ "container:gluetun" ];
               volumes = [
                 "/var/lib/qbittorrent:/config:rw"
                 "/mnt/user/download:/downloads:rw"
@@ -213,8 +213,8 @@ in {
                 TZ = "Europe/Dublin";
                 WEBUI_PORT = "8080";
               };
-              labels = [ "io.containers.autoupdate=registry" ];
-              podmanArgs = [ "--log-driver=journald" ];
+              autoUpdate = "registry";
+              logDriver = "journald";
             };
             serviceConfig = {
               Restart = "always";
@@ -293,8 +293,8 @@ in {
               volumes = [
                 "/var/lib/uptime-kuma:/app/data:rw"
               ];
-              labels = [ "io.containers.autoupdate=registry" ];
-              podmanArgs = [ "--log-driver=journald" ];
+              autoUpdate = "registry";
+              logDriver = "journald";
             };
             serviceConfig = {
               Restart = "always";
@@ -314,8 +314,8 @@ in {
               environments = {
                 OPTIONS = "--no-auth";
               };
-              labels = [ "io.containers.autoupdate=registry" ];
-              podmanArgs = [ "--log-driver=journald" ];
+              autoUpdate = "registry";
+              logDriver = "journald";
             };
             serviceConfig = {
               Restart = "always";
@@ -332,9 +332,9 @@ in {
               volumes = [
                 "/var/lib/ollama:/root/.ollama:rw"
               ];
-              addDevices = [ "/dev/dri:/dev/dri" ];
-              labels = [ "io.containers.autoupdate=registry" ];
-              podmanArgs = [ "--log-driver=journald" ];
+              devices = [ "/dev/dri:/dev/dri" ];
+              autoUpdate = "registry";
+              logDriver = "journald";
             };
             serviceConfig = {
               Restart = "always";
@@ -355,7 +355,8 @@ in {
                 OLLAMA_BASE_URL = "http://host.containers.internal:11434";
               };
               labels = [ "io.containers.autoupdate=registry" ];
-              podmanArgs = [ "--log-driver=journald" "--add-host=host.containers.internal:host-gateway" ];
+              logDriver = "journald";
+              addHosts = [ "host.containers.internal:host-gateway" ];
             };
             serviceConfig = {
               Restart = "always";

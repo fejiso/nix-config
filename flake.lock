@@ -244,6 +244,21 @@
         "type": "github"
       }
     },
+    "quadlet-nix": {
+      "locked": {
+        "lastModified": 1769966843,
+        "narHash": "sha256-enKACLREiXH8VhFwENIk++gWfjmvNi5Gy5ZS3JTT9B4=",
+        "owner": "SEIAROTg",
+        "repo": "quadlet-nix",
+        "rev": "50f2317ae3ed8b72fa3011091f88965bfec42c6c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "SEIAROTg",
+        "repo": "quadlet-nix",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "airspy-adsb-bin": "airspy-adsb-bin",
@@ -254,6 +269,7 @@
         "nixpkgs": "nixpkgs_4",
         "nixpkgs-master": "nixpkgs-master",
         "nixpkgs-unstable": "nixpkgs-unstable",
+        "quadlet-nix": "quadlet-nix",
         "sops-nix": "sops-nix"
       }
     },

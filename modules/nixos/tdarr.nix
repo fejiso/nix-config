@@ -140,8 +140,8 @@ with lib;
                 PGID = "0";
                 TZ = "Europe/Dublin";
               };
-              labels = [ "io.containers.autoupdate=registry" ];
-              podmanArgs = [ "--log-driver=journald" ];
+              autoUpdate = "registry";
+              logDriver = "journald";
             };
             serviceConfig = {
               Restart = "always";
@@ -163,7 +163,7 @@ with lib;
                 "/var/lib/tdarr/logs:/app/logs:rw"
                 "${config.services.tdarr.transcodeCache}:/temp:rw"
               ] ++ (mapAttrsToList (name: path: "${path}:/${name}:rw") config.services.tdarr.mediaDirectories);
-              addDevices = [ "/dev/dri:/dev/dri" ];
+              devices = [ "/dev/dri:/dev/dri" ];
               environments = {
                 serverIP = config.services.tdarr.node.serverIP;
                 serverPort = toString config.services.tdarr.node.serverPort;
@@ -174,8 +174,8 @@ with lib;
                 PGID = "0";
                 TZ = "Europe/Dublin";
               };
-              labels = [ "io.containers.autoupdate=registry" ];
-              podmanArgs = [ "--log-driver=journald" ];
+              autoUpdate = "registry";
+              logDriver = "journald";
             };
             serviceConfig = {
               Restart = "always";
