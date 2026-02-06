@@ -295,6 +295,8 @@
       atuin-key = {
         sopsFile = "${inputs.self}/secrets/atuin.yaml";
         key = "atuin_key";
+        path = "${config.home.homeDirectory}/.local/share/atuin/key";
+        mode = "0600";
       };
     };
   };
