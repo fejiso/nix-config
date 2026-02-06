@@ -71,26 +71,10 @@ with lib;
       transcodeCache = config.services.tdarr-worker.transcodeCache;
     };
 
-    # Enable podman for tdarr
+    # Enable podman for quadlet containers
     virtualisation.podman = {
       enable = true;
       dockerCompat = false;
-    };
-
-    # Runtime directory for podman user
-    systemd.tmpfiles.rules = [
-      "d /run/user/13106 0700 media-podman media-services -"
-    ];
-
-    # Enable lingering for media-podman user
-    systemd.services.enable-linger-media-podman = {
-      description = "Enable lingering for media-podman user";
-      wantedBy = [ "multi-user.target" ];
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-        ExecStart = "${pkgs.systemd}/bin/loginctl enable-linger media-podman";
-      };
     };
   };
 }

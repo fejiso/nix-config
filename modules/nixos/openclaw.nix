@@ -37,35 +37,53 @@ in {
       "d ${cfg.dataDir}/workspace 0755 root root -"
     ];
 
-    # OpenClaw systemd service using podman
-    systemd.services.openclaw = {
-      description = "OpenClaw AI Assistant";
-      after = [ "network-online.target" "sops-nix.service" ];
-      wants = [ "network-online.target" ];
+    # Create environment file from secrets
+    systemd.services.openclaw-env-setup = {
+      description = "Create OpenClaw environment file from secrets";
       wantedBy = [ "multi-user.target" ];
-
-      path = [ pkgs.podman ];
-
-      script = ''
-        GATEWAY_TOKEN=$(cat ${tokenFile})
-        ANTHROPIC_API_KEY=$(cat ${anthropicKeyFile})
-        exec ${pkgs.podman}/bin/podman run --rm --name openclaw \
-          --label io.containers.autoupdate=registry \
-          -p ${toString cfg.port}:3080 \
-          -v ${cfg.dataDir}:/root/.openclaw:rw \
-          -e OPENCLAW_GATEWAY_PORT=3080 \
-          -e OPENCLAW_GATEWAY_TOKEN="$GATEWAY_TOKEN" \
-          -e OPENCLAW_AGENT_MODEL=${cfg.model} \
-          -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
-          ghcr.io/openclaw/openclaw:latest
-      '';
-
+      before = [ "openclaw.service" ];
+      after = [ "sops-nix.service" ];
       serviceConfig = {
-        Type = "simple";
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      script = ''
+        mkdir -p /run/secrets
+        GATEWAY_TOKEN=$(cat ${tokenFile})
+        ANTHROPIC_KEY=$(cat ${anthropicKeyFile})
+        cat > /run/secrets/openclaw-env << EOF
+        OPENCLAW_GATEWAY_TOKEN=$GATEWAY_TOKEN
+        ANTHROPIC_API_KEY=$ANTHROPIC_KEY
+        EOF
+        chmod 600 /run/secrets/openclaw-env
+      '';
+    };
+
+    # OpenClaw quadlet container
+    virtualisation.quadlet.containers.openclaw = {
+      autoStart = true;
+      containerConfig = {
+        image = "ghcr.io/openclaw/openclaw:latest";
+        publishPorts = [ "${toString cfg.port}:3080" ];
+        volumes = [
+          "${cfg.dataDir}:/root/.openclaw:rw"
+        ];
+        environments = {
+          OPENCLAW_GATEWAY_PORT = "3080";
+          OPENCLAW_AGENT_MODEL = cfg.model;
+        };
+        environmentFiles = [ "/run/secrets/openclaw-env" ];
+        labels = [ "io.containers.autoupdate=registry" ];
+        podmanArgs = [ "--log-driver=journald" ];
+      };
+      serviceConfig = {
         Restart = "always";
         RestartSec = "30";
-        ExecStartPre = "-${pkgs.podman}/bin/podman rm -f openclaw";
-        ExecStop = "${pkgs.podman}/bin/podman stop -t 10 openclaw";
+        TimeoutStartSec = "5min";
+      };
+      unitConfig = {
+        After = [ "openclaw-env-setup.service" "sops-nix.service" ];
+        Requires = [ "openclaw-env-setup.service" ];
       };
     };
 

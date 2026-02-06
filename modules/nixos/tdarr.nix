@@ -10,19 +10,6 @@
 
 with lib;
 
-let
-  # Common restart configuration for podman services (serviceConfig)
-  commonRestartConfig = {
-    Restart = "always";
-    RestartSec = "15min";
-  };
-
-  # Common unit configuration for podman services
-  commonUnitConfig = {
-    StartLimitIntervalSec = 0;
-  };
-in
-
 {
   options.services.tdarr = {
     enable = mkEnableOption "Tdarr transcoding server";
@@ -113,127 +100,76 @@ in
   };
 
   config = mkIf config.services.tdarr.enable {
-    # Tdarr Server
-    systemd.services.tdarr-server = mkIf config.services.tdarr.server.enable {
-      description = "Tdarr Transcoding Server";
-      after = [ "network-online.target" ];
-      wants = [ "network-online.target" ];
-      wantedBy = [ "multi-user.target" ];
-
-      path = [ pkgs.podman ];
-
-      unitConfig = commonUnitConfig;
-
-      serviceConfig = commonRestartConfig // {
-        Type = "simple";
-        User = config.services.tdarr.user;
-        Group = config.services.tdarr.group;
+    # Tdarr Server quadlet container
+    virtualisation.quadlet.containers.tdarr-server = mkIf config.services.tdarr.server.enable {
+      autoStart = true;
+      containerConfig = {
+        image = "ghcr.io/haveagitgat/tdarr:latest";
+        publishPorts = [
+          "${toString config.services.tdarr.server.webPort}:8265"
+          "${toString config.services.tdarr.server.serverPort}:8266"
+        ] ++ optional config.services.tdarr.server.internalNode
+          "${toString config.services.tdarr.server.nodePort}:8264";
+        volumes = [
+          "/var/lib/tdarr/server:/app/server:rw"
+          "/var/lib/tdarr/configs:/app/configs:rw"
+          "/var/lib/tdarr/logs:/app/logs:rw"
+          "${config.services.tdarr.transcodeCache}:/temp:rw"
+        ] ++ (mapAttrsToList (name: path: "${path}:/${name}:rw") config.services.tdarr.mediaDirectories);
+        environments = {
+          serverIP = "0.0.0.0";
+          serverPort = toString config.services.tdarr.server.serverPort;
+          webUIPort = toString config.services.tdarr.server.webPort;
+          internalNode = if config.services.tdarr.server.internalNode then "true" else "false";
+          nodeID = "InternalNode";
+          nodeIP = "0.0.0.0";
+          nodePort = toString config.services.tdarr.server.nodePort;
+          PUID = "0";
+          PGID = "0";
+          TZ = "Europe/Dublin";
+        };
+        labels = [ "io.containers.autoupdate=registry" ];
+        podmanArgs = [ "--log-driver=journald" ];
+      };
+      serviceConfig = {
+        Restart = "always";
+        RestartSec = "30";
         TimeoutStartSec = "5min";
-
-        # Resource limits - low priority
-        MemoryMax = "2G";
-        CPUWeight = 50;
-        IOWeight = 50;
-        Nice = 15;
-
-        Environment = [
-          "HOME=/var/lib/${config.services.tdarr.user}"
-          "XDG_RUNTIME_DIR=/run/user/13106"
-          "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
-        ];
-
-        ExecStartPre = [
-          "+${pkgs.coreutils}/bin/mkdir -p ${config.services.tdarr.transcodeCache}"
-          "+${pkgs.coreutils}/bin/chown -R 13106:13100 ${config.services.tdarr.transcodeCache}"
-          "-${pkgs.podman}/bin/podman rm -f tdarr-server"
-        ];
-
-        ExecStart = ''
-          ${pkgs.podman}/bin/podman run --rm --name tdarr-server \
-            --label io.containers.autoupdate=registry \
-            --log-driver=journald \
-            -p ${toString config.services.tdarr.server.webPort}:8265 \
-            -p ${toString config.services.tdarr.server.serverPort}:8266 \
-            ${optionalString config.services.tdarr.server.internalNode "-p ${toString config.services.tdarr.server.nodePort}:8264"} \
-            -v /var/lib/tdarr/server:/app/server:rw \
-            -v /var/lib/tdarr/configs:/app/configs:rw \
-            -v /var/lib/tdarr/logs:/app/logs:rw \
-            ${concatStringsSep " " (mapAttrsToList (name: path: "-v ${path}:/${name}:rw,rslave") config.services.tdarr.mediaDirectories)} \
-            -v ${config.services.tdarr.transcodeCache}:/temp:rw \
-            -e serverIP=0.0.0.0 \
-            -e serverPort=${toString config.services.tdarr.server.serverPort} \
-            -e webUIPort=${toString config.services.tdarr.server.webPort} \
-            -e internalNode=${if config.services.tdarr.server.internalNode then "true" else "false"} \
-            -e nodeID=InternalNode \
-            -e nodeIP=0.0.0.0 \
-            -e nodePort=${toString config.services.tdarr.server.nodePort} \
-            -e PUID=0 \
-            -e PGID=0 \
-            -e TZ=Europe/Dublin \
-            ghcr.io/haveagitgat/tdarr:latest
-        '';
-
-        ExecStop = "${pkgs.podman}/bin/podman stop -t 10 tdarr-server";
       };
     };
 
-    # Tdarr Node
-    systemd.services.tdarr-node = mkIf config.services.tdarr.node.enable {
-      description = "Tdarr Transcoding Node";
-      after = [ "network-online.target" ] ++ optional config.services.tdarr.server.enable "tdarr-server.service";
-      wants = [ "network-online.target" ];
-      wantedBy = [ "multi-user.target" ];
-
-      path = [ pkgs.podman ];
-
-      unitConfig = commonUnitConfig;
-
-      serviceConfig = commonRestartConfig // {
-        Type = "simple";
-        User = config.services.tdarr.user;
-        Group = config.services.tdarr.group;
+    # Tdarr Node quadlet container
+    virtualisation.quadlet.containers.tdarr-node = mkIf config.services.tdarr.node.enable {
+      autoStart = true;
+      containerConfig = {
+        image = "ghcr.io/haveagitgat/tdarr_node:latest";
+        publishPorts = [ "${toString config.services.tdarr.node.nodePort}:8267" ];
+        volumes = [
+          "/var/lib/tdarr/configs:/app/configs:rw"
+          "/var/lib/tdarr/logs:/app/logs:rw"
+          "${config.services.tdarr.transcodeCache}:/temp:rw"
+        ] ++ (mapAttrsToList (name: path: "${path}:/${name}:rw") config.services.tdarr.mediaDirectories);
+        addDevices = [ "/dev/dri:/dev/dri" ];
+        environments = {
+          serverIP = config.services.tdarr.node.serverIP;
+          serverPort = toString config.services.tdarr.node.serverPort;
+          nodeIP = "0.0.0.0";
+          nodeID = config.services.tdarr.node.nodeId;
+          nodePort = toString config.services.tdarr.node.nodePort;
+          PUID = "0";
+          PGID = "0";
+          TZ = "Europe/Dublin";
+        };
+        labels = [ "io.containers.autoupdate=registry" ];
+        podmanArgs = [ "--log-driver=journald" ];
+      };
+      serviceConfig = {
+        Restart = "always";
+        RestartSec = "30";
         TimeoutStartSec = "5min";
-
-        # Resource limits - low priority, can use more resources for transcoding
-        MemoryMax = "8G";
-        CPUWeight = 20;
-        IOWeight = 50;
-        Nice = 19;
-
-        Environment = [
-          "HOME=/var/lib/${config.services.tdarr.user}"
-          "XDG_RUNTIME_DIR=/run/user/13106"
-          "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
-        ];
-
-        ExecStartPre = [
-          "+${pkgs.coreutils}/bin/mkdir -p ${config.services.tdarr.transcodeCache}"
-          "-${pkgs.coreutils}/bin/chown -R 13106:13100 ${config.services.tdarr.transcodeCache}"
-          "-${pkgs.podman}/bin/podman rm -f tdarr-node"
-        ];
-
-        ExecStart = ''
-          ${pkgs.podman}/bin/podman run --rm --name tdarr-node \
-            --label io.containers.autoupdate=registry \
-            --log-driver=journald \
-            -p ${toString config.services.tdarr.node.nodePort}:8267 \
-            -v /var/lib/tdarr/configs:/app/configs:rw \
-            -v /var/lib/tdarr/logs:/app/logs:rw \
-            ${concatStringsSep " " (mapAttrsToList (name: path: "-v ${path}:/${name}:rw,rslave") config.services.tdarr.mediaDirectories)} \
-            -v ${config.services.tdarr.transcodeCache}:/temp:rw \
-            --device /dev/dri:/dev/dri \
-            -e serverIP=${config.services.tdarr.node.serverIP} \
-            -e serverPort=${toString config.services.tdarr.node.serverPort} \
-            -e nodeIP=0.0.0.0 \
-            -e nodeID=${config.services.tdarr.node.nodeId} \
-            -e nodePort=${toString config.services.tdarr.node.nodePort} \
-            -e PUID=0 \
-            -e PGID=0 \
-            -e TZ=Europe/Dublin \
-            ghcr.io/haveagitgat/tdarr_node:latest
-        '';
-
-        ExecStop = "${pkgs.podman}/bin/podman stop -t 10 tdarr-node";
+      };
+      unitConfig = mkIf config.services.tdarr.server.enable {
+        After = [ "tdarr-server.service" ];
       };
     };
 
@@ -253,11 +189,11 @@ in
 
     # Tmpfiles rules for directories
     systemd.tmpfiles.rules = [
-      "d /var/lib/tdarr 0755 13106 13100 -"
-      "d /var/lib/tdarr/server 0755 13106 13100 -"
-      "d /var/lib/tdarr/configs 0755 13106 13100 -"
-      "d /var/lib/tdarr/logs 0755 13106 13100 -"
-      "d ${config.services.tdarr.transcodeCache} 0777 13106 13100 -"
+      "d /var/lib/tdarr 0755 root root -"
+      "d /var/lib/tdarr/server 0755 root root -"
+      "d /var/lib/tdarr/configs 0755 root root -"
+      "d /var/lib/tdarr/logs 0755 root root -"
+      "d ${config.services.tdarr.transcodeCache} 0777 root root -"
     ];
   };
 }

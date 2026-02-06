@@ -25,6 +25,9 @@
     # Colmena for deployment
     colmena.url = "github:zhaofengli/colmena";
 
+    # Quadlet-nix for podman container management
+    quadlet-nix.url = "github:SEIAROTg/quadlet-nix";
+
     # Airspy ADS-B source
     airspy-adsb-bin.url = "github:fejiso/airspy_adsb/master";
     #airspy-adsb-bin.follows = "nixpkgs";
@@ -40,6 +43,7 @@
     nix-darwin,
     sops-nix,
     colmena,
+    quadlet-nix,
     airspy-adsb-bin,
     ...
   } @ inputs: let
@@ -63,6 +67,7 @@
         ./hosts/common/nixos
         sops-nix.nixosModules.sops
         airspy-adsb-bin.nixosModules.airspy-adsb
+        quadlet-nix.nixosModules.quadlet
         home-manager.nixosModules.home-manager
       ];
       home = [

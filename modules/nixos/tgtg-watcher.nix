@@ -10,7 +10,7 @@ with lib;
 
 let
   # Dockerfile for building tgtg-watcher from source
-  dockerfile = pkgs.writeText "Dockerfile" ''
+  dockerfile = pkgs.writeText "Containerfile" ''
     FROM node:18-alpine
     RUN apk add --no-cache tzdata git
     WORKDIR /home/node/app
@@ -23,17 +23,6 @@ let
     ENTRYPOINT [ "node", "index.js" ]
     CMD ["watch"]
   '';
-
-  # Common restart configuration for podman services (serviceConfig)
-  commonRestartConfig = {
-    Restart = "always";
-    RestartSec = "15min";
-  };
-
-  # Common unit configuration for podman services
-  commonUnitConfig = {
-    StartLimitIntervalSec = 0;
-  };
 in
 {
   options.services.tgtg-watcher = {
@@ -49,71 +38,35 @@ in
   config = mkIf config.services.tgtg-watcher.enable {
     # Create tmpfiles directory
     systemd.tmpfiles.rules = [
-      "d ${config.services.tgtg-watcher.configPath} 0755 utils-podman utils-podman -"
+      "d ${config.services.tgtg-watcher.configPath} 0755 root root -"
     ];
 
-    # Build the Docker image from source using podman build
-    systemd.services.tgtg-watcher-build = {
-      description = "Build TooGoodToGo Watcher Docker Image";
-      wantedBy = [ "multi-user.target" ];
-      serviceConfig = {
-        Type = "oneshot";
-        RemainAfterExit = true;
-        User = "utils-podman";
-        Group = "utils-podman";
-        Environment = [
-          "HOME=/var/lib/utils-podman"
-          "XDG_RUNTIME_DIR=/run/user/13107"
-          "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
-        ];
+    # Build the container image using quadlet
+    virtualisation.quadlet.builds.tgtg-watcher = {
+      buildConfig = {
+        file = dockerfile.outPath;
+        tag = "localhost/tgtg-watcher:latest";
       };
-      script = ''
-        ${pkgs.podman}/bin/podman build -t localhost/tgtg-watcher:latest -f ${dockerfile} /var/empty
-      '';
     };
 
-    # TooGoodToGo watcher service
-    systemd.services.tgtg-watcher = {
-      description = "TooGoodToGo Watcher";
-      after = [ "network-online.target" "tgtg-watcher-build.service" ];
-      wants = [ "network-online.target" ];
-      requires = [ "tgtg-watcher-build.service" ];
-      wantedBy = [ "multi-user.target" ];
-
-      unitConfig = commonUnitConfig;
-
-      serviceConfig = commonRestartConfig // {
-        Type = "simple";
-        User = "utils-podman";
-        Group = "utils-podman";
+    # TooGoodToGo watcher container using quadlet
+    virtualisation.quadlet.containers.tgtg-watcher = {
+      autoStart = true;
+      containerConfig = {
+        image = config.virtualisation.quadlet.builds.tgtg-watcher.ref;
+        volumes = [
+          "${config.services.tgtg-watcher.configPath}:/home/node/.config/toogoodtogo-watcher-nodejs:rw"
+        ];
+        environments = {
+          TZ = "Europe/Dublin";
+        };
+        podmanArgs = [ "--log-driver=journald" ];
+        exec = "watch";
+      };
+      serviceConfig = {
+        Restart = "always";
+        RestartSec = "30";
         TimeoutStartSec = "5min";
-
-        # Resource limits
-        CPUQuota = "50%";
-        MemoryMax = "500M";
-        IOWeight = 50;
-
-        Environment = [
-          "HOME=/var/lib/utils-podman"
-          "XDG_RUNTIME_DIR=/run/user/13107"
-          "PATH=/run/wrappers/bin:/run/current-system/sw/bin:/nix/var/nix/profiles/default/bin"
-        ];
-
-        ExecStartPre = [
-          "-${pkgs.podman}/bin/podman rm -f tgtg-watcher"
-        ];
-
-        ExecStart = ''
-          ${pkgs.podman}/bin/podman run --rm --name tgtg-watcher \
-            --log-driver=journald \
-            --userns=keep-id:uid=1000,gid=1000 \
-            -v ${config.services.tgtg-watcher.configPath}:/home/node/.config/toogoodtogo-watcher-nodejs:rw \
-            -e TZ=Europe/Dublin \
-            localhost/tgtg-watcher:latest \
-            watch
-        '';
-
-        ExecStop = "${pkgs.podman}/bin/podman stop -t 10 tgtg-watcher";
       };
     };
   };
