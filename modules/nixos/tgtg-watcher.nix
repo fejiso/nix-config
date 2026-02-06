@@ -67,6 +67,7 @@ in
       imports = [ quadlet-nix.homeManagerModules.quadlet ];
 
       home.stateVersion = "25.05";
+      home.enableNixpkgsReleaseCheck = false;
       home.homeDirectory = "/var/lib/utils-podman";
       home.username = "utils-podman";
 

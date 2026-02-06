@@ -57,6 +57,7 @@ in {
         imports = [ quadlet-nix.homeManagerModules.quadlet ];
 
         home.stateVersion = "25.05";
+        home.enableNixpkgsReleaseCheck = false;
         home.homeDirectory = "/var/lib/media-podman";
         home.username = "media-podman";
 
@@ -141,7 +142,6 @@ in {
             autoStart = true;
             containerConfig = {
               image = "lscr.io/linuxserver/emby:latest";
-              userns = "keep-id:uid=13106,gid=13100";
               publishPorts = [ "8096:8096" ];
               volumes = [
                 "/var/lib/emby:/config:rw"
@@ -150,13 +150,14 @@ in {
                 "/mnt/user/Music:/music:ro"
                 "/mnt/user/Backups/Emby:/backup:rw"
               ];
+              tmpfses = [ "/run" "/var/run" ];
               environments = {
                 PUID = "0";
                 PGID = "0";
                 UMASK = "002";
                 TZ = "Europe/Dublin";
               };
-              labels = [ "io.containers.autoupdate=registry" ];
+              autoUpdate = "registry";
               devices = [ "/dev/dri:/dev/dri" ];
               shmSize = "1024m";
               logDriver = "journald";
@@ -279,6 +280,7 @@ in {
         imports = [ quadlet-nix.homeManagerModules.quadlet ];
 
         home.stateVersion = "25.05";
+        home.enableNixpkgsReleaseCheck = false;
         home.homeDirectory = "/var/lib/utils-podman";
         home.username = "utils-podman";
 

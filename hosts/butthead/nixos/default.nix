@@ -62,13 +62,16 @@
   # Enable container support for media services
   boot.enableContainers = true;
 
-  # Enable Podman for containers
+  # Enable Podman for nginx-proxy-manager
   virtualisation.podman = {
     enable = true;
     dockerCompat = false;
     extraPackages = [ pkgs.slirp4netns ];
     autoPrune.enable = true;
   };
+
+  # Use podman for oci-containers
+  virtualisation.oci-containers.backend = "podman";
 
   # Enable libvirt for VM management
   virtualisation.libvirtd = {

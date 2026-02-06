@@ -106,6 +106,7 @@ with lib;
       imports = [ quadlet-nix.homeManagerModules.quadlet ];
 
       home.stateVersion = "25.05";
+      home.enableNixpkgsReleaseCheck = false;
       home.homeDirectory = "/var/lib/media-podman";
       home.username = "media-podman";
 
@@ -116,7 +117,6 @@ with lib;
             autoStart = true;
             containerConfig = {
               image = "ghcr.io/haveagitgat/tdarr:latest";
-              userns = "keep-id:uid=13106,gid=13100";
               publishPorts = [
                 "${toString config.services.tdarr.server.webPort}:8265"
                 "${toString config.services.tdarr.server.serverPort}:8266"
@@ -127,7 +127,7 @@ with lib;
                 "/var/lib/tdarr/configs:/app/configs:rw"
                 "/var/lib/tdarr/logs:/app/logs:rw"
                 "${config.services.tdarr.transcodeCache}:/temp:rw"
-              ] ++ (mapAttrsToList (name: path: "${path}:/${name}:rw") config.services.tdarr.mediaDirectories);
+              ] ++ (mapAttrsToList (name: path: "${path}:/${name}:rw,rslave") config.services.tdarr.mediaDirectories);
               environments = {
                 serverIP = "0.0.0.0";
                 serverPort = toString config.services.tdarr.server.serverPort;
@@ -156,13 +156,12 @@ with lib;
             autoStart = true;
             containerConfig = {
               image = "ghcr.io/haveagitgat/tdarr_node:latest";
-              userns = "keep-id:uid=13106,gid=13100";
               publishPorts = [ "${toString config.services.tdarr.node.nodePort}:8267" ];
               volumes = [
                 "/var/lib/tdarr/configs:/app/configs:rw"
                 "/var/lib/tdarr/logs:/app/logs:rw"
                 "${config.services.tdarr.transcodeCache}:/temp:rw"
-              ] ++ (mapAttrsToList (name: path: "${path}:/${name}:rw") config.services.tdarr.mediaDirectories);
+              ] ++ (mapAttrsToList (name: path: "${path}:/${name}:rw,rslave") config.services.tdarr.mediaDirectories);
               devices = [ "/dev/dri:/dev/dri" ];
               environments = {
                 serverIP = config.services.tdarr.node.serverIP;
