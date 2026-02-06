@@ -34,6 +34,12 @@
         key = "gateway_token";
         mode = "0444";
       };
+
+      anthropic-api-key = {
+        sopsFile = "${inputs.self}/secrets/openclaw.yaml";
+        key = "anthropic_api_key";
+        mode = "0444";
+      };
     };
   };
 }

@@ -6,6 +6,7 @@ with lib;
 let
   cfg = config.services.openclaw;
   tokenFile = config.sops.secrets.openclaw-gateway-token.path;
+  anthropicKeyFile = config.sops.secrets.anthropic-api-key.path;
 in {
   options.services.openclaw = {
     enable = mkEnableOption "OpenClaw AI assistant";
@@ -47,6 +48,7 @@ in {
 
       script = ''
         GATEWAY_TOKEN=$(cat ${tokenFile})
+        ANTHROPIC_API_KEY=$(cat ${anthropicKeyFile})
         exec ${pkgs.podman}/bin/podman run --rm --name openclaw \
           --label io.containers.autoupdate=registry \
           -p ${toString cfg.port}:3080 \
@@ -54,6 +56,7 @@ in {
           -e OPENCLAW_GATEWAY_PORT=3080 \
           -e OPENCLAW_GATEWAY_TOKEN="$GATEWAY_TOKEN" \
           -e OPENCLAW_AGENT_MODEL=${cfg.model} \
+          -e ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
           ghcr.io/openclaw/openclaw:latest
       '';
 
