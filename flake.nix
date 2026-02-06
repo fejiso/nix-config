@@ -67,8 +67,9 @@
         ./hosts/common/nixos
         sops-nix.nixosModules.sops
         airspy-adsb-bin.nixosModules.airspy-adsb
-        quadlet-nix.nixosModules.quadlet
         home-manager.nixosModules.home-manager
+        # Pass quadlet-nix to modules via specialArgs
+        { _module.args.quadlet-nix = quadlet-nix; }
       ];
       home = [
         ./modules/home-manager

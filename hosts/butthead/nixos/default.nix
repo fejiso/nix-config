@@ -7,10 +7,6 @@
   hostname,
   ...
 }:
-let
-  # Inherit quadlet containers for cross-references
-  inherit (config.virtualisation.quadlet) containers;
-in
 {
   imports = [
     ./hardware-configuration.nix
@@ -23,11 +19,15 @@ in
     (import ../../../modules/nixos/development.nix)
     (import ../../../modules/nixos/tgtg-watcher.nix)
     (import ../../../modules/nixos/emulation.nix)
+    (import ../../../modules/nixos/quadlet-containers.nix)
   ];
 
+  # Enable quadlet-based containers
+  services.quadlet-media.enable = true;
+  services.quadlet-utils.enable = true;
+
   # Enable Kopia server
-  services.backup =
-  {
+  services.backup = {
     server = true;
     repoPath = "/mnt/user/Backups/Kopia";
   };
@@ -104,444 +104,14 @@ in
     };
   };
 
-  # Quadlet container definitions
-  virtualisation.quadlet.containers = {
-    # Emby Media Server
-    emby = {
-      autoStart = true;
-      containerConfig = {
-        image = "lscr.io/linuxserver/emby:latest";
-        publishPorts = [ "8096:8096" ];
-        volumes = [
-          "/var/lib/emby:/config:rw"
-          "/mnt/user/Movies:/movies:ro"
-          "/mnt/user/Series:/tv:ro"
-          "/mnt/user/Music:/music:ro"
-          "/mnt/user/Backups/Emby:/backup:rw"
-        ];
-        environments = {
-          PUID = "0";
-          PGID = "0";
-          UMASK = "002";
-          TZ = "Europe/Dublin";
-        };
-        labels = [ "io.containers.autoupdate=registry" ];
-        addDevices = [ "/dev/dri:/dev/dri" ];
-        shmSize = "1024m";
-        podmanArgs = [ "--log-driver=journald" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-    };
-
-    # Nginx Proxy Manager
-    nginx-proxy-manager = {
-      autoStart = true;
-      containerConfig = {
-        image = "docker.io/jc21/nginx-proxy-manager:latest";
-        publishPorts = [
-          "8102:81"
-          "8002:80"
-          "44302:443"
-        ];
-        volumes = [
-          "/var/lib/npm-storage/data:/data:rw"
-          "/var/lib/npm-storage/letsencrypt:/etc/letsencrypt:rw"
-        ];
-        environments = {
-          DB_SQLITE_FILE = "/data/database.sqlite";
-        };
-        labels = [ "io.containers.autoupdate=registry" ];
-        podmanArgs = [ "--log-driver=journald" "--memory=1G" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-    };
-
-    # Sonarr - TV Series Manager
-    sonarr = {
-      autoStart = true;
-      containerConfig = {
-        image = "lscr.io/linuxserver/sonarr:latest";
-        publishPorts = [ "8989:8989" ];
-        volumes = [
-          "/var/lib/sonarr:/config:rw"
-          "/mnt/user/download:/downloads:rw"
-          "/mnt/user/Series:/tv:rw"
-        ];
-        environments = {
-          PUID = "13106";
-          PGID = "13100";
-          UMASK = "002";
-          TZ = "Europe/Dublin";
-        };
-        labels = [ "io.containers.autoupdate=registry" ];
-        podmanArgs = [ "--log-driver=journald" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-    };
-
-    # Radarr - Movie Manager
-    radarr = {
-      autoStart = true;
-      containerConfig = {
-        image = "lscr.io/linuxserver/radarr:latest";
-        publishPorts = [ "7878:7878" ];
-        volumes = [
-          "/var/lib/radarr:/config:rw"
-          "/mnt/user/download:/downloads:rw"
-          "/mnt/user/Movies:/movies:rw"
-        ];
-        environments = {
-          PUID = "13106";
-          PGID = "13100";
-          UMASK = "002";
-          TZ = "Europe/Dublin";
-        };
-        labels = [ "io.containers.autoupdate=registry" ];
-        podmanArgs = [ "--log-driver=journald" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-    };
-
-    # Lidarr - Music Manager
-    lidarr = {
-      autoStart = true;
-      containerConfig = {
-        image = "lscr.io/linuxserver/lidarr:latest";
-        publishPorts = [ "8686:8686" ];
-        volumes = [
-          "/var/lib/lidarr:/config:rw"
-          "/mnt/user/download:/downloads:rw"
-          "/mnt/user/Music:/music:rw"
-        ];
-        environments = {
-          PUID = "13106";
-          PGID = "13100";
-          UMASK = "002";
-          TZ = "Europe/Dublin";
-        };
-        labels = [ "io.containers.autoupdate=registry" ];
-        podmanArgs = [ "--log-driver=journald" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-    };
-
-    # Prowlarr - Indexer Manager
-    prowlarr = {
-      autoStart = true;
-      containerConfig = {
-        image = "lscr.io/linuxserver/prowlarr:latest";
-        publishPorts = [ "9696:9696" ];
-        volumes = [
-          "/var/lib/prowlarr:/config:rw"
-        ];
-        environments = {
-          PUID = "13106";
-          PGID = "13100";
-          UMASK = "002";
-          TZ = "Europe/Dublin";
-        };
-        labels = [ "io.containers.autoupdate=registry" ];
-        podmanArgs = [ "--log-driver=journald" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-    };
-
-    # LazyLibrarian - Book Manager
-    lazylibrarian = {
-      autoStart = true;
-      containerConfig = {
-        image = "lscr.io/linuxserver/lazylibrarian:latest";
-        publishPorts = [ "5299:5299" ];
-        volumes = [
-          "/var/lib/lazylibrarian:/config:rw"
-          "/mnt/user/Books:/books:rw"
-          "/mnt/user/download:/downloads:rw"
-        ];
-        environments = {
-          PUID = "13106";
-          PGID = "13100";
-          UMASK = "002";
-          TZ = "Europe/Dublin";
-        };
-        labels = [ "io.containers.autoupdate=registry" ];
-        podmanArgs = [ "--log-driver=journald" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-    };
-
-    # SABnzbd - Usenet Downloader
-    sabnzbd = {
-      autoStart = true;
-      containerConfig = {
-        image = "lscr.io/linuxserver/sabnzbd:latest";
-        publishPorts = [ "8080:8080" ];
-        volumes = [
-          "/var/lib/sabnzbd:/config:rw"
-          "/mnt/user/download:/downloads:rw"
-          "/mnt/user/downloadtemp/incomplete:/incomplete-downloads:rw"
-        ];
-        environments = {
-          PUID = "13106";
-          PGID = "13100";
-          UMASK = "002";
-          TZ = "Europe/Dublin";
-        };
-        labels = [ "io.containers.autoupdate=registry" ];
-        podmanArgs = [ "--log-driver=journald" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-    };
-
-    # Deluge - BitTorrent Client
-    deluge = {
-      autoStart = true;
-      containerConfig = {
-        image = "lscr.io/linuxserver/deluge:latest";
-        publishPorts = [ "8112:8112" ];
-        volumes = [
-          "/var/lib/deluge:/config:rw"
-          "/mnt/user/download:/downloads:rw"
-        ];
-        environments = {
-          PUID = "13106";
-          PGID = "13100";
-          UMASK = "002";
-          TZ = "Europe/Dublin";
-        };
-        labels = [ "io.containers.autoupdate=registry" ];
-        podmanArgs = [ "--log-driver=journald" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-    };
-
-    # Uptime Kuma - Monitoring
-    uptime-kuma = {
-      autoStart = true;
-      containerConfig = {
-        image = "docker.io/louislam/uptime-kuma:latest";
-        publishPorts = [ "3344:3001" ];
-        volumes = [
-          "/var/lib/uptime-kuma:/app/data:rw"
-        ];
-        labels = [ "io.containers.autoupdate=registry" ];
-        podmanArgs = [ "--log-driver=journald" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-    };
-
-    # Restic REST Server
-    restic-rest-server = {
-      autoStart = true;
-      containerConfig = {
-        image = "docker.io/restic/rest-server:latest";
-        publishPorts = [ "8000:8000" ];
-        volumes = [
-          "/var/lib/restic:/data:rw"
-        ];
-        environments = {
-          OPTIONS = "--no-auth";
-        };
-        labels = [ "io.containers.autoupdate=registry" ];
-        podmanArgs = [ "--log-driver=journald" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-    };
-
-    # Ollama LLM Runtime
-    ollama = {
-      autoStart = true;
-      containerConfig = {
-        image = "docker.io/ollama/ollama:latest";
-        publishPorts = [ "11434:11434" ];
-        volumes = [
-          "/var/lib/ollama:/root/.ollama:rw"
-        ];
-        addDevices = [ "/dev/dri:/dev/dri" ];
-        labels = [ "io.containers.autoupdate=registry" ];
-        podmanArgs = [ "--log-driver=journald" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-    };
-
-    # Open WebUI for Ollama
-    open-webui = {
-      autoStart = true;
-      containerConfig = {
-        image = "ghcr.io/open-webui/open-webui:main";
-        publishPorts = [ "3003:8080" ];
-        volumes = [
-          "/var/lib/open-webui:/app/backend/data:rw"
-        ];
-        environments = {
-          OLLAMA_BASE_URL = "http://host.containers.internal:11434";
-        };
-        labels = [ "io.containers.autoupdate=registry" ];
-        podmanArgs = [ "--log-driver=journald" "--add-host=host.containers.internal:host-gateway" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-      unitConfig = {
-        After = [ "ollama.service" ];
-        Requires = [ "ollama.service" ];
-      };
-    };
-
-    # Gluetun VPN Client
-    gluetun = {
-      autoStart = true;
-      containerConfig = {
-        image = "ghcr.io/qdm12/gluetun:latest";
-        publishPorts = [ "8084:8080" ];
-        volumes = [
-          "/var/lib/gluetun:/gluetun:rw"
-        ];
-        environments = {
-          VPN_SERVICE_PROVIDER = "nordvpn";
-          VPN_TYPE = "openvpn";
-          SERVER_COUNTRIES = "Ireland";
-          FIREWALL_VPN_INPUT_PORTS = "8080";
-          TZ = "Europe/Dublin";
-          UPDATER_PERIOD = "24h";
-        };
-        environmentFiles = [ "/run/secrets/nordvpn-credentials-env" ];
-        addCapabilities = [ "NET_ADMIN" ];
-        addDevices = [ "/dev/net/tun:/dev/net/tun" ];
-        podmanArgs = [ "--log-driver=journald" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-    };
-
-    # qBittorrent via Gluetun VPN
-    qbittorrent = {
-      autoStart = true;
-      containerConfig = {
-        image = "lscr.io/linuxserver/qbittorrent:latest";
-        network = containers.gluetun.ref;
-        volumes = [
-          "/var/lib/qbittorrent:/config:rw"
-          "/mnt/user/download:/downloads:rw"
-        ];
-        environments = {
-          PUID = "13106";
-          PGID = "13100";
-          UMASK = "002";
-          TZ = "Europe/Dublin";
-          WEBUI_PORT = "8080";
-        };
-        labels = [ "io.containers.autoupdate=registry" ];
-        podmanArgs = [ "--log-driver=journald" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-      unitConfig = {
-        After = [ "gluetun.service" ];
-        Requires = [ "gluetun.service" ];
-      };
-    };
-  };
-
-  # Create environment file for gluetun from sops secret
-  systemd.services.gluetun-env-setup = {
-    description = "Create Gluetun environment file from secrets";
-    wantedBy = [ "multi-user.target" ];
-    before = [ "gluetun.service" ];
-    serviceConfig = {
-      Type = "oneshot";
-      RemainAfterExit = true;
-    };
-    script = ''
-      VPNUSER=$(sed -n "1p" /run/secrets/nordvpn-credentials | tr -d "\n\r")
-      VPNPASS=$(sed -n "2p" /run/secrets/nordvpn-credentials | tr -d "\n\r")
-      echo "OPENVPN_USER=$VPNUSER" > /run/secrets/nordvpn-credentials-env
-      echo "OPENVPN_PASSWORD=$VPNPASS" >> /run/secrets/nordvpn-credentials-env
-      chmod 600 /run/secrets/nordvpn-credentials-env
-    '';
-  };
-
   # Enable ROCm for ML/LLM/AI workloads and create service directories
   systemd.tmpfiles.rules = [
     "L+    /opt/rocm/hip   -    -    -     -    ${pkgs.rocmPackages.clr}"
     "d /var/lib/nginx-proxy-manager 0755 nginx-proxy-manager nginx-proxy-manager -"
-    "d /var/lib/npm-storage 0755 root root -"
-    "d /var/lib/npm-storage/data 0755 root root -"
-    "d /var/lib/npm-storage/letsencrypt 0755 root root -"
+    "d /var/lib/npm-storage 0755 100000 100000 -"
+    "Z /var/lib/npm-storage/data 0755 100000 100000 -"
+    "Z /var/lib/npm-storage/letsencrypt 0755 100000 100000 -"
     "d /run/user/13200 0700 nginx-proxy-manager nginx-proxy-manager -"
-    "d /run/user/13106 0700 media-podman media-services -"
-    "d /run/user/13107 0700 utils-podman utils-podman -"
-    "d /var/lib/ollama 0755 root root -"
-    "d /var/lib/open-webui 0755 root root -"
-    "d /var/lib/emby 0755 root root -"
-    "d /var/lib/uptime-kuma 0755 root root -"
-    "d /var/lib/restic 0755 root root -"
-    # Media service directories
-    "d /var/lib/sonarr 0755 13106 13100 -"
-    "d /var/lib/radarr 0755 13106 13100 -"
-    "d /var/lib/lidarr 0755 13106 13100 -"
-    "d /var/lib/prowlarr 0755 13106 13100 -"
-    "d /var/lib/lazylibrarian 0755 13106 13100 -"
-    # Download service directories
-    "d /var/lib/gluetun 0755 root root -"
-    "d /var/lib/qbittorrent 0755 13106 13100 -"
-    "d /var/lib/sabnzbd 0755 13106 13100 -"
-    "d /var/lib/deluge 0755 13106 13100 -"
     # Download directories with proper permissions
     "d /mnt/user/download 0775 root media-services -"
     "d /mnt/user/downloadtemp 0775 root media-services -"
@@ -923,18 +493,52 @@ in
     gid = 13107;
   };
 
-  # Enable lingering for podman users to create /run/user/UID directories
-  systemd.services.enable-linger-podman-users = {
-    description = "Enable lingering for podman users";
+  # Nginx Proxy Manager container (still using systemd service for rootless)
+  systemd.services.nginx-proxy-manager = {
+    description = "Nginx Proxy Manager";
+    after = [ "network-online.target" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+
+    path = [ pkgs.podman pkgs.slirp4netns ];
+
+    unitConfig = {
+      StartLimitIntervalSec = 0;
+    };
+
+    serviceConfig = {
+      Restart = "always";
+      RestartSec = "15min";
+      Type = "simple";
+      User = "nginx-proxy-manager";
+      Group = "nginx-proxy-manager";
+      TimeoutStartSec = "5min";
+
+      Environment = [
+        "HOME=/var/lib/nginx-proxy-manager"
+        "XDG_RUNTIME_DIR=/run/user/13200"
+        "PATH=${pkgs.slirp4netns}/bin:/run/wrappers/bin:/nix/var/nix/profiles/default/bin:/run/current-system/sw/bin"
+      ];
+
+      ExecStartPre = [
+        "-${pkgs.podman}/bin/podman rm -f nginx-proxy-manager"
+        "${pkgs.podman}/bin/podman pull docker.io/jc21/nginx-proxy-manager:latest"
+      ];
+
+      ExecStart = "${pkgs.bash}/bin/bash -c 'set -x; ${pkgs.podman}/bin/podman run --rm --name nginx-proxy-manager --label io.containers.autoupdate=registry --log-driver=journald --memory=1G --network=slirp4netns:allow_host_loopback=true -p 8102:81 -p 8002:80 -p 44302:443 -v /var/lib/npm-storage/data:/data:rw -v /var/lib/npm-storage/letsencrypt:/etc/letsencrypt:rw -e DB_SQLITE_FILE=/data/database.sqlite docker.io/jc21/nginx-proxy-manager:latest'";
+
+      ExecStop = "${pkgs.podman}/bin/podman stop -t 10 nginx-proxy-manager";
+    };
+  };
+
+  # Enable lingering for nginx-proxy-manager user
+  systemd.services.enable-linger-nginx-proxy-manager = {
+    description = "Enable lingering for nginx-proxy-manager user";
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "oneshot";
       RemainAfterExit = true;
-      ExecStart = [
-        "${pkgs.systemd}/bin/loginctl enable-linger nginx-proxy-manager"
-        "${pkgs.systemd}/bin/loginctl enable-linger media-podman"
-        "${pkgs.systemd}/bin/loginctl enable-linger utils-podman"
-      ];
+      ExecStart = "${pkgs.systemd}/bin/loginctl enable-linger nginx-proxy-manager";
     };
   };
 

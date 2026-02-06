@@ -1,5 +1,5 @@
-# OpenClaw - Self-hosted AI assistant
-{ config, lib, pkgs, ... }:
+# OpenClaw - Self-hosted AI assistant - using rootless podman
+{ config, lib, pkgs, quadlet-nix, ... }:
 
 with lib;
 
@@ -31,17 +31,42 @@ in {
   };
 
   config = mkIf cfg.enable {
-    # Create data directory
+    # Create openclaw user for rootless podman
+    users.users.openclaw = {
+      isSystemUser = true;
+      group = "openclaw";
+      uid = 13108;
+      home = "/var/lib/openclaw";
+      createHome = true;
+      subUidRanges = [{ startUid = 500000; count = 65536; }];
+      subGidRanges = [{ startGid = 500000; count = 65536; }];
+    };
+    users.groups.openclaw = {
+      gid = 13108;
+    };
+
+    # Create data directory and runtime dir
     systemd.tmpfiles.rules = [
-      "d ${cfg.dataDir} 0755 root root -"
-      "d ${cfg.dataDir}/workspace 0755 root root -"
+      "d ${cfg.dataDir} 0755 openclaw openclaw -"
+      "d ${cfg.dataDir}/workspace 0755 openclaw openclaw -"
+      "d /run/user/13108 0700 openclaw openclaw -"
     ];
+
+    # Enable lingering for openclaw user
+    systemd.services.enable-linger-openclaw = {
+      description = "Enable lingering for openclaw user";
+      wantedBy = [ "multi-user.target" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = "${pkgs.systemd}/bin/loginctl enable-linger openclaw";
+      };
+    };
 
     # Create environment file from secrets
     systemd.services.openclaw-env-setup = {
       description = "Create OpenClaw environment file from secrets";
       wantedBy = [ "multi-user.target" ];
-      before = [ "openclaw.service" ];
       after = [ "sops-nix.service" ];
       serviceConfig = {
         Type = "oneshot";
@@ -55,35 +80,41 @@ in {
         OPENCLAW_GATEWAY_TOKEN=$GATEWAY_TOKEN
         ANTHROPIC_API_KEY=$ANTHROPIC_KEY
         EOF
-        chmod 600 /run/secrets/openclaw-env
+        chmod 644 /run/secrets/openclaw-env
       '';
     };
 
-    # OpenClaw quadlet container
-    virtualisation.quadlet.containers.openclaw = {
-      autoStart = true;
-      containerConfig = {
-        image = "ghcr.io/openclaw/openclaw:latest";
-        publishPorts = [ "${toString cfg.port}:3080" ];
-        volumes = [
-          "${cfg.dataDir}:/root/.openclaw:rw"
-        ];
-        environments = {
-          OPENCLAW_GATEWAY_PORT = "3080";
-          OPENCLAW_AGENT_MODEL = cfg.model;
+    # Home-manager configuration for openclaw user
+    home-manager.users.openclaw = { pkgs, ... }: {
+      imports = [ quadlet-nix.homeManagerModules.quadlet ];
+
+      home.stateVersion = "25.05";
+      home.homeDirectory = "/var/lib/openclaw";
+      home.username = "openclaw";
+
+      virtualisation.quadlet.containers.openclaw = {
+        autoStart = true;
+        containerConfig = {
+          image = "ghcr.io/openclaw/openclaw:latest";
+          publishPorts = [ "${toString cfg.port}:3080" ];
+          volumes = [
+            "${cfg.dataDir}:/root/.openclaw:rw"
+          ];
+          environments = {
+            OPENCLAW_GATEWAY_PORT = "3080";
+            OPENCLAW_AGENT_MODEL = cfg.model;
+          };
+          environmentFiles = [ "/run/secrets/openclaw-env" ];
+          labels = [ "io.containers.autoupdate=registry" ];
+          podmanArgs = [ "--log-driver=journald" ];
         };
-        environmentFiles = [ "/run/secrets/openclaw-env" ];
-        labels = [ "io.containers.autoupdate=registry" ];
-        podmanArgs = [ "--log-driver=journald" ];
-      };
-      serviceConfig = {
-        Restart = "always";
-        RestartSec = "30";
-        TimeoutStartSec = "5min";
-      };
-      unitConfig = {
-        After = [ "openclaw-env-setup.service" "sops-nix.service" ];
-        Requires = [ "openclaw-env-setup.service" ];
+        serviceConfig = {
+          Restart = "always";
+          RestartSec = "900";
+        };
+        unitConfig = {
+          After = [ "openclaw-env-setup.service" ];
+        };
       };
     };
 
