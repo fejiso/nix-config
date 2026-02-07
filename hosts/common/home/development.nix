@@ -3,6 +3,7 @@
   config,
   lib,
   pkgs,
+  inputs,
   ...
 }: {
   home.packages = with pkgs; [
@@ -47,7 +48,7 @@
       ripgrep
       fd
       nodejs
-      tree-sitter
+      inputs.nixpkgs-master.legacyPackages.${pkgs.system}.tree-sitter
 
       # Language servers (already in development tools but explicit here)
       lua-language-server
@@ -80,6 +81,10 @@
           { import = "lazyvim.plugins.extras.dap.core" },
           -- Enable Neotest for running tests
           { import = "lazyvim.plugins.extras.test.core" },
+          {
+            "nvim-treesitter/nvim-treesitter",
+            branch = "main",
+          },
           { "nvim-orgmode/orgmode",
             event = "VeryLazy",
             ft = { "org" },

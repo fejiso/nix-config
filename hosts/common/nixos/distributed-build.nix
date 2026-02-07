@@ -59,7 +59,7 @@ let
     sshUser = "z-247";
     sshKey = "/home/z-247/.ssh/id_ed25519";
     maxJobs = host.maxJobs;
-    speedFactor = host.speedFactor;
+    speedFactor = host.speedFactor * 2; # Double speed factor for remote machines to prefer them
     supportedFeatures = host.supportedFeatures;
     protocol = "ssh-ng";
   } // (lib.optionalAttrs ((keys.${name}.hostPublicKey or "") != "") {
@@ -78,26 +78,29 @@ let
 
 in
 {
-  # Enable experimental features for flakes and nix-command
-  nix.extraOptions = ''
-    experimental-features = nix-command flakes
-    builders-use-substitutes = true
-    connect-timeout = 1
-    stalled-download-timeout = 5
-    http-connections = 25
-    fallback = true
-    narinfo-cache-negative-ttl = 10
-    warn-dirty = false
-  '';
+  # Nix configuration
+  nix.settings = {
+    builders-use-substitutes = true;
+    connect-timeout = 1;
+    stalled-download-timeout = 5;
+    http-connections = 25;
+    fallback = true;
+    narinfo-cache-negative-ttl = 10;
+    warn-dirty = false;
+    # Limit local builds to encourage distribution
+    max-jobs = lib.mkDefault (if buildHosts?${hostname} then buildHosts.${hostname}.maxJobs else 2);
+    # Allow z-247 user to be a trusted user for remote builds
+    trusted-users = [ "z-247" ];
+    extra-substituters = substituters;
+    trusted-substituters = substituters;
+    trusted-public-keys = trustedPublicKeys;
+  };
 
   # Configure remote builders
   nix.buildMachines = buildMachines;
 
   # Distribute builds to remote machines
   nix.distributedBuilds = true;
-
-  # Allow z-247 user to be a trusted user for remote builds
-  nix.settings.trusted-users = [ "z-247" ];
 
   # Configure binary cache serving
   services.nix-serve = {
@@ -134,11 +137,6 @@ in
       fi
     '';
   };
-
-  # Use all hosts as substituters
-  nix.settings.extra-substituters = substituters;
-  nix.settings.trusted-substituters = substituters;
-  nix.settings.trusted-public-keys = trustedPublicKeys;
 
   # Open firewall for nix-serve
   networking.firewall.allowedTCPPorts = [ 5000 ];
