@@ -23,6 +23,9 @@
   # Enable heavy dev tools
   programs.dev-heavy.enable = true;
 
+  # Enable TidalCycles
+  programs.tidalcycles.enable = true;
+
   # Media server specific applications
   home.packages = with pkgs; [
     # Media management tools

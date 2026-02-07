@@ -91,6 +91,8 @@
             end,
           },
           { "thgrund/tidal.nvim",
+            -- Load eagerly to ensure autocmds are set up before BufEnter fires
+            lazy = false,
             config = function()
               require("tidal").setup({
                 boot = {
@@ -103,7 +105,7 @@
                   sclang = {
                     cmd = "sclang",
                     args = {},
-                    file = vim.api.nvim_get_runtime_file("bootfiles/BootSuperDirt.scd", false)[1],
+                    file = nil,
                     enabled = false,
                   },
                   split = "v",
@@ -118,7 +120,6 @@
                 },
               })
             end,
-            ft = { "haskell", "tidal" },
           },
         },
         defaults = {
