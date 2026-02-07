@@ -29,23 +29,88 @@ with lib;
       jack-example-tools
     ];
 
+    # Headless startup script for systemd
+    home.file.".local/share/SuperCollider/headless_startup.scd".text = ''
+      // Load the main startup file
+      load("~/.local/share/SuperCollider/startup.scd".standardizePath);
+      
+      "SuperDirt Systemd Daemon Started".postln;
+      
+      // Prevent sclang from exiting
+      Condition.new.hang;
+    '';
+
+    # SuperCollider systemd service
+    systemd.user.services.superdirt = {
+      Unit = {
+        Description = "SuperDirt (SuperCollider) Audio Engine";
+        After = [ "pipewire.service" "jack.service" ];
+      };
+      Service = {
+        ExecStartPre = "${pkgs.bash}/bin/bash -c '${pkgs.killall}/bin/killall scsynth || true'";
+        ExecStart = let
+          sc = "${pkgs.supercollider-with-sc3-plugins}/bin/sclang";
+          pw = "${pkgs.pipewire.jack}/bin/pw-jack";
+          headless = "${config.home.homeDirectory}/.local/share/SuperCollider/headless_startup.scd";
+        in "${pw} ${sc} ${headless}";
+        Restart = "on-failure";
+        RestartSec = "15m";
+      };
+      Install = {
+        WantedBy = [ "default.target" ];
+      };
+    };
+
     # Create TidalCycles boot file using standard BootTidal.hs
     home.file.".tidal/BootTidal.hs".text = ''
       :set -XOverloadedStrings
       :set prompt "tidal> "
       import Sound.Tidal.Context
-      tidal <- startTidal (superdirtTarget {oAddress = "127.0.0.1", oPort = 57120}) (defaultConfig {cFrameTimespan = 1/20})
-      let d1 = streamReplace tidal 1
-      let d2 = streamReplace tidal 2
-      let d3 = streamReplace tidal 3
-      let d4 = streamReplace tidal 4
-      let d5 = streamReplace tidal 5
-      let d6 = streamReplace tidal 6
-      let d7 = streamReplace tidal 7
-      let d8 = streamReplace tidal 8
-      let d9 = streamReplace tidal 9
-      let hush = streamHush tidal
-      let solo = streamSolo tidal
+      import qualified Sound.Tidal.Transition as T
+
+      let editorTarget = Target {oName = "editor", oAddress = "127.0.0.1", oPort = 6013, oLatency = 0.03, oSchedule = Live, oWindow = Nothing, oHandshake = False, oBusPort = Nothing}
+      let editorShape = OSCContext "/editor/highlights"
+      tidal <- startStream (defaultConfig {cFrameTimespan = 1/20}) [(superdirtTarget {oAddress = "127.0.0.1", oPort = 57120, oLatency = 0.05}, [superdirtShape]), (editorTarget, [editorShape])]
+
+      let p = streamReplace tidal
+          hush = streamHush tidal
+          list = streamList tidal
+          mute = streamMute tidal
+          unmute = streamUnmute tidal
+          solo = streamSolo tidal
+          unsolo = streamUnsolo tidal
+          once = streamOnce tidal
+          first = streamFirst tidal
+          asap = once
+          nudgeAll = streamNudgeAll tidal
+          all = streamAll tidal
+          resetCycles = streamResetCycles tidal
+          setcps = asap . cps
+          xfade i = transition tidal True (T.xfadeIn 4) i
+          xfadeIn i t = transition tidal True (T.xfadeIn t) i
+          histpan i = transition tidal True (T.histpan 4) i
+          wait i t = transition tidal True (T.wait t) i
+          wash i f t = transition tidal True (T.wash f id t) i
+          washIn i f t = transition tidal True (T.washIn f t) i
+          clutch i = transition tidal True (\_ h -> T.clutch 4 h) i
+          clutchIn i t = transition tidal True (\_ h -> T.clutch t h) i
+          anticipate i = transition tidal True (\_ h -> T.anticipate 4 h) i
+          anticipateIn i t = transition tidal True (\_ h -> T.anticipate t h) i
+          deltaContext _ _ p = p
+          d1 = p 1 . (|< orbit 0)
+          d2 = p 2 . (|< orbit 1)
+          d3 = p 3 . (|< orbit 2)
+          d4 = p 4 . (|< orbit 3)
+          d5 = p 5 . (|< orbit 4)
+          d6 = p 6 . (|< orbit 5)
+          d7 = p 7 . (|< orbit 6)
+          d8 = p 8 . (|< orbit 7)
+          d9 = p 9 . (|< orbit 8)
+          d10 = p 10 . (|< orbit 9)
+          d11 = p 11 . (|< orbit 10)
+          d12 = p 12 . (|< orbit 11)
+
+      :set prompt "tidal> "
       putStrLn "TidalCycles ready! Try: d1 $ s \"bd sn bd sn\""
     '';
 
@@ -60,11 +125,12 @@ with lib;
           });
       }, {
           "SuperDirt found, starting...".postln;
-          s.options.numBuffers = 1024 * 16; 
-          s.options.memSize = 8192 * 16;
+          s.options.numBuffers = 1024 * 256;
+          s.options.memSize = 8192 * 64; // 512MB
+          s.options.numWireBufs = 2048; // Fix for interconnect buffers
           s.options.numInputBusChannels = 0;
           s.options.numOutputBusChannels = 2;
-          s.options.maxNodes = 1024 * 8;
+          s.options.maxNodes = 1024 * 32;
           Server.default = s;
 
           // Boot server and start SuperDirt
@@ -72,8 +138,6 @@ with lib;
               ~dirt = SuperDirt(2, s);
               // Load default samples - this downloads and loads Dirt-Samples
               ~dirt.loadSoundFiles("/home/z-247/.local/share/SuperCollider/downloaded-quarks/Dirt-Samples/*");
-              // Also try loading from default locations
-              ~dirt.loadSoundFiles;
               s.sync;
               ~dirt.start(57120, 0 ! 12);
               "SuperDirt started on port 57120".postln;
@@ -87,7 +151,7 @@ with lib;
     home.file.".local/bin/tidal_ghci".text = ''
       #!/usr/bin/env bash
       # Start GHCi with Tidal packages available and BootTidal.hs as ghci script
-      ${pkgs.haskellPackages.ghcWithPackages (p: [ p.tidal p.tidal-core p.tidal-link ])}/bin/ghci -ghci-script ~/.tidal/BootTidal.hs
+      exec ${pkgs.haskellPackages.ghcWithPackages (p: [ p.tidal p.tidal-core p.tidal-link ])}/bin/ghci -ghci-script ~/.tidal/BootTidal.hs "$@"
     '';
     
     home.file.".local/bin/tidal_ghci".executable = true;

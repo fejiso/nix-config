@@ -102,7 +102,7 @@
               require("tidal").setup({
                 boot = {
                   tidal = {
-                    cmd = "${config.home.homeDirectory}/.local/bin/tidal_ghci",
+                    cmd = "${config.home.homeDirectory}/.local/bin/tidal/ghci",
                     args = {},
                     file = "${config.home.homeDirectory}/.tidal/BootTidal.hs",
                     enabled = true,
@@ -124,6 +124,20 @@
                   send_hush = { mode = "n", key = "<leader><Esc>" },
                 },
               })
+
+              -- Drain stdout/stderr on start to prevent GHCi pipe deadlock.
+              -- tidal.nvim defers attaching pipe readers until :TidalNotification,
+              -- so without this, the OS pipe buffer fills and GHCi blocks on write.
+              local Repl = require("tidal.util.repl.repl")
+              local _orig_start = Repl.start
+              function Repl:start(opts)
+                local result = _orig_start(self, opts)
+                if self.proc then
+                  if self.stdout then self.stdout:read_start(function() end) end
+                  if self.stderr then self.stderr:read_start(function() end) end
+                end
+                return result
+              end
             end,
           },
         },
