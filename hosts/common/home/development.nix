@@ -106,6 +106,7 @@
                     args = {},
                     file = "${config.home.homeDirectory}/.tidal/BootTidal.hs",
                     enabled = true,
+                    highlight = { autostart = true, fps = 10 },
                   },
                   sclang = {
                     cmd = "sclang",
@@ -138,6 +139,18 @@
                 end
                 return result
               end
+
+              -- Silence the nearest previous d<N> stream
+              vim.keymap.set("n", "<Leader>ds", function()
+                local line_num = vim.fn.search([[\v<d\d+]], "bnW")
+                if line_num > 0 then
+                  local stream_id = vim.fn.matchstr(vim.fn.getline(line_num), [[\v<d\d+]])
+                  require("tidal.core.message").tidal.send_line(stream_id .. " silence")
+                  vim.notify("Silenced " .. stream_id)
+                else
+                  vim.notify("No Tidal stream ID found backwards from cursor.")
+                end
+              end, { silent = true, desc = "Silence nearest Tidal stream" })
             end,
           },
         },
@@ -159,7 +172,6 @@
         },
       })
       
-      -- Set up file association for .tidal files
       vim.filetype.add({
         extension = {
           tidal = "haskell",

@@ -31,6 +31,16 @@
           mods = 'SHIFT',
           action = wezterm.action.SendString('\x1b[13;2u'),
         },
+        {
+          key = 'Enter',
+          mods = 'ALT',
+          action = wezterm.action.SendKey { key = 'Enter', mods = 'ALT' },
+        },
+        {
+          key = 'F11',
+          mods = 'CTRL',
+          action = wezterm.action.ToggleFullScreen,
+        },
       }
       '' else ""}
       

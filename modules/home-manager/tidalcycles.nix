@@ -96,7 +96,6 @@ with lib;
           clutchIn i t = transition tidal True (\_ h -> T.clutch t h) i
           anticipate i = transition tidal True (\_ h -> T.anticipate 4 h) i
           anticipateIn i t = transition tidal True (\_ h -> T.anticipate t h) i
-          deltaContext _ _ p = p
           d1 = p 1 . (|< orbit 0)
           d2 = p 2 . (|< orbit 1)
           d3 = p 3 . (|< orbit 2)

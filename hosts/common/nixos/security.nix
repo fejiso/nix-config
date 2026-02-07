@@ -6,6 +6,9 @@
 }: {
   # Enable sudo
   security.sudo.enable = true;
+  security.sudo.extraConfig = ''
+    Defaults timestamp_timeout=30
+  '';
   
   # Polkit
   security.polkit.enable = true;
