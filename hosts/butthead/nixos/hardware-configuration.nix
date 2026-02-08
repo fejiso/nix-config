@@ -9,8 +9,8 @@
 
   boot.initrd.availableKernelModules = [ "xhci_pci" "ahci" "nvme" "usbhid" "usb_storage" "sd_mod" ];
   boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "kvm-amd" ];
-  boot.extraModulePackages = [ ];
+  boot.kernelModules = [ "kvm-amd" "nct6687d" ];
+  boot.extraModulePackages = with config.boot.kernelPackages; [ nct6687d ];
 
   fileSystems."/" =
     { device = "/dev/mapper/crypted";
