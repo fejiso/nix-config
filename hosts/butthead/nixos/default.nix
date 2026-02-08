@@ -166,6 +166,12 @@
     options = [ "defaults" "noatime" "nofail" ];
   };
 
+  fileSystems."/mnt/data07" = {
+    device = "/dev/disk/by-label/data07";
+    fsType = "btrfs";
+    options = [ "defaults" "noatime" "nofail" ];
+  };
+
   # Parity disk mounts
   fileSystems."/mnt/parity1" = {
     device = "/dev/disk/by-label/parity1"; # sdg1 - 7.3T
@@ -182,7 +188,7 @@
 
   # MergerFS pool combining all data disks (SSD writes first)
   fileSystems."/mnt/user" = {
-    device = "/mnt/data01:/mnt/data02:/mnt/data03:/mnt/data04:/mnt/data05:/mnt/data06";
+    device = "/mnt/data01:/mnt/data02:/mnt/data03:/mnt/data04:/mnt/data05:/mnt/data06:/mnt/data07";
     fsType = "fuse.mergerfs";
     options = [
       "defaults"
@@ -203,7 +209,7 @@
 
   # Slow storage pool (HDDs only, for aging files from SSD)
   fileSystems."/mnt/storage" = {
-    device = "/mnt/data02:/mnt/data03:/mnt/data04:/mnt/data05:/mnt/data06";
+    device = "/mnt/data02:/mnt/data03:/mnt/data04:/mnt/data05:/mnt/data06:/mnt/data07";
     fsType = "fuse.mergerfs";
     options = [
       "defaults"
@@ -232,6 +238,7 @@
       d4 = "/mnt/data04";
       d5 = "/mnt/data05";
       d6 = "/mnt/data06";
+      d7 = "/mnt/data07";
     };
     parityFiles = [
       "/mnt/parity1/snapraid.parity"
@@ -245,6 +252,7 @@
       "/mnt/data04/.snapraid.content"
       "/mnt/data05/.snapraid.content"
       "/mnt/data06/.snapraid.content"
+      "/mnt/data07/.snapraid.content"
     ];
   };
 
@@ -286,6 +294,7 @@
   systemd.timers."btrfs-scrub-mnt-data04".timerConfig.OnCalendar = lib.mkForce "*-*-13 07:00:00";
   systemd.timers."btrfs-scrub-mnt-data05".timerConfig.OnCalendar = lib.mkForce "*-*-17 07:00:00";
   systemd.timers."btrfs-scrub-mnt-data06".timerConfig.OnCalendar = lib.mkForce "*-*-21 07:00:00";
+  systemd.timers."btrfs-scrub-mnt-data07".timerConfig.OnCalendar = lib.mkForce "*-*-23 07:00:00";
   systemd.timers."btrfs-scrub-mnt-parity1".timerConfig.OnCalendar = lib.mkForce "*-*-25 07:00:00";
   systemd.timers."btrfs-scrub-mnt-parity2".timerConfig.OnCalendar = lib.mkForce "*-*-28 07:00:00";
 
@@ -302,6 +311,8 @@
     "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data05";
   systemd.services."btrfs-scrub-mnt-data06".serviceConfig.ExecStart = lib.mkForce
     "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data06";
+  systemd.services."btrfs-scrub-mnt-data07".serviceConfig.ExecStart = lib.mkForce
+    "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data07";
   systemd.services."btrfs-scrub-mnt-parity1".serviceConfig.ExecStart = lib.mkForce
     "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/parity1";
   systemd.services."btrfs-scrub-mnt-parity2".serviceConfig.ExecStart = lib.mkForce
