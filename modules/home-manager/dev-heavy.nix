@@ -24,6 +24,7 @@ with lib;
       # Other heavy dev tools
       stripe-cli
       jdt-language-server  # Java
+      openjdk
       localsend
     ];
 

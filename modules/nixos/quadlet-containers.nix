@@ -5,6 +5,7 @@
   config,
   lib,
   pkgs,
+  inputs,
   quadlet-nix,
   ...
 }:
@@ -368,6 +369,24 @@ in {
               After = [ "ollama.service" ];
             };
           };
+
+          # GQC
+          gqc = {
+            autoStart = true;
+            containerConfig = {
+              image = "localhost/globalquake:latest";
+              publishPorts = [ "6080:6080" ];
+              volumes = [
+                "/var/lib/gqc:/config:rw"
+              ];
+              logDriver = "journald";
+            };
+            serviceConfig = {
+              Restart = "always";
+              RestartSec = "900";
+            };
+            unitConfig = {};
+          };
         };
       };
 
@@ -378,7 +397,29 @@ in {
         "d /var/lib/restic 0755 utils-podman utils-podman -"
         "d /var/lib/ollama 0755 utils-podman utils-podman -"
         "d /var/lib/open-webui 0755 utils-podman utils-podman -"
+        "d /var/lib/gqc 0755 utils-podman utils-podman -"
       ];
+
+      # Load nix-built GQC container image into utils-podman's podman store
+      systemd.services.gqc-image-load = {
+        description = "Load GQC container image";
+        after = [ "enable-linger-utils-podman.service" ];
+        wants = [ "enable-linger-utils-podman.service" ];
+        before = [ "home-manager-utils-podman.service" ];
+        wantedBy = [ "multi-user.target" ];
+        path = [ pkgs.podman ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+          User = "utils-podman";
+          Group = "utils-podman";
+          Environment = [
+            "HOME=/var/lib/utils-podman"
+            "XDG_RUNTIME_DIR=/run/user/13107"
+          ];
+          ExecStart = "${pkgs.podman}/bin/podman load -i ${inputs.gqc.packages.x86_64-linux.container}";
+        };
+      };
 
       # Enable lingering for utils-podman
       systemd.services.enable-linger-utils-podman = {

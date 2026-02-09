@@ -43,6 +43,12 @@
     };
   };
 
+  # Symlink root's nix config to z-247's so sudo inherits access-tokens etc.
+  systemd.tmpfiles.rules = [
+    "d /root/.config/nix 0755 root root -"
+    "L+ /root/.config/nix/nix.conf - - - - /home/z-247/.config/nix/nix.conf"
+  ];
+
   # Enable NFS mounts
   services.nfs-mounts.enable = true;
 

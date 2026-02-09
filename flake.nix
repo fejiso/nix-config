@@ -32,6 +32,9 @@
     airspy-adsb-bin.url = "github:fejiso/airspy_adsb/master";
     #airspy-adsb-bin.follows = "nixpkgs";
 
+    # GQC container
+    gqc.url = "github:fejiso/gqc";
+
     };
 
   outputs = {
@@ -45,6 +48,7 @@
     colmena,
     quadlet-nix,
     airspy-adsb-bin,
+    gqc,
     ...
   } @ inputs: let
     inherit (self) outputs;
