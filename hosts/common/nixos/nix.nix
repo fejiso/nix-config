@@ -21,11 +21,6 @@
       trusted-users = ["root" "@wheel"];
     };
     
-    # GitHub access token from sops secret
-    extraOptions = ''
-      !include /run/secrets/nix-access-tokens
-    '';
-
     # Enable channels
     channel.enable = true;
 

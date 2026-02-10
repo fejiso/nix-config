@@ -40,13 +40,6 @@
         key = "anthropic_api_key";
         mode = "0444";
       };
-
-      nix-access-tokens = {
-        sopsFile = "${inputs.self}/secrets/github.yaml";
-        key = "nix_access_tokens";
-        mode = "0440";
-        group = "nixbld";
-      };
     };
   };
 }

@@ -326,13 +326,32 @@
       ExecStart = pkgs.writeShellScript "ssd-migrate" ''
         set -e
 
+        MEDIA_SERVICES="tdarr.service lidarr.service sonarr.service radarr.service lazylibrarian.service sabnzbd.service"
+
+        stop_services() {
+          echo "Stopping media services..."
+          for svc in $MEDIA_SERVICES; do
+            ${pkgs.systemd}/bin/systemctl --user -M media-podman@ stop "$svc" 2>/dev/null || true
+          done
+        }
+
+        start_services() {
+          echo "Starting media services..."
+          for svc in $MEDIA_SERVICES; do
+            ${pkgs.systemd}/bin/systemctl --user -M media-podman@ start "$svc" 2>/dev/null || true
+          done
+        }
+
+        # Ensure services are restarted on exit (even on failure)
+        trap start_services EXIT
+
         # Acquire exclusive lock for disk operations
         exec 200>/var/lock/disk-maintenance.lock
         ${pkgs.util-linux}/bin/flock 200
 
         FILELIST=$(mktemp)
         OPENFILES=$(mktemp)
-        trap "rm -f $FILELIST $OPENFILES" EXIT
+        trap "rm -f $FILELIST $OPENFILES; start_services" EXIT
 
         # Get all open files under /mnt/data01 in one lsof call
         ${pkgs.lsof}/bin/lsof +D /mnt/data01 2>/dev/null | ${pkgs.gawk}/bin/awk 'NR>1 {print $9}' | sort -u > "$OPENFILES"
@@ -347,6 +366,7 @@
           -print0)
 
         if [ -s "$FILELIST" ]; then
+          stop_services
           echo "Migrating $(wc -l < "$FILELIST") files..."
           ${pkgs.rsync}/bin/rsync -av --remove-source-files --files-from="$FILELIST" /mnt/data01/ /mnt/storage/
           echo "Migration complete"
@@ -364,8 +384,8 @@
 
         # Invalidate mergerfs metadata cache after moving files
         echo "Refreshing mergerfs cache..."
-        ${pkgs.util-linux}/bin/mount -o remount /mnt/user
-        ${pkgs.util-linux}/bin/mount -o remount /mnt/storage
+        ${pkgs.attr}/bin/setfattr -n user.mergerfs.cache.clear -v true /mnt/user/.mergerfs 2>/dev/null || true
+        ${pkgs.attr}/bin/setfattr -n user.mergerfs.cache.clear -v true /mnt/storage/.mergerfs 2>/dev/null || true
       '';
     };
   };

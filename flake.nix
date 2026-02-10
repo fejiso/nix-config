@@ -33,7 +33,7 @@
     #airspy-adsb-bin.follows = "nixpkgs";
 
     # GQC container
-    gqc.url = "github:fejiso/gqc";
+    gqc.url = "git+file:///home/z-247/dev/gqc";
 
     };
 
