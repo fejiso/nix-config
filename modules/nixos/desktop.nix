@@ -63,6 +63,7 @@
     pcsclite
     pcsc-tools
     spotify
+    poppler-utils
   ];
 
   # SSH configuration for desktop access

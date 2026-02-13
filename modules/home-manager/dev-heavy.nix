@@ -21,6 +21,12 @@ with lib;
       arduino-ide
       arduino-cli
 
+      # Profiling tools
+      cargo-flamegraph
+      samply
+      linuxPackages_latest.perf
+      tokio-console
+
       # Other heavy dev tools
       stripe-cli
       jdt-language-server  # Java

@@ -96,6 +96,13 @@
     variant = "alt-intl";
   };
 
+  # nix-ld for running unpatched binaries (uv/pip venvs, etc.)
+  programs.nix-ld.enable = true;
+  programs.nix-ld.libraries = with pkgs; [
+    stdenv.cc.cc.lib
+    zlib
+  ];
+
   # System packages available to all users
   environment.systemPackages = with pkgs; [
     vim
