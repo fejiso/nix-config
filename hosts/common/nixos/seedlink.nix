@@ -1,4 +1,4 @@
-# SeedLink relay — socat proxies on ports 18000–18004 (netbird/wt0 only)
+# SeedLink relay — socat proxies on ports 18000–18006 (netbird/wt0 only)
 # Each local port forwards to a different upstream seismological data server
 { lib, pkgs, ... }:
 
@@ -9,6 +9,8 @@ let
     { port = 18002; host = "rtserve.resif.fr:18000";            name = "resif"; }
     { port = 18003; host = "eida.bgr.de:18000";                 name = "bgr"; }
     { port = 18004; host = "link.geonet.org.nz:18000";          name = "geonet"; }
+    { port = 18005; host = "rtserver.ipgp.fr:18000";            name = "ipgp"; }
+    { port = 18006; host = "eida.orfeus-eu.org:18000";          name = "orfeus"; }
   ];
   mkRelay = s: {
     name = "seedlink-relay-${s.name}";
@@ -38,5 +40,5 @@ let
 in {
   systemd.services = builtins.listToAttrs (map mkRelay seedlinkUpstreams);
 
-  networking.firewall.interfaces.wt0.allowedTCPPorts = [ 18000 18001 18002 18003 18004 ];
+  networking.firewall.interfaces.wt0.allowedTCPPorts = [ 18000 18001 18002 18003 18004 18005 18006 ];
 }
