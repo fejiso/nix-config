@@ -98,6 +98,7 @@
     nix-index
     nixd
     rmlint
+    age
     sops
   ];
 

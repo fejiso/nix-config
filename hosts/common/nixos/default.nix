@@ -141,6 +141,8 @@
     yggdrasil
     i2pd
     pipx
+    age
+    sops
     ssh-to-age
     rclone
     python3Packages.meshtastic
