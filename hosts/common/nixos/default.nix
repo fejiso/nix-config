@@ -19,6 +19,7 @@
     ./home-manager.nix
     ./netbird.nix
     ./seedlink.nix
+    ./socks-proxy.nix
     ./podman.nix
     inputs.home-manager.nixosModules.home-manager
     ../../../modules/nixos/nfs-mounts.nix

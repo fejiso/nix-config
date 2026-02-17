@@ -40,7 +40,7 @@
     allowedUDPPorts = [ 22000 21027 ]; # Syncthing discovery
 
     # Allow connections from netbird (wt0 interface)
-    interfaces.wt0.allowedTCPPorts = [ 3333 ];
+    interfaces.wt0.allowedTCPPorts = [ 3333 1080 ];
   };
 
   # Enable IPv6
