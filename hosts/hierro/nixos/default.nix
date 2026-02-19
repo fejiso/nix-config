@@ -30,6 +30,19 @@
   # Network configuration
   networking.hostName = "hierro";
 
+  # Static IPv6 — Hetzner doesn't do SLAAC/DHCPv6
+  networking.interfaces.enp41s0 = {
+    useDHCP = true; # Keep IPv4 DHCP working (interface exits NetworkManager)
+    ipv6.addresses = [{
+      address = "2a01:4f9:6b:2ba4::1";
+      prefixLength = 64;
+    }];
+  };
+  networking.defaultGateway6 = {
+    address = "fe80::1";
+    interface = "enp41s0";
+  };
+
   # Enable development tools and aarch64 emulation
   development.enable = true;
 
