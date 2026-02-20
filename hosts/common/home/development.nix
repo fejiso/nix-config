@@ -15,6 +15,9 @@
     go
     rustc
     cargo
+    # C/C++ build tools (for xgboost-sys bindgen, cmake-based crates)
+    cmake
+    clang
     # Development tools
     jetbrains.idea
     postman
