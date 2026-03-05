@@ -59,10 +59,10 @@ SERVICES=()
 PAUSED_SERVICES=()
 
 # Where to keep the warning counter (persistent across runs)
-SYNC_WARN_FILE="/var/lib/snapraid/snapRAID.warnCount"
+SYNC_WARN_FILE="/var/snapraid/snapRAID.warnCount"
 
 # Optional: prevent overlapping runs (recommended for cron)
-LOCK_FILE="/var/lib/snapraid/snapraid-sync.lock"
+LOCK_FILE="/var/snapraid/snapraid-sync.lock"
 
 # Exit-code policy:
 # 0 = continue on failures (but warn and block downstream risky steps)

@@ -119,6 +119,9 @@
     "d /mnt/user/download 0775 root media-services -"
     "d /mnt/user/downloadtemp 0775 root media-services -"
     "d /mnt/user/downloadtemp/incomplete 0775 root media-services -"
+    # SnapRAID directories
+    "d /var/snapraid 0755 root root -"
+    "d /var/log/snapraid 0755 root root -"
   ];
 
   hardware.graphics = {

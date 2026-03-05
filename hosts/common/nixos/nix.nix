@@ -3,6 +3,7 @@
   inputs,
   lib,
   config,
+  pkgs,
   ...
 }: {
   nix = let
@@ -28,11 +29,54 @@
     registry = lib.mapAttrs (_: flake: {inherit flake;}) flakeInputs;
     nixPath = lib.mapAttrsToList (n: _: "${n}=flake:${n}") flakeInputs;
     
-    # Garbage collection
-    gc = {
-      automatic = true;
-      dates = "weekly";
-      options = "--delete-older-than 7d";
+  };
+
+  # Garbage collection - system + user profiles
+  systemd.services.nix-garbage-collect = {
+    description = "Nix Garbage Collection (system + user)";
+    serviceConfig.Type = "oneshot";
+    path = [ config.nix.package pkgs.coreutils ];
+    script = ''
+      echo "=== Nix GC start ==="
+      echo "Store size before: $(du -sh /nix/store | cut -f1)"
+
+      # Delete old generations from all system profiles
+      nix-collect-garbage --delete-older-than 7d
+
+      # Delete old per-user profile generations (home-manager, nix-env)
+      for dir in /nix/var/nix/profiles/per-user/*/; do
+        [ -d "$dir" ] || continue
+        for profile in "$dir"*; do
+          # Skip if it's a generation link (handled by nix-collect-garbage)
+          # Target actual profile heads like 'profile', 'home-manager', 'channels'
+          [ -L "$profile" ] || continue
+          case "$(basename "$profile")" in
+            *-*-link) continue ;;  # skip generation links
+          esac
+          echo "Cleaning profile: $profile"
+          nix-env --delete-generations +3 --profile "$profile" 2>/dev/null || true
+        done
+      done
+
+      # Delete old home-manager generations stored in user home dirs
+      for gcroot_dir in /home/*/.local/state/home-manager/gcroots; do
+        [ -d "$gcroot_dir" ] || continue
+        echo "Cleaning home-manager gcroots in: $gcroot_dir"
+        find "$gcroot_dir" -maxdepth 1 -type l ! -name current-home -delete 2>/dev/null || true
+      done
+
+      echo "Store size after: $(du -sh /nix/store | cut -f1)"
+      echo "=== Nix GC done ==="
+    '';
+  };
+
+  systemd.timers.nix-garbage-collect = {
+    description = "Nix Garbage Collection Timer";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "weekly";
+      Persistent = true;
+      RandomizedDelaySec = "30min";
     };
   };
 

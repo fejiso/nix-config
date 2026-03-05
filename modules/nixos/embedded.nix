@@ -58,12 +58,14 @@
     # Clean /tmp on boot to save space
     boot.tmp.cleanOnBoot = true;
 
-    # Automatic garbage collection to manage Nix store size
-    nix.gc = {
-      automatic = lib.mkDefault true;
-      dates = lib.mkDefault "weekly";
-      options = lib.mkDefault "--delete-older-than 30d";
-    };
+    # Override GC to keep 30d on embedded (more conservative)
+    systemd.services.nix-garbage-collect.script = lib.mkForce ''
+      echo "=== Nix GC start (embedded) ==="
+      echo "Store size before: $(du -sh /nix/store | cut -f1)"
+      nix-collect-garbage --delete-older-than 30d
+      echo "Store size after: $(du -sh /nix/store | cut -f1)"
+      echo "=== Nix GC done ==="
+    '';
 
     # Optimize Nix builds on embedded devices
     nix.settings = {
