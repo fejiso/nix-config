@@ -18,6 +18,8 @@
     # Development tools
     jetbrains.idea
     postman
+    cmake
+    clang
 
     # Language servers (heavy ones in dev-heavy module)
     python3Packages.python-lsp-server
@@ -26,6 +28,8 @@
 
     # AWS tools
   ];
+
+  home.sessionVariables.LIBCLANG_PATH = "${pkgs.llvmPackages.libclang.lib}/lib";
 
   # Direnv for environment management
   programs.direnv = {
