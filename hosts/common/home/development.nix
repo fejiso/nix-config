@@ -24,6 +24,7 @@
     cmake
     clang
     gnumake
+    llvmPackages.openmp
 
     # Language servers (heavy ones in dev-heavy module)
     python3Packages.python-lsp-server
