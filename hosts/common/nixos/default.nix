@@ -165,6 +165,9 @@
   hardware.bluetooth.enable = true;
   services.blueman.enable = true;
 
+  # Enable Magic SysRq (REISUB)
+  boot.kernel.sysctl."kernel.sysrq" = 1;
+
   # Memory management
   zramSwap = {
     enable = true;
