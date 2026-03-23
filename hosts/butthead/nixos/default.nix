@@ -7,6 +7,86 @@
   hostname,
   ...
 }:
+let
+  ssd-migrate = pkgs.writeShellScript "ssd-migrate" ''
+    set -e
+    MODE="''${1:-daily}"
+
+    USE_PCT=$(${pkgs.coreutils}/bin/df --output=pcent /mnt/data01 | ${pkgs.gawk}/bin/awk 'NR==2 {gsub(/%/,""); print $1+0}')
+
+    if [ "$MODE" = "hourly" ]; then
+      if [ "$USE_PCT" -lt 70 ]; then
+        echo "data01 at ''${USE_PCT}% — below 70%, skipping"
+        exit 0
+      fi
+      AGE_FLAG="-mmin +60"
+    else
+      AGE_FLAG="-mtime +1"
+    fi
+    echo "data01 at ''${USE_PCT}% — migrating files ($MODE, $AGE_FLAG)"
+
+    MEDIA_SERVICES="tdarr.service lidarr.service sonarr.service radarr.service lazylibrarian.service sabnzbd.service"
+
+    stop_services() {
+      echo "Stopping media services..."
+      for svc in $MEDIA_SERVICES; do
+        ${pkgs.systemd}/bin/systemctl --user -M media-podman@ stop "$svc" 2>/dev/null || true
+      done
+    }
+
+    start_services() {
+      echo "Starting media services..."
+      for svc in $MEDIA_SERVICES; do
+        ${pkgs.systemd}/bin/systemctl --user -M media-podman@ start "$svc" 2>/dev/null || true
+      done
+    }
+
+    # Ensure services are restarted on exit (even on failure)
+    trap start_services EXIT
+
+    # Acquire exclusive lock for disk operations
+    exec 200>/var/lock/disk-maintenance.lock
+    ${pkgs.util-linux}/bin/flock 200
+
+    FILELIST=$(mktemp)
+    OPENFILES=$(mktemp)
+    trap "rm -f $FILELIST $OPENFILES; start_services" EXIT
+
+    # Get all open files under /mnt/data01 in one lsof call
+    ${pkgs.lsof}/bin/lsof +D /mnt/data01 2>/dev/null | ${pkgs.gawk}/bin/awk 'NR>1 {print $9}' | sort -u > "$OPENFILES"
+
+    # Build list of files to migrate (skip open/in-progress files)
+    while IFS= read -r -d "" file; do
+      if ! grep -qxF "$file" "$OPENFILES"; then
+        echo "''${file#/mnt/data01/}" >> "$FILELIST"
+      fi
+    done < <(${pkgs.findutils}/bin/find /mnt/data01 -type f $AGE_FLAG \
+      ! -name "*.partial" ! -name "*.tmp" ! -path "*/.snapraid.content" ! -path "*/Trash/*" ! -path "*downloadtemp*" \
+      -print0)
+
+    if [ -s "$FILELIST" ]; then
+      stop_services
+      echo "Migrating $(wc -l < "$FILELIST") files..."
+      ${pkgs.rsync}/bin/rsync -av --remove-source-files --files-from="$FILELIST" /mnt/data01/ /mnt/storage/
+      echo "Migration complete"
+    else
+      echo "No files to migrate"
+    fi
+
+    # Remove empty directories on SSD
+    ${pkgs.findutils}/bin/find /mnt/data01 -type d -empty -delete 2>/dev/null || true
+
+    # Delete files in Trash older than 7 days
+    echo "Cleaning up Trash..."
+    ${pkgs.findutils}/bin/find /mnt/user/Trash -type f -mtime +7 -delete 2>/dev/null || true
+    ${pkgs.findutils}/bin/find /mnt/user/Trash -type d -empty -delete 2>/dev/null || true
+
+    # Invalidate mergerfs metadata cache after moving files
+    echo "Refreshing mergerfs cache..."
+    ${pkgs.attr}/bin/setfattr -n user.mergerfs.cache.clear -v true /mnt/user/.mergerfs 2>/dev/null || true
+    ${pkgs.attr}/bin/setfattr -n user.mergerfs.cache.clear -v true /mnt/storage/.mergerfs 2>/dev/null || true
+  '';
+in
 {
   imports = [
     ./hardware-configuration.nix
@@ -220,7 +300,7 @@
       "use_ino"
       "cache.files=partial"
       "dropcacheonclose=true"
-      "category.create=epmfs"
+      "category.create=mfs"
       # Metadata caching (3h) to prevent drive spinup
       "cache.symlinks=true"
       "cache.readdir=true"
@@ -273,6 +353,7 @@
     serviceConfig = {
       Type = "oneshot";
       ExecStart = "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.bash}/bin/bash ${../../../scripts/zackreed-snapraid.sh}";
+      ExecStartPost = "${pkgs.bash}/bin/bash -c '${pkgs.curl}/bin/curl -fsS -o /dev/null \"$(cat ${config.sops.secrets.kuma-disk-maintenance-push-url.path})\"'";
       StandardOutput = "append:/var/log/snapraid-run.log";
       StandardError = "append:/var/log/snapraid-run.log";
       Nice = 19;
@@ -321,75 +402,31 @@
   systemd.services."btrfs-scrub-mnt-parity2".serviceConfig.ExecStart = lib.mkForce
     "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/parity2";
 
-  # SSD cache migration script
+  # SSD cache migration services
+  #   ssd-migrate:         daily, always runs, migrates files older than 24h (triggered by snapraid)
+  #   ssd-migrate-hourly:  hourly, only if data01 > 70% full, migrates files older than 1h
   systemd.services.ssd-migrate = {
-    description = "Migrate old files from SSD to HDD pool";
+    description = "Migrate old files from SSD to HDD pool (daily)";
     serviceConfig = {
       Type = "oneshot";
-      ExecStart = pkgs.writeShellScript "ssd-migrate" ''
-        set -e
+      ExecStart = "${ssd-migrate} daily";
+    };
+  };
 
-        MEDIA_SERVICES="tdarr.service lidarr.service sonarr.service radarr.service lazylibrarian.service sabnzbd.service"
+  systemd.services.ssd-migrate-hourly = {
+    description = "Migrate old files from SSD to HDD pool (hourly)";
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${ssd-migrate} hourly";
+    };
+  };
 
-        stop_services() {
-          echo "Stopping media services..."
-          for svc in $MEDIA_SERVICES; do
-            ${pkgs.systemd}/bin/systemctl --user -M media-podman@ stop "$svc" 2>/dev/null || true
-          done
-        }
-
-        start_services() {
-          echo "Starting media services..."
-          for svc in $MEDIA_SERVICES; do
-            ${pkgs.systemd}/bin/systemctl --user -M media-podman@ start "$svc" 2>/dev/null || true
-          done
-        }
-
-        # Ensure services are restarted on exit (even on failure)
-        trap start_services EXIT
-
-        # Acquire exclusive lock for disk operations
-        exec 200>/var/lock/disk-maintenance.lock
-        ${pkgs.util-linux}/bin/flock 200
-
-        FILELIST=$(mktemp)
-        OPENFILES=$(mktemp)
-        trap "rm -f $FILELIST $OPENFILES; start_services" EXIT
-
-        # Get all open files under /mnt/data01 in one lsof call
-        ${pkgs.lsof}/bin/lsof +D /mnt/data01 2>/dev/null | ${pkgs.gawk}/bin/awk 'NR>1 {print $9}' | sort -u > "$OPENFILES"
-
-        # Build list of files to migrate (older than 24h, not open)
-        while IFS= read -r -d "" file; do
-          if ! grep -qxF "$file" "$OPENFILES"; then
-            echo "''${file#/mnt/data01/}" >> "$FILELIST"
-          fi
-        done < <(${pkgs.findutils}/bin/find /mnt/data01 -type f -mtime +1 \
-          ! -name "*.partial" ! -name "*.tmp" ! -path "*/.snapraid.content" ! -path "*/Trash/*" ! -path "*downloadtemp*" \
-          -print0)
-
-        if [ -s "$FILELIST" ]; then
-          stop_services
-          echo "Migrating $(wc -l < "$FILELIST") files..."
-          ${pkgs.rsync}/bin/rsync -av --remove-source-files --files-from="$FILELIST" /mnt/data01/ /mnt/storage/
-          echo "Migration complete"
-        else
-          echo "No files to migrate"
-        fi
-
-        # Remove empty directories on SSD
-        ${pkgs.findutils}/bin/find /mnt/data01 -type d -empty -delete 2>/dev/null || true
-
-        # Delete files in Trash older than 7 days
-        echo "Cleaning up Trash..."
-        ${pkgs.findutils}/bin/find /mnt/user/Trash -type f -mtime +7 -delete 2>/dev/null || true
-        ${pkgs.findutils}/bin/find /mnt/user/Trash -type d -empty -delete 2>/dev/null || true
-
-        # Invalidate mergerfs metadata cache after moving files
-        echo "Refreshing mergerfs cache..."
-        ${pkgs.attr}/bin/setfattr -n user.mergerfs.cache.clear -v true /mnt/user/.mergerfs 2>/dev/null || true
-        ${pkgs.attr}/bin/setfattr -n user.mergerfs.cache.clear -v true /mnt/storage/.mergerfs 2>/dev/null || true
-      '';
+  systemd.timers.ssd-migrate-hourly = {
+    description = "Hourly SSD cache migration";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnCalendar = "hourly";
+      Persistent = true;
     };
   };
 

@@ -27,6 +27,9 @@ with lib;
       linuxPackages_latest.perf
       tokio-console
 
+      # ML/AI
+      libtorch-bin
+
       # Other heavy dev tools
       stripe-cli
       jdt-language-server  # Java

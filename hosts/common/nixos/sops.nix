@@ -40,6 +40,11 @@
         key = "anthropic_api_key";
         mode = "0444";
       };
+
+      kuma-disk-maintenance-push-url = {
+        sopsFile = "${inputs.self}/secrets/kuma.yaml";
+        key = "disk_maintenance_push_url";
+      };
     };
   };
 }
