@@ -168,10 +168,15 @@
   # Enable Magic SysRq (REISUB)
   boot.kernel.sysctl."kernel.sysrq" = 1;
 
-  # Memory management
+  # Memory management: zswap for hosts with swap, zram for those without
+  boot.kernelParams = lib.mkIf (config.swapDevices != []) [
+    "zswap.enabled=1"
+    "zswap.compressor=lz4"
+    "zswap.zpool=z3fold"
+  ];
   zramSwap = {
-    enable = true;
-    algorithm = "lzo";
+    enable = config.swapDevices == [];
+    algorithm = "lz4";
     memoryPercent = 10;
   };
 
