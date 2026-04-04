@@ -142,6 +142,7 @@
     yggdrasil
     i2pd
     pipx
+    parallel-full
     age
     sops
     ssh-to-age
