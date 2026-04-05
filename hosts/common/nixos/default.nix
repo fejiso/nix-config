@@ -24,6 +24,7 @@
     inputs.home-manager.nixosModules.home-manager
     ../../../modules/nixos/nfs-mounts.nix
     ../../../modules/nixos/backup.nix
+    ../../../modules/nixos/storagebox-mount.nix
   ];
 
   # Enable backups on all nodes
@@ -53,6 +54,9 @@
 
   # Enable NFS mounts
   services.nfs-mounts.enable = true;
+
+  # Enable Hetzner Storage Box mount
+  services.storagebox-mount.enable = true;
 
   # Set hostname
   networking.hostName = hostname;
