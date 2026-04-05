@@ -181,6 +181,13 @@
     memoryPercent = 10;
   };
 
+  # OOM management
+  systemd.oomd.enable = true;
+  systemd.slices."user".sliceConfig = {
+    ManagedOOMMemoryPressure = "kill";
+    MemoryMax = "80%";
+  };
+
   # Journald optimization for SSD longevity
   # Embedded systems override this with volatile storage
   services.journald.extraConfig = lib.mkDefault ''

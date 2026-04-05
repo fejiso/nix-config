@@ -445,6 +445,7 @@ in
   environment.systemPackages = with pkgs; [
     # Storage and filesystem tools
     mergerfs
+    mergerfs-tools
     snapraid
     hdparm
 

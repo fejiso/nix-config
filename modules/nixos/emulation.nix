@@ -34,6 +34,9 @@ with lib;
 
       # Arcade
       mame
+
+      # image management
+      chdman
     ];
   };
 }

@@ -145,9 +145,11 @@ log() {
   printf '%s\n' "$*"
 }
 
-# Fatal error - exit immediately
+# Fatal error - send pushover notification and exit immediately
 die() {
   log "**ERROR** $*"
+  SUBJECT="${EMAIL_SUBJECT_PREFIX} [ERROR] $*"
+  send_pushover 2>/dev/null || true
   exit 1
 }
 
