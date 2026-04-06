@@ -383,14 +383,14 @@
   environment.etc."lxmf/config".text = ''
     [propagation]
     enable_node = yes
-    node_name = ${hostname}
+    node_name = ${hostname}-propagation
     announce_at_start = yes
     announce_interval = 360
     autopeer = yes
     message_storage_limit = 1024
 
     [lxmf]
-    display_name = ${hostname}
+    display_name = ${hostname}-propagation
     announce_at_start = yes
   '';
 

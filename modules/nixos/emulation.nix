@@ -36,7 +36,9 @@ with lib;
       mame
 
       # image management
-      chdman
+      mame-tools
+      _7zz
+      unrar
     ];
   };
 }
