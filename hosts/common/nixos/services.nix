@@ -171,24 +171,28 @@
         peers = mrwqlsioq4hoo2lmeeud7dkfscnm7yxak7dmiyvsrnpfag3z5tsq.b32.i2p
 
 
-      # Netbird mesh peers
+      # Netbird mesh peers (skip self)
+      ${lib.optionalString (hostname != "hierro") ''
       [[Peer hierro]]
         type = TCPClientInterface
         enabled = yes
         target_host = hierro.netbird.cloud
         target_port = 4242
-
+      ''}
+      ${lib.optionalString (hostname != "blacktop") ''
       [[Peer blacktop]]
         type = TCPClientInterface
         enabled = yes
         target_host = blacktop.netbird.cloud
         target_port = 4242
-
+      ''}
+      ${lib.optionalString (hostname != "butthead") ''
       [[Peer butthead]]
         type = TCPClientInterface
         enabled = yes
         target_host = butthead.netbird.cloud
         target_port = 4242
+      ''}
 
       [[acehoss]]
         type = TCPClientInterface
