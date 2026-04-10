@@ -204,11 +204,24 @@ in
     "d /var/log/snapraid 0755 root root -"
   ];
 
+  # AMD GPU (RX 500 series / Polaris / gfx803)
+  services.xserver.videoDrivers = [ "amdgpu" ];
+
   hardware.graphics = {
     enable = true;
     extraPackages = with pkgs; [
       rocmPackages.clr.icd
+      amdvlk
     ];
+    extraPackages32 = with pkgs; [
+      driversi686Linux.amdvlk
+    ];
+  };
+
+  # ROCm on pre-Vega: override GFX version to gfx803 and limit HW queues for stability
+  environment.variables = {
+    HSA_OVERRIDE_GFX_VERSION = "8.0.3";
+    GPU_MAX_HW_QUEUES = "1";
   };
 
   # Storage configuration for media server
