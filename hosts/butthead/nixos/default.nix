@@ -153,6 +153,12 @@ in
   # Use podman for oci-containers
   virtualisation.oci-containers.backend = "podman";
 
+  # Docker daemon — standard docker/docker-compose workflow (user in docker group)
+  virtualisation.docker = {
+    enable = true;
+    autoPrune.enable = true;
+  };
+
   # Enable libvirt for VM management
   virtualisation.libvirtd = {
     enable = true;
@@ -205,18 +211,24 @@ in
   ];
 
   # AMD GPU (RX 500 series / Polaris / gfx803)
-  services.xserver.videoDrivers = [ "amdgpu" ];
+  # NVIDIA GPU (EVGA 3060 12GB) for ML workloads
+  services.xserver.videoDrivers = [ "amdgpu" "nvidia" ];
+
+  hardware.nvidia = {
+    modesetting.enable = true;
+    open = true;  # Ampere (GA106) supports open kernel modules
+    nvidiaSettings = true;
+  };
 
   hardware.graphics = {
     enable = true;
     extraPackages = with pkgs; [
       rocmPackages.clr.icd
-      amdvlk
-    ];
-    extraPackages32 = with pkgs; [
-      driversi686Linux.amdvlk
     ];
   };
+
+  # NVIDIA Container Toolkit (CDI) — GPU access in Docker & Podman containers
+  hardware.nvidia-container-toolkit.enable = true;
 
   # ROCm on pre-Vega: override GFX version to gfx803 and limit HW queues for stability
   environment.variables = {
@@ -476,6 +488,14 @@ in
     # ROCm for ML/AI
     rocmPackages.rocm-smi
     rocmPackages.rocminfo
+
+    # NVIDIA/CUDA for ML/AI
+    nvtopPackages.nvidia
+    cudaPackages.cudatoolkit
+
+    # Docker/container tools
+    docker-compose
+    podman-compose
   ];
 
   # Aggressive VFS caching to keep directory structure in RAM

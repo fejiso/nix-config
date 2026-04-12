@@ -109,7 +109,7 @@
   environment.systemPackages = with pkgs; [
     vim
     wget
-    aria2c
+    aria2
     curl
     git
     git-crypt
