@@ -24,13 +24,8 @@ with lib;
     };
 
     # Credentials file assembled from decrypted secrets
-    sops.templates."storagebox-credentials" = {
-      content = ''
-        username=${config.sops.placeholder.storagebox-username}
-        password=${config.sops.placeholder.storagebox-password}
-      '';
-      mode = "0600";
-    };
+    sops.templates."storagebox-credentials".content = "username=${config.sops.placeholder.storagebox-username}\npassword=${config.sops.placeholder.storagebox-password}\n";
+    sops.templates."storagebox-credentials".mode = "0600";
 
     environment.systemPackages = [ pkgs.cifs-utils ];
 
@@ -43,7 +38,6 @@ with lib;
       description = "Mount Hetzner Storage Box";
       after = [ "network-online.target" "sops-nix.service" ];
       wants = [ "network-online.target" ];
-      requires = [ "sops-nix.service" ];
       wantedBy = [ "multi-user.target" ];
       path = [ pkgs.cifs-utils pkgs.util-linux ];
       serviceConfig = {
