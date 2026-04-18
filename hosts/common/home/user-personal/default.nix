@@ -1,6 +1,6 @@
 { lib, config, ... }:
 {
   programs.git = {
-    settings.user.name = lib.mkForce "z-247";
+    settings.user.name = lib.mkForce "Fernando Jiménez";
   };
 }

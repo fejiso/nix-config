@@ -335,7 +335,7 @@ in {
               volumes = [
                 "/var/lib/ollama:/root/.ollama:rw"
               ];
-              devices = [ "/dev/dri:/dev/dri" ];
+              devices = [ "/dev/dri:/dev/dri" "nvidia.com/gpu=all" ];
               autoUpdate = "registry";
               logDriver = "journald";
             };
@@ -370,6 +370,25 @@ in {
             };
           };
 
+          # ComfyUI - Stable Diffusion Node Editor
+          comfyui = {
+            autoStart = true;
+            containerConfig = {
+              image = "docker.io/yanwk/comfyui-boot:cu126-slim";
+              publishPorts = [ "8188:8188" ];
+              volumes = [
+                "/var/lib/comfyui:/root:rw"
+              ];
+              devices = [ "nvidia.com/gpu=all" ];
+              autoUpdate = "registry";
+              logDriver = "journald";
+            };
+            serviceConfig = {
+              Restart = "always";
+              RestartSec = "900";
+            };
+          };
+
           # GQC
           gqc = {
             autoStart = true;
@@ -397,6 +416,7 @@ in {
         "d /var/lib/restic 0755 utils-podman utils-podman -"
         "d /var/lib/ollama 0755 utils-podman utils-podman -"
         "d /var/lib/open-webui 0755 utils-podman utils-podman -"
+        "d /var/lib/comfyui 0755 utils-podman utils-podman -"
         "d /var/lib/gqc 0755 utils-podman utils-podman -"
       ];
 

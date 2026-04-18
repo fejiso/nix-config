@@ -21,6 +21,9 @@
     ncspot
     spot
 
+#ai 
+lmstudio
+
 # Music ripping
     whipper
   ];
