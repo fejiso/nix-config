@@ -366,7 +366,7 @@
   # Environment variable so all apps use the shared Reticulum instance
   environment.variables.RNS_SHARED_INSTANCE = "Yes";
 
-  # LXMF daemon for message propagation and node announcement
+  # LXMF daemon for message  and node announcement
   systemd.services.lxmd = {
     description = "LXMF Propagation Daemon";
     after = [ "network.target" "rnsd.service" ];
@@ -387,7 +387,7 @@
   environment.etc."lxmf/config".text = ''
     [propagation]
     enable_node = yes
-    node_name = ${hostname}-propagation
+    node_name = ${hostname}-fer-propagation
     announce_at_start = yes
     announce_interval = 360
     autopeer = yes
@@ -395,7 +395,10 @@
 
     [lxmf]
     display_name = ${hostname}-propagation
-    announce_at_start = yes
+    announce_at_start = no
+
+    [logging]
+    loglevel = 5
   '';
 
   # iperf3 server listening on wt0 interface for network performance testing
