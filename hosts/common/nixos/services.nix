@@ -370,7 +370,7 @@
   systemd.services.lxmd = {
     description = "LXMF Propagation Daemon";
     after = [ "network.target" "rnsd.service" ];
-    requires = [ "rnsd.service" ];
+    bindsTo = [ "rnsd.service" ];
     wantedBy = [ "multi-user.target" ];
     environment = {
       RNS_SHARED_INSTANCE = "Yes";
@@ -389,7 +389,7 @@
     enable_node = yes
     node_name = ${hostname}-fer-propagation
     announce_at_start = yes
-    announce_interval = 360
+    announce_interval = 30
     autopeer = yes
     message_storage_limit = 1024
 

@@ -117,9 +117,9 @@
   # Swayidle configuration
   services.swayidle = lib.mkIf (!config.programs.niri.enable) {
     enable = true;
-    events = {
-      before-sleep = "${pkgs.hyprlock}/bin/hyprlock";
-    };
+    events = [
+      { event = "before-sleep"; command = "${pkgs.hyprlock}/bin/hyprlock"; }
+    ];
     timeouts = [
       {
         timeout = 600;

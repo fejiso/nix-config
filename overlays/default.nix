@@ -15,6 +15,7 @@
         && !(prev.lib.hasInfix "fbalpha2012" c.name)
       ) (prev.lib.attrValues cores)
     );
+
   };
 
   # When applied, the unstable nixpkgs set (declared in the flake inputs) will
