@@ -35,6 +35,7 @@ with lib;
       jdt-language-server  # Java
       openjdk
       localsend
+      teams-for-linux
     ];
 
     # Helix editor configuration (heavy due to rust-analyzer, clangd pulling LLVM)
