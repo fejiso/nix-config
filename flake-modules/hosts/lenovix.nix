@@ -10,4 +10,15 @@
       "${inputs.self}/hosts/lenovix/nixos"
     ];
   };
+
+  flake.colmenaNodes.lenovix = {
+    deployment = {
+      targetHost = "lenovix";
+      targetUser = "root";
+    };
+    imports = config.flake.commonModules.nixos ++ [
+      "${inputs.self}/hosts/lenovix/nixos"
+    ];
+    _module.args.hostname = "lenovix";
+  };
 }
