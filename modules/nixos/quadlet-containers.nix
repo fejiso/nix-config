@@ -389,6 +389,87 @@ in {
             };
           };
 
+          # Redis for Paperless-ngx
+          paperless-redis = {
+            autoStart = true;
+            containerConfig = {
+              image = "docker.io/library/redis:7-alpine";
+              publishPorts = [ "6379:6379" ];
+              volumes = [
+                "/var/lib/paperless-redis:/data:rw"
+              ];
+              autoUpdate = "registry";
+              logDriver = "journald";
+            };
+            serviceConfig = {
+              Restart = "always";
+              RestartSec = "900";
+            };
+          };
+
+          # Paperless-ngx - Document Management
+          paperless-ngx = {
+            autoStart = true;
+            containerConfig = {
+              image = "ghcr.io/paperless-ngx/paperless-ngx:latest";
+              publishPorts = [ "8010:8000" ];
+              volumes = [
+                "/var/lib/paperless-ngx/data:/usr/src/paperless/data:rw"
+                "/var/lib/paperless-ngx/media:/usr/src/paperless/media:rw"
+                "/var/lib/paperless-ngx/export:/usr/src/paperless/export:rw"
+                "/var/lib/paperless-ngx/consume:/usr/src/paperless/consume:rw"
+              ];
+              environments = {
+                PAPERLESS_REDIS = "redis://host.containers.internal:6379";
+                PAPERLESS_OCR_LANGUAGE = "eng";
+                PAPERLESS_OCR_LANGUAGES = "eng+fra+spa+ukr+rus";
+                PAPERLESS_FILENAME_FORMAT = "{created}-{correspondent}-{title}";
+                PAPERLESS_TIME_ZONE = "Europe/Dublin";
+                PAPERLESS_URL = "https://paperless.fer.xyz";
+                PAPERLESS_CONSUMER_POLLING = "30";
+              };
+              environmentFiles = [ "/run/secrets/paperless-env" ];
+              autoUpdate = "registry";
+              logDriver = "journald";
+              addHosts = [ "host.containers.internal:host-gateway" ];
+            };
+            serviceConfig = {
+              Restart = "always";
+              RestartSec = "900";
+            };
+            unitConfig = {
+              After = [ "paperless-redis.service" ];
+              Requires = [ "paperless-redis.service" ];
+            };
+          };
+
+          # Pure-FTPd for Paperless document ingestion
+          pure-ftpd = {
+            autoStart = true;
+            containerConfig = {
+              image = "docker.io/crazymax/pure-ftpd:latest";
+              publishPorts = [
+                "29999:2100"
+                "30000-30009:30000-30009"
+              ];
+              volumes = [
+                "/var/lib/pure-ftpd:/data:rw"
+                "/var/lib/paperless-ngx/consume:/home/admin:rw"
+              ];
+              environments = {
+                AUTH_METHOD = "puredb";
+                SECURE_MODE = "true";
+                PASSIVE_PORT_RANGE = "30000:30009";
+              };
+              autoUpdate = "registry";
+              logDriver = "journald";
+            };
+            serviceConfig = {
+              Restart = "always";
+              RestartSec = "900";
+            };
+          };
+
           # GQC
           gqc = {
             autoStart = true;
@@ -418,6 +499,13 @@ in {
         "d /var/lib/open-webui 0755 utils-podman utils-podman -"
         "d /var/lib/comfyui 0755 utils-podman utils-podman -"
         "d /var/lib/gqc 0755 utils-podman utils-podman -"
+        "d /var/lib/paperless-redis 0755 utils-podman utils-podman -"
+        "d /var/lib/paperless-ngx 0755 utils-podman utils-podman -"
+        "d /var/lib/paperless-ngx/data 0755 utils-podman utils-podman -"
+        "d /var/lib/paperless-ngx/media 0755 utils-podman utils-podman -"
+        "d /var/lib/paperless-ngx/export 0755 utils-podman utils-podman -"
+        "d /var/lib/paperless-ngx/consume 0755 utils-podman utils-podman -"
+        "d /var/lib/pure-ftpd 0755 utils-podman utils-podman -"
       ];
 
       # Load nix-built GQC container image into utils-podman's podman store
@@ -439,6 +527,21 @@ in {
           ];
           ExecStart = "${pkgs.podman}/bin/podman load -i ${inputs.gqc.packages.x86_64-linux.container}";
         };
+      };
+
+      # Create paperless env file from secrets
+      systemd.services.paperless-env-setup = {
+        description = "Create Paperless environment file from secrets";
+        wantedBy = [ "multi-user.target" ];
+        serviceConfig = {
+          Type = "oneshot";
+          RemainAfterExit = true;
+        };
+        script = ''
+          SECRET_KEY=$(cat /run/secrets/paperless-secret-key | tr -d "\n\r")
+          echo "PAPERLESS_SECRET_KEY=$SECRET_KEY" > /run/secrets/paperless-env
+          chmod 644 /run/secrets/paperless-env
+        '';
       };
 
       # Enable lingering for utils-podman

@@ -45,6 +45,12 @@
         sopsFile = "${inputs.self}/secrets/kuma.yaml";
         key = "disk_maintenance_push_url";
       };
+
+      paperless-secret-key = {
+        sopsFile = "${inputs.self}/secrets/paperless.yaml";
+        key = "secret_key";
+        mode = "0444";
+      };
     };
   };
 }

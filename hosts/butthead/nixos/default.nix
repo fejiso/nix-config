@@ -118,6 +118,12 @@ in
   # Enable emulation
   emulation.enable = true;
 
+  # SANE scanner support
+  hardware.sane = {
+    enable = true;
+    extraBackends = [ pkgs.sane-airscan ];
+  };
+
   # Enable TooGoodToGo watcher
   services.tgtg-watcher.enable = true;
 
@@ -565,7 +571,7 @@ in
 
   # Open NFS ports in firewall
   networking.firewall = {
-    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 3002 4743 8096 8080 8989 7878 8686 9696 5299 8081 8112 3344 8000 11434 3003 8084 6080 8188 ];
+    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 3002 4743 8096 8080 8989 7878 8686 9696 5299 8081 8112 3344 8000 8010 11434 3003 8084 6080 8188 29999 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009 ];
     allowedUDPPorts = [ 2049 111 20048 ];
   };
 
