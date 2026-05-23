@@ -90,27 +90,38 @@ in {
     (mkIf cfg.enable {
       systemd.services.kopia-backup = {
         description = "Kopia Backup Snapshot";
+        after = [ "sops-nix.service" ] ++ lib.optionals (cfg.server) [ "kopia-server.service" ];
+        wants = lib.optionals (cfg.server) [ "kopia-server.service" ];
         environment = {
-          # We use the server password to connect
-          KOPIA_PASSWORD_FILE = config.sops.secrets.kopia_server_password.path;
+          HOME = "/root";
         };
         path = [ kopia ];
         script = ''
-          # Check if connected
+          export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_server_password.path})"
+
+          # Check if connected, auto-connect if not
           if ! ${kopia}/bin/kopia repository status >/dev/null 2>&1; then
              echo "Kopia not connected. Attempting to connect..."
-             # Note: This will fail if the server cert is not trusted.
-             # You might need to run this manually once:
-             # kopia repository connect server --url ${cfg.serverAddress} --server-cert-fingerprint <FINGERPRINT>
-             echo "Automatic connection not fully implemented (needs cert fingerprint). Please connect manually."
-             exit 1
+
+             CERT_FILE="/var/lib/kopia/.config/kopia/kopia.cert"
+             if [ -f "$CERT_FILE" ]; then
+               FINGERPRINT=$(${pkgs.openssl}/bin/openssl x509 -fingerprint -sha256 -noout -in "$CERT_FILE" | sed 's/.*=//;s/://g')
+               echo "Connecting to ${cfg.serverAddress} with fingerprint $FINGERPRINT"
+               ${kopia}/bin/kopia repository connect server \
+                 --url ${cfg.serverAddress} \
+                 --server-cert-fingerprint "$FINGERPRINT" \
+                 --override-hostname "$(hostname)" \
+                 --override-username "backup-user"
+             else
+               echo "Server cert not found at $CERT_FILE. Is kopia-server running?"
+               exit 1
+             fi
           fi
-          
+
           echo "Starting snapshot..."
           ${kopia}/bin/kopia snapshot create /home /var/lib
-          
-          # Set retention policy (can be run repeatedly, it's idempotent-ish)
-          # We set it for the current user/host
+
+          # Set retention policy
           ${kopia}/bin/kopia policy set --global --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --keep-annual 1
         '';
       };

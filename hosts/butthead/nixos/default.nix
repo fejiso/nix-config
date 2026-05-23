@@ -124,6 +124,7 @@ in
     extraBackends = [ pkgs.sane-airscan ];
   };
 
+
   # Enable TooGoodToGo watcher
   services.tgtg-watcher.enable = true;
 
@@ -502,6 +503,9 @@ in
     # Docker/container tools
     docker-compose
     podman-compose
+
+    # Scanning
+    simple-scan
   ];
 
   # Aggressive VFS caching to keep directory structure in RAM
