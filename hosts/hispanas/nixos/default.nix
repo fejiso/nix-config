@@ -23,14 +23,6 @@
   # Host-specific networking
   networking.hostName = "hispanas";
 
-
-  # Create mjpg-streamer user
-  users.users.mjpg-streamer = {
-    isSystemUser = true;
-    group = "video";
-  };
-  users.groups.video = {};
-
   # Emilia user account
   users.users.emilia = {
     isNormalUser = true;
