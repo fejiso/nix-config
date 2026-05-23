@@ -14,6 +14,25 @@
     };
     modules = [
       "${inputs.self}/hosts/work-laptop/darwin"
+      inputs.home-manager.darwinModules.home-manager
+      {
+        home-manager = {
+          useGlobalPkgs = true;
+          useUserPackages = true;
+          extraSpecialArgs = {
+            inherit inputs;
+            outputs = inputs.self;
+            hostname = "work-laptop";
+          };
+          users.superfer = { ... }: {
+            imports = [
+              # Bare `default` — no Wayland modules on darwin.
+              config.flake.modules.homeManager.default
+              "${inputs.self}/hosts/work-laptop/home"
+            ];
+          };
+        };
+      }
     ];
   };
 }

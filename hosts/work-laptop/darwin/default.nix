@@ -11,6 +11,8 @@
   system.stateVersion = 4;
   system.primaryUser = "superfer";
 
+  nixpkgs.config.allowUnfree = true;
+
   # Nix configuration
   nix = {
     settings = {

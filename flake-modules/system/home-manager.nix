@@ -9,7 +9,9 @@
 
       users.z-247 = { ... }: {
         imports = [
-          config.flake.modules.homeManager.default
+          # Every NixOS host is Linux, so use linux-default (which transitively
+          # imports default plus Wayland tooling).
+          config.flake.modules.homeManager.linux-default
           "${inputs.self}/hosts/${hostname}/home"
         ];
 
