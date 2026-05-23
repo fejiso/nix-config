@@ -190,8 +190,8 @@ with lib;
       ];
     };
 
-    # Firewall configuration
-    networking.firewall.allowedTCPPorts = mkMerge [
+    # Firewall — tdarr server/node traffic is between netbird peers only.
+    networking.firewall.interfaces.wt0.allowedTCPPorts = mkMerge [
       (mkIf config.services.tdarr.server.enable [
         config.services.tdarr.server.webPort
         config.services.tdarr.server.serverPort

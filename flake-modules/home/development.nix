@@ -59,7 +59,7 @@
       ripgrep
       fd
       nodejs
-      inputs.nixpkgs-master.legacyPackages.${pkgs.system}.tree-sitter
+      inputs.nixpkgs-master.legacyPackages.${pkgs.stdenv.hostPlatform.system}.tree-sitter
 
       # Language servers (already in development tools but explicit here)
       lua-language-server

@@ -9,6 +9,9 @@
 }: {
   imports = [
     ./hardware-configuration.nix
+    ./forgejo.nix
+    ./nats.nix
+    ./metrics.nix
   ];
 
   # Boot configuration

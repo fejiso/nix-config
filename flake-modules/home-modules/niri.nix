@@ -10,7 +10,7 @@ with lib;
   };
 
   config = mkIf config.programs.niri.enable {
-    home.packages = with pkgs; [ niri waybar brightnessctl wireplumber hyprlock hypridle pavucontrol swww xwayland-satellite wlopm git curl wl-clipboard cliphist ];
+    home.packages = with pkgs; [ niri waybar brightnessctl wireplumber hyprlock hypridle pavucontrol awww xwayland-satellite wlopm git curl wl-clipboard cliphist ];
 
     # Disable swayidle, use hypridle instead
     services.swayidle.enable = false;
@@ -75,7 +75,7 @@ with lib;
         for output in $OUTPUTS; do
             random_wallpaper=''${WALLPAPERS[$RANDOM % ''${#WALLPAPERS[@]}]}
             echo "Setting wallpaper for $output: $random_wallpaper"
-            swww img "$random_wallpaper" --outputs "$output" --transition-type fade --transition-duration 1
+            awww img "$random_wallpaper" --outputs "$output" --transition-type fade --transition-duration 1
         done
       '';
       executable = true;
@@ -91,7 +91,7 @@ with lib;
       Service = {
         Type = "oneshot";
         ExecStart = "${config.home.homeDirectory}/.local/bin/set-wallpaper.sh";
-        Environment = "PATH=${pkgs.git}/bin:${pkgs.curl}/bin:${pkgs.swww}/bin:${pkgs.niri}/bin:${pkgs.coreutils}/bin:${pkgs.findutils}/bin:${pkgs.gnugrep}/bin:${pkgs.gawk}/bin";
+        Environment = "PATH=${pkgs.git}/bin:${pkgs.curl}/bin:${pkgs.awww}/bin:${pkgs.niri}/bin:${pkgs.coreutils}/bin:${pkgs.findutils}/bin:${pkgs.gnugrep}/bin:${pkgs.gawk}/bin";
       };
       Install = {
         WantedBy = [ "graphical-session.target" ];
@@ -430,7 +430,7 @@ with lib;
           Mod+Shift+E { quit; }
       }
 
-      spawn-at-startup "${pkgs.swww}/bin/swww-daemon"
+      spawn-at-startup "${pkgs.awww}/bin/awww-daemon"
       spawn-at-startup "sleep 3 && ${config.home.homeDirectory}/.local/bin/set-wallpaper.sh"
       spawn-at-startup "${pkgs.waybar}/bin/waybar"
       spawn-at-startup "${pkgs.mako}/bin/mako"

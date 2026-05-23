@@ -140,7 +140,7 @@ in
   };
 
   # Open firewall for nix-serve
-  networking.firewall.allowedTCPPorts = [ 5000 ];
+  networking.firewall.interfaces.wt0.allowedTCPPorts = [ 5000 ];
 }
 ;
 }

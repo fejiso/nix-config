@@ -121,8 +121,9 @@ in {
       };
     };
 
-    # Open firewall port
-    networking.firewall.allowedTCPPorts = [ cfg.port ];
+    # Open only on the netbird mesh; butthead's nginx-proxy-manager
+    # reverse-proxies for external access.
+    networking.firewall.interfaces.wt0.allowedTCPPorts = [ cfg.port ];
   };
 }
 ;

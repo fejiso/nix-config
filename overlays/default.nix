@@ -18,14 +18,14 @@
 
     # Nixpkgs ships colmena 0.4.0, which only supports the legacy
     # outputs.colmena API. Use the flake input (0.5.0-pre) for colmenaHive.
-    colmena = inputs.colmena.packages.${final.system}.colmena;
+    colmena = inputs.colmena.packages.${final.stdenv.hostPlatform.system}.colmena;
   };
 
   # When applied, the unstable nixpkgs set (declared in the flake inputs) will
   # be accessible through 'pkgs.unstable'
   unstable-packages = final: _prev: {
     unstable = import inputs.nixpkgs-unstable {
-      system = final.system;
+      system = final.stdenv.hostPlatform.system;
       config.allowUnfree = true;
     };
   };

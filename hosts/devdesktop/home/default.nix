@@ -41,10 +41,10 @@
   programs.atuin.settings.sync_address = "http://localhost:8888";
 
   # Amazon Linux specific shell configuration
-  programs.zsh.initExtra = ''
+  programs.zsh.initContent = ''
     # Amazon Linux specific environment
     export AWS_DEFAULT_REGION=us-east-1
-    
+
     # Add local bin to PATH if it exists
     if [ -d "$HOME/.local/bin" ]; then
       export PATH="$HOME/.local/bin:$PATH"
@@ -52,9 +52,9 @@
   '';
 
   # Git configuration for work
-  programs.git = {
-    userName = lib.mkForce "superfer";
-    userEmail = lib.mkForce "superfer@amazon.com"; # Adjust as needed
+  programs.git.settings.user = {
+    name = lib.mkForce "superfer";
+    email = lib.mkForce "superfer@amazon.com"; # Adjust as needed
   };
 
 }

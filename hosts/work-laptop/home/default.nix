@@ -27,7 +27,7 @@
   ];
 
   # macOS specific shell configuration
-  programs.zsh.initExtra = ''
+  programs.zsh.initContent = ''
     # macOS specific environment
     export HOMEBREW_PREFIX="/opt/homebrew"
     export HOMEBREW_CELLAR="/opt/homebrew/Cellar"
@@ -38,9 +38,9 @@
   '';
 
   # Git configuration for work
-  programs.git = {
-    userName = lib.mkForce "superfer";
-    userEmail = lib.mkForce "superfer@amazon.com"; # Adjust as needed
+  programs.git.settings.user = {
+    name = lib.mkForce "superfer";
+    email = lib.mkForce "superfer@amazon.com"; # Adjust as needed
   };
 
   # macOS specific programs
