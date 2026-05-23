@@ -8,7 +8,6 @@
   ...
 }: {
   imports = [
-    ../../../hosts/common/home
   ];
 
   # Desktop-specific packages

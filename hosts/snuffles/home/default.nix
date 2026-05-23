@@ -8,7 +8,6 @@
   ...
 }: {
   imports = [
-    ../../common/home
   ];
 
 }

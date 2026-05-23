@@ -1,17 +1,5 @@
 # Hierro home-manager configuration (server)
-{
-  inputs,
-  outputs,
-  lib,
-  config,
-  pkgs,
-  ...
-}: {
-  imports = [
-    ../../common/home
-    ../../common/home/development.nix
-  ];
-
+{ inputs, outputs, lib, config, pkgs, ... }: {
   # Disable desktop/GUI programs for server
   programs.firefox.enable = lib.mkForce false;
   programs.niri.enable = lib.mkForce false;

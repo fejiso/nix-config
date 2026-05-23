@@ -9,13 +9,14 @@
 }: {
   # macOS system configuration
   system.stateVersion = 4;
+  system.primaryUser = "superfer";
 
   # Nix configuration
   nix = {
     settings = {
       experimental-features = "nix-command flakes";
-      auto-optimise-store = true;
     };
+    optimise.automatic = true;
     gc = {
       automatic = true;
       interval = {Weekday = 0; Hour = 2; Minute = 0;};
@@ -63,13 +64,10 @@
     };
   };
 
-  # Services
-  services.nix-daemon.enable = true;
-  
-  # Fonts
-  fonts.fontDir.enable = true;
-  fonts.fonts = with pkgs; [
-    (nerdfonts.override {fonts = ["FiraCode" "DroidSansMono"];})
+  # Fonts (nix-darwin manages /Library/Fonts/Nix Fonts directly)
+  fonts.packages = with pkgs; [
+    nerd-fonts.fira-code
+    nerd-fonts.droid-sans-mono
   ];
 
   # User configuration

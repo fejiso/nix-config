@@ -9,9 +9,6 @@
   ...
 }: {
   imports = [
-    ../../common/home
-    ../../common/home/development.nix
-    ../../common/home/desktop.nix
   ];
 
   # Enable desktop programs (shares config with blacktop)

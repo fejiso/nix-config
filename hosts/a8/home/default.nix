@@ -8,7 +8,6 @@
   ...
 }: {
   imports = [
-    ../../../hosts/common/home
   ];
 
   # Server-specific packages (CLI only)

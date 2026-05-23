@@ -9,10 +9,6 @@
 }: {
   imports = [
     ./hardware-configuration.nix
-    ../../common/nixos
-    (import ../../../modules/nixos/development.nix)
-    (import ../../../modules/nixos/tdarr-worker.nix)
-    (import ../../../modules/nixos/openclaw.nix)
   ];
 
   # Boot configuration

@@ -9,20 +9,6 @@
 }: {
   imports = [
     ./hardware-configuration.nix
-    ../../common/nixos/nix.nix
-    ../../common/nixos/users.nix
-    ../../common/nixos/security.nix
-    ../../common/nixos/networking.nix
-    ../../common/nixos/services.nix
-    ../../common/nixos/sops.nix
-    ../../common/nixos/distributed-build.nix
-    ../../common/nixos/netbird.nix
-    (import ../../../modules/nixos/desktop.nix)
-    (import ../../../modules/nixos/laptop.nix)
-    (import ../../../modules/nixos/development.nix)
-    (import ../../../modules/nixos/emulation.nix)
-    (import ../../../modules/nixos/tdarr-worker.nix)
-    ../../../modules/nixos/adsb-readsb.nix
   ];
 
   # ADS-B configuration (Hardware support only)

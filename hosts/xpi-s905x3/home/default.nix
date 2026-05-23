@@ -2,7 +2,6 @@
 
 {
   imports = [
-    ../../common/home
   ];
 
   # Minimal home-manager setup for embedded device

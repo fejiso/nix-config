@@ -3,9 +3,6 @@
 {
   imports = [
     ./hardware-configuration.nix
-    ../../common/nixos
-    ../../../modules/nixos/embedded.nix
-    ../../../modules/nixos/btrfs-convert-firstboot.nix
   ];
 
   # Host identification

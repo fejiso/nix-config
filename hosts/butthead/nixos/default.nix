@@ -90,16 +90,6 @@ in
 {
   imports = [
     ./hardware-configuration.nix
-    ../../common/nixos
-    (import ../../../modules/nixos/desktop.nix)
-    (import ../../../modules/nixos/systemd-nspawn.nix)
-    (import ../../../modules/nixos/media-services.nix)
-    (import ../../../modules/nixos/download-services.nix)
-    (import ../../../modules/nixos/tdarr-worker.nix)  # imports media-podman.nix
-    (import ../../../modules/nixos/development.nix)
-    (import ../../../modules/nixos/tgtg-watcher.nix)
-    (import ../../../modules/nixos/emulation.nix)
-    (import ../../../modules/nixos/quadlet-containers.nix)
   ];
 
   # Enable quadlet-based containers

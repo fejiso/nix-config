@@ -10,8 +10,6 @@
 }: {
   imports = [
     ./hardware-configuration.nix
-    ../../common/nixos
-    ../../../modules/nixos/novasdr.nix
     # Add appropriate nixos-hardware module for your specific Lenovo model
     # inputs.nixos-hardware.nixosModules.lenovo-thinkpad-x1-carbon-gen11
   ];

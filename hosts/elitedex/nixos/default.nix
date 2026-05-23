@@ -9,7 +9,6 @@
 }: {
   imports = [
     ./hardware-configuration.nix
-    (import ../../../modules/nixos/emulation.nix)
   ];
 
   # Enable emulation

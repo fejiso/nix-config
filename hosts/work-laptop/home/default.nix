@@ -9,13 +9,12 @@
   ...
 }: {
   imports = [
-    ../../common/home/default.nix
   ];
 
   # macOS specific configuration
   home = {
     username = "superfer";
-    homeDirectory = "${config.home.homeDirectory}";
+    homeDirectory = "/Users/superfer";
   };
 
   # macOS specific packages

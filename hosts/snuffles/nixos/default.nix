@@ -10,11 +10,6 @@
 }: {
   imports = [
     ./hardware-configuration.nix
-    ../../common/nixos
-    ../../../modules/nixos/laptop.nix
-    ../../../modules/nixos/adsb-readsb.nix
-    ../../../modules/nixos/adsb-feeders.nix
-    ../../../modules/nixos/network-watchdog.nix
   ];
 
   services.network-watchdog.enable = true;

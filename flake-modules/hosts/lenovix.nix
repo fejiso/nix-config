@@ -6,7 +6,7 @@
       outputs = inputs.self;
       hostname = "lenovix";
     };
-    modules = config.flake.commonModules.nixos ++ [
+    modules = [ config.flake.modules.nixos.default ] ++ [
       "${inputs.self}/hosts/lenovix/nixos"
     ];
   };
@@ -16,7 +16,7 @@
       targetHost = "lenovix";
       targetUser = "root";
     };
-    imports = config.flake.commonModules.nixos ++ [
+    imports = [ config.flake.modules.nixos.default ] ++ [
       "${inputs.self}/hosts/lenovix/nixos"
     ];
     _module.args.hostname = "lenovix";

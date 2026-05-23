@@ -8,9 +8,6 @@
   ...
 }: {
   imports = [
-    ../../common/home
-    ../../common/home/development.nix
-    ../../common/home/desktop.nix
   ];
 
   # Disable Sway

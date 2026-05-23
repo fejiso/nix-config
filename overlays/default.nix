@@ -16,6 +16,9 @@
       ) (prev.lib.attrValues cores)
     );
 
+    # Nixpkgs ships colmena 0.4.0, which only supports the legacy
+    # outputs.colmena API. Use the flake input (0.5.0-pre) for colmenaHive.
+    colmena = inputs.colmena.packages.${final.system}.colmena;
   };
 
   # When applied, the unstable nixpkgs set (declared in the flake inputs) will

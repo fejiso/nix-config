@@ -8,10 +8,6 @@
   hostname,
   ...
 }: {
-  imports = [
-    ../../common/home-standalone
-  ];
-
   # Amazon Linux specific configuration
   home = {
     username = "superfer";
