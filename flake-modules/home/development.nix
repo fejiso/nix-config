@@ -52,6 +52,8 @@
     defaultEditor = true;
     viAlias = true;
     vimAlias = true;
+    withPython3 = true;
+    withRuby = true;
     
     extraPackages = with pkgs; [
       # LazyVim dependencies
