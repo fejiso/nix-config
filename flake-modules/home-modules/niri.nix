@@ -44,10 +44,19 @@ with lib;
     home.file.".local/bin/set-wallpaper.sh" = {
       text = ''
         #!${pkgs.bash}/bin/bash
-        
+
         WALLPAPER_DIR="$HOME/.local/share/wallpapers/dharmx-walls"
         WALLS_REPO="https://github.com/dharmx/walls.git"
-        
+
+        # Bail out cleanly when no awww-daemon is running (e.g. during a
+        # nixos-rebuild switch with no active Wayland session). Without this
+        # the script exits 1 and the systemd unit ends up failed, which
+        # blocks sd-switch on the next activation.
+        if ! compgen -G "''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/wayland-*-awww-daemon.sock" > /dev/null; then
+            echo "awww-daemon socket not present, skipping wallpaper update"
+            exit 0
+        fi
+
         # Create wallpaper directory if it doesn't exist
         mkdir -p "$WALLPAPER_DIR"
         
@@ -81,12 +90,17 @@ with lib;
       executable = true;
     };
 
-    # Systemd user service for wallpaper management
+    # Systemd user service for wallpaper management.
+    # ConditionPathExistsGlob makes systemd skip the unit (no failure) when the
+    # awww-daemon socket isn't present — happens during nixos-rebuild activation
+    # before the daemon respawns, and would otherwise leave the unit in a
+    # `failed` state that sd-switch escalates to a switch-to-configuration error.
     systemd.user.services.wallpaper = {
       Unit = {
         Description = "Set random wallpaper from dharmx/walls";
         After = [ "graphical-session.target" ];
         PartOf = [ "graphical-session.target" ];
+        ConditionPathExistsGlob = "%t/wayland-*-awww-daemon.sock";
       };
       Service = {
         Type = "oneshot";
