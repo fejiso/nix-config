@@ -69,7 +69,7 @@
       vscode-extensions.ms-python.debugpy  # Python debugger
     ];
     
-    extraLuaConfig = ''
+    initLua = ''
       -- Bootstrap lazy.nvim
       local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
       if not vim.loop.fs_stat(lazypath) then

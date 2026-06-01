@@ -25,14 +25,16 @@
   # Use systemd-resolved with DNS-over-TLS for encryption
   services.resolved = {
     enable = true;
-    dnssec = "allow-downgrade";
-    domains = [ "~." ];
-    fallbackDns = [
-      "9.9.9.9#dns.quad9.net"
-      "1.1.1.1#cloudflare-dns.com"
-      "194.242.2.2#dns.mullvad.net"
-    ];
-    dnsovertls = "opportunistic";
+    settings.Resolve = {
+      DNSSEC = "allow-downgrade";
+      Domains = [ "~." ];
+      FallbackDNS = [
+        "9.9.9.9#dns.quad9.net"
+        "1.1.1.1#cloudflare-dns.com"
+        "194.242.2.2#dns.mullvad.net"
+      ];
+      DNSOverTLS = "opportunistic";
+    };
   };
 
   # Firewall

@@ -20,13 +20,12 @@
   };
 
   config = lib.mkIf config.services.btrfs-convert-firstboot.enable {
-    # Create systemd service that runs on first boot
+    # Userspace oneshot: detect ext4 root, drop flag, reboot into initrd conversion.
     systemd.services.btrfs-convert-firstboot = {
       description = "Convert root filesystem from ext4 to btrfs on first boot";
       wantedBy = [ "multi-user.target" ];
       after = [ "local-fs.target" ];
 
-      # Only run once - flag file prevents re-running
       unitConfig = {
         ConditionPathExists = "!/var/lib/btrfs-convert-firstboot.done";
       };
@@ -41,7 +40,6 @@
 
         echo "Checking if btrfs conversion is needed..."
 
-        # Check if root is already btrfs
         ROOT_FS=$(${pkgs.util-linux}/bin/findmnt -n -o FSTYPE /)
         if [ "$ROOT_FS" = "btrfs" ]; then
           echo "Root is already btrfs, skipping conversion"
@@ -56,16 +54,13 @@
         fi
 
         echo "Root is ext4, preparing for btrfs conversion..."
-        echo "This will happen on next boot."
 
-        # Create flag for initrd to do conversion
         mkdir -p /boot
         cat > /boot/convert-to-btrfs.flag <<EOF
 DEVICE=${config.services.btrfs-convert-firstboot.rootDevice}
 SUBVOL=${config.services.btrfs-convert-firstboot.subvolume}
 EOF
 
-        # Mark as done so we don't check again
         touch /var/lib/btrfs-convert-firstboot.done
 
         echo "Conversion will occur on next boot. Rebooting in 5 seconds..."
@@ -74,22 +69,51 @@ EOF
       '';
     };
 
-    # Add conversion script to initrd
-    boot.initrd.postDeviceCommands = lib.mkBefore ''
-      if [ -f /boot/convert-to-btrfs.flag ]; then
+    # Initrd side (systemd stage 1).
+    boot.initrd.kernelModules = [ "btrfs" "vfat" ];
+    boot.initrd.availableKernelModules = [ "btrfs" "vfat" ];
+
+    # Make btrfs/e2fsprogs available in the systemd-initrd PATH.
+    boot.initrd.systemd.initrdBin = [ pkgs.btrfs-progs pkgs.e2fsprogs ];
+
+    # Mount unit for /boot inside initrd so we can read the flag file before
+    # the root filesystem is touched.
+    boot.initrd.systemd.mounts = [
+      {
+        what = "/dev/disk/by-label/NIXOS_BOOT";
+        where = "/boot";
+        type = "vfat";
+        options = "ro";
+        unitConfig.DefaultDependencies = false;
+        wantedBy = [ "initrd-root-device.target" ];
+        before = [ "btrfs-convert-firstboot.service" ];
+      }
+    ];
+
+    boot.initrd.systemd.services.btrfs-convert-firstboot = {
+      description = "Convert root filesystem from ext4 to btrfs";
+      wantedBy = [ "initrd-root-fs.target" ];
+      after = [ "initrd-root-device.target" "boot.mount" ];
+      before = [ "sysroot.mount" ];
+      unitConfig.DefaultDependencies = false;
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+      };
+      script = ''
+        if [ ! -f /boot/convert-to-btrfs.flag ]; then
+          exit 0
+        fi
+
         echo "============================================"
         echo "Converting root filesystem from ext4 to btrfs"
         echo "============================================"
 
-        # Parse flag file
         . /boot/convert-to-btrfs.flag
 
-        # Wait for device
         echo "Waiting for device $DEVICE..."
         for i in $(seq 1 30); do
-          if [ -e "$DEVICE" ]; then
-            break
-          fi
+          if [ -e "$DEVICE" ]; then break; fi
           sleep 1
         done
 
@@ -112,8 +136,6 @@ EOF
         if [ ! -d "/mnt/root-convert/$SUBVOL" ]; then
           btrfs subvolume create "/mnt/root-convert/$SUBVOL"
 
-          # Move everything to subvolume (except ext2_saved for rollback)
-          echo "Moving files to subvolume..."
           shopt -s dotglob
           for item in /mnt/root-convert/*; do
             basename=$(basename "$item")
@@ -123,7 +145,6 @@ EOF
           done
         fi
 
-        # Set default subvolume
         subvol_id=$(btrfs subvolume list /mnt/root-convert | grep "$SUBVOL" | awk '{print $2}')
         if [ -n "$subvol_id" ]; then
           btrfs subvolume set-default "$subvol_id" /mnt/root-convert
@@ -131,23 +152,13 @@ EOF
 
         umount /mnt/root-convert
 
-        # Remove flag file
+        mount -o remount,rw /boot
         rm /boot/convert-to-btrfs.flag
+        mount -o remount,ro /boot
 
         echo "Conversion complete! Continuing boot..."
-      fi
-    '';
-
-    # Ensure btrfs-progs is available in initrd
-    boot.initrd.kernelModules = [ "btrfs" ];
-    boot.initrd.availableKernelModules = [ "btrfs" ];
-
-    # Add btrfs tools to initrd
-    boot.initrd.extraUtilsCommands = ''
-      copy_bin_and_libs ${pkgs.btrfs-progs}/bin/btrfs
-      copy_bin_and_libs ${pkgs.btrfs-progs}/bin/btrfs-convert
-      copy_bin_and_libs ${pkgs.e2fsprogs}/bin/e2fsck
-    '';
+      '';
+    };
   };
 }
 ;

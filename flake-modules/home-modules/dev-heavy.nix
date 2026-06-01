@@ -26,7 +26,7 @@ with lib;
       # Profiling tools
       cargo-flamegraph
       samply
-      linuxPackages_latest.perf
+      perf
       tokio-console
 
       # ML/AI

@@ -32,7 +32,6 @@ with lib;
       # Sony
       pcsx2        # PS2
       ppsspp       # PSP
-      duckstation  # PS1
 
       # Arcade
       mame

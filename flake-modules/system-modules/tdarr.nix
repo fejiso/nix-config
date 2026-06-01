@@ -14,7 +14,7 @@
 with lib;
 
 {
-  options.services.tdarr = {
+  options.services.tdarr-podman = {
     enable = mkEnableOption "Tdarr transcoding server";
 
     server = {
@@ -102,7 +102,7 @@ with lib;
     };
   };
 
-  config = mkIf config.services.tdarr.enable {
+  config = mkIf config.services.tdarr-podman.enable {
     # Home-manager configuration for media-podman user (tdarr containers)
     home-manager.users.media-podman = { pkgs, ... }: {
       imports = [ quadlet-nix.homeManagerModules.quadlet ];
@@ -114,30 +114,30 @@ with lib;
 
       virtualisation.quadlet.containers = mkMerge [
         # Tdarr Server
-        (mkIf config.services.tdarr.server.enable {
+        (mkIf config.services.tdarr-podman.server.enable {
           tdarr-server = {
             autoStart = true;
             containerConfig = {
               image = "ghcr.io/haveagitgat/tdarr:latest";
               publishPorts = [
-                "${toString config.services.tdarr.server.webPort}:8265"
-                "${toString config.services.tdarr.server.serverPort}:8266"
-              ] ++ optional config.services.tdarr.server.internalNode
-                "${toString config.services.tdarr.server.nodePort}:8264";
+                "${toString config.services.tdarr-podman.server.webPort}:8265"
+                "${toString config.services.tdarr-podman.server.serverPort}:8266"
+              ] ++ optional config.services.tdarr-podman.server.internalNode
+                "${toString config.services.tdarr-podman.server.nodePort}:8264";
               volumes = [
                 "/var/lib/tdarr/server:/app/server:rw"
                 "/var/lib/tdarr/configs:/app/configs:rw"
                 "/var/lib/tdarr/logs:/app/logs:rw"
-                "${config.services.tdarr.transcodeCache}:/temp:rw"
-              ] ++ (mapAttrsToList (name: path: "${path}:/${name}:rw,rslave") config.services.tdarr.mediaDirectories);
+                "${config.services.tdarr-podman.transcodeCache}:/temp:rw"
+              ] ++ (mapAttrsToList (name: path: "${path}:/${name}:rw,rslave") config.services.tdarr-podman.mediaDirectories);
               environments = {
                 serverIP = "0.0.0.0";
-                serverPort = toString config.services.tdarr.server.serverPort;
-                webUIPort = toString config.services.tdarr.server.webPort;
-                internalNode = if config.services.tdarr.server.internalNode then "true" else "false";
+                serverPort = toString config.services.tdarr-podman.server.serverPort;
+                webUIPort = toString config.services.tdarr-podman.server.webPort;
+                internalNode = if config.services.tdarr-podman.server.internalNode then "true" else "false";
                 nodeID = "InternalNode";
                 nodeIP = "0.0.0.0";
-                nodePort = toString config.services.tdarr.server.nodePort;
+                nodePort = toString config.services.tdarr-podman.server.nodePort;
                 PUID = "0";
                 PGID = "0";
                 TZ = "Europe/Dublin";
@@ -153,24 +153,24 @@ with lib;
         })
 
         # Tdarr Node
-        (mkIf config.services.tdarr.node.enable {
+        (mkIf config.services.tdarr-podman.node.enable {
           tdarr-node = {
             autoStart = true;
             containerConfig = {
               image = "ghcr.io/haveagitgat/tdarr_node:latest";
-              publishPorts = [ "${toString config.services.tdarr.node.nodePort}:8267" ];
+              publishPorts = [ "${toString config.services.tdarr-podman.node.nodePort}:8267" ];
               volumes = [
                 "/var/lib/tdarr/configs:/app/configs:rw"
                 "/var/lib/tdarr/logs:/app/logs:rw"
-                "${config.services.tdarr.transcodeCache}:/temp:rw"
-              ] ++ (mapAttrsToList (name: path: "${path}:/${name}:rw,rslave") config.services.tdarr.mediaDirectories);
+                "${config.services.tdarr-podman.transcodeCache}:/temp:rw"
+              ] ++ (mapAttrsToList (name: path: "${path}:/${name}:rw,rslave") config.services.tdarr-podman.mediaDirectories);
               devices = [ "/dev/dri:/dev/dri" ];
               environments = {
-                serverIP = config.services.tdarr.node.serverIP;
-                serverPort = toString config.services.tdarr.node.serverPort;
+                serverIP = config.services.tdarr-podman.node.serverIP;
+                serverPort = toString config.services.tdarr-podman.node.serverPort;
                 nodeIP = "0.0.0.0";
-                nodeID = config.services.tdarr.node.nodeId;
-                nodePort = toString config.services.tdarr.node.nodePort;
+                nodeID = config.services.tdarr-podman.node.nodeId;
+                nodePort = toString config.services.tdarr-podman.node.nodePort;
                 PUID = "0";
                 PGID = "0";
                 TZ = "Europe/Dublin";
@@ -182,7 +182,7 @@ with lib;
               Restart = "always";
               RestartSec = "900";
             };
-            unitConfig = mkIf config.services.tdarr.server.enable {
+            unitConfig = mkIf config.services.tdarr-podman.server.enable {
               After = [ "tdarr-server.service" ];
             };
           };
@@ -192,15 +192,15 @@ with lib;
 
     # Firewall — tdarr server/node traffic is between netbird peers only.
     networking.firewall.interfaces.wt0.allowedTCPPorts = mkMerge [
-      (mkIf config.services.tdarr.server.enable [
-        config.services.tdarr.server.webPort
-        config.services.tdarr.server.serverPort
+      (mkIf config.services.tdarr-podman.server.enable [
+        config.services.tdarr-podman.server.webPort
+        config.services.tdarr-podman.server.serverPort
       ])
-      (mkIf (config.services.tdarr.server.enable && config.services.tdarr.server.internalNode) [
-        config.services.tdarr.server.nodePort
+      (mkIf (config.services.tdarr-podman.server.enable && config.services.tdarr-podman.server.internalNode) [
+        config.services.tdarr-podman.server.nodePort
       ])
-      (mkIf config.services.tdarr.node.enable [
-        config.services.tdarr.node.nodePort
+      (mkIf config.services.tdarr-podman.node.enable [
+        config.services.tdarr-podman.node.nodePort
       ])
     ];
 
@@ -210,7 +210,7 @@ with lib;
       "d /var/lib/tdarr/server 0755 media-podman media-services -"
       "d /var/lib/tdarr/configs 0755 media-podman media-services -"
       "d /var/lib/tdarr/logs 0755 media-podman media-services -"
-      "d ${config.services.tdarr.transcodeCache} 0777 media-podman media-services -"
+      "d ${config.services.tdarr-podman.transcodeCache} 0777 media-podman media-services -"
     ];
   };
 }

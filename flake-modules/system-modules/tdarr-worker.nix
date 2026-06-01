@@ -54,7 +54,7 @@ with lib;
   };
 
   config = mkIf config.services.tdarr-worker.enable {
-    services.tdarr = {
+    services.tdarr-podman = {
       enable = true;
       server.enable = config.services.tdarr-worker.serverEnabled;
       node = {

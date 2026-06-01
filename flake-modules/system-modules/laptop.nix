@@ -58,9 +58,6 @@
     };
   };
   
-  # Backlight control
-  programs.light.enable = true;
-  
   # Enable touchpad support
   services.libinput = {
     enable = true;
@@ -81,6 +78,7 @@
   # Laptop-specific packages
   environment.systemPackages = with pkgs; [
     powertop
+    brightnessctl
   ];
 };
 }

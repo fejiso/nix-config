@@ -1,5 +1,12 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, inputs, ... }:
 {
+  sops.secrets.grafana-secret-key = {
+    sopsFile = "${inputs.self}/secrets/grafana.yaml";
+    key = "secret_key";
+    owner = "grafana";
+    group = "grafana";
+  };
+
   ##########################################################################
   # VictoriaMetrics — single-binary timeseries DB
   ##########################################################################
@@ -119,6 +126,7 @@
       };
       analytics.reporting_enabled = false;
       security.admin_user = "admin";
+      security.secret_key = "$__file{${config.sops.secrets.grafana-secret-key.path}}";
     };
     provision = {
       enable = true;
