@@ -25,8 +25,12 @@
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
 
-    # Colmena for deployment
+    # Colmena for deployment (NixOS hosts)
     colmena.url = "github:zhaofengli/colmena";
+
+    # deploy-rs for deployment (home-manager on foreign distros, etc.)
+    deploy-rs.url = "github:serokell/deploy-rs";
+    deploy-rs.inputs.nixpkgs.follows = "nixpkgs";
 
     # Quadlet-nix for podman container management
     quadlet-nix.url = "github:SEIAROTg/quadlet-nix";
