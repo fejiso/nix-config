@@ -7,11 +7,7 @@
 {
   services.netbird.enable = true;
 
-  # Enable systemd-resolved for Netbird DNS
-  services.resolved = {
-    enable = true;
-    dnssec = "allow-downgrade";
-  };
+  # systemd-resolved (required for Netbird DNS) is configured in networking.nix.
 
   # Custom netbird setup service that uses the setup key
   systemd.services.netbird-setup = {

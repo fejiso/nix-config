@@ -10,7 +10,9 @@
   # Enable networking
   networking.networkmanager.enable = true;
 
-  # DNS configuration - multiple trusted sources with DNS-over-TLS
+  # DNS configuration - DNS-over-TLS via systemd-resolved.
+  # Mullvad belongs only in fallbackDns below: its public DNS refuses plain
+  # UDP/53 and requires SNI dns.mullvad.net, which the #hostname suffix supplies.
   networking.nameservers = [
     # Quad9 (privacy-focused, blocks malware)
     "9.9.9.9"
@@ -18,8 +20,6 @@
     # Cloudflare (fast, privacy-focused)
     "1.1.1.1"
     "1.0.0.1"
-    # Mullvad (privacy-focused)
-    "194.242.2.2"
   ];
 
   # Use systemd-resolved with DNS-over-TLS for encryption
