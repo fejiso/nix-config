@@ -53,6 +53,13 @@
         key = "secret_key";
         mode = "0444";
       };
+
+      nix-builder-key = {
+        sopsFile = "${inputs.self}/secrets/nix-builder.yaml";
+        key = "private_key";
+        owner = "nix-ssh";
+        mode = "0400";
+      };
     };
   };
 }

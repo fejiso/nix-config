@@ -57,8 +57,8 @@ let
   buildMachines = lib.mapAttrsToList (name: host: {
     hostName = "${name}.netbird.cloud";
     system = host.system;
-    sshUser = "z-247";
-    sshKey = "/home/z-247/.ssh/id_ed25519";
+    sshUser = "nix-ssh";
+    sshKey = config.sops.secrets.nix-builder-key.path;
     maxJobs = host.maxJobs;
     speedFactor = host.speedFactor * 2; # Double speed factor for remote machines to prefer them
     supportedFeatures = host.supportedFeatures;
@@ -102,6 +102,15 @@ in
 
   # Distribute builds to remote machines
   nix.distributedBuilds = true;
+
+  # Accept inbound remote-build connections on the shared nix-ssh role account.
+  # Creates user `nix-ssh` whose shell is locked to `nix-store --serve --write`.
+  nix.sshServe = {
+    enable = true;
+    protocol = "ssh-ng";
+    write = true;
+    keys = [ buildKeys.nixBuilderPublicKey ];
+  };
 
   # Configure binary cache serving
   services.nix-serve = {
