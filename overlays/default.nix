@@ -19,6 +19,10 @@
     # Nixpkgs ships colmena 0.4.0, which only supports the legacy
     # outputs.colmena API. Use the flake input (0.5.0-pre) for colmenaHive.
     colmena = inputs.colmena.packages.${final.stdenv.hostPlatform.system}.colmena;
+
+    # pipx 1.8.0 tests fail against newer `packaging` library (whitespace
+    # formatting mismatches in test_package_specifier). Runtime is unaffected.
+    pipx = prev.pipx.overridePythonAttrs (_: { doCheck = false; });
   };
 
   # When applied, the unstable nixpkgs set (declared in the flake inputs) will

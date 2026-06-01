@@ -51,7 +51,7 @@
   environment.systemPackages = with pkgs; [
     libva-utils
     lightdm
-    xorg.xinit
+    xinit
     cifs-utils
     lm_sensors
     nvme-cli

@@ -19,8 +19,8 @@
 
   # Screen timeout and DPMS
   services.xserver.displayManager.sessionCommands = lib.mkIf config.services.xserver.enable ''
-    ${pkgs.xorg.xset}/bin/xset dpms 300 600 900
-    ${pkgs.xorg.xset}/bin/xset s 300 300
+    ${pkgs.xset}/bin/xset dpms 300 600 900
+    ${pkgs.xset}/bin/xset s 300 300
   '';
 
   # Console blanking (for kmscon/tty)
