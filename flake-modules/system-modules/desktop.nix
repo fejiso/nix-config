@@ -30,9 +30,19 @@
 
   # Display manager and desktop environment
   services.xserver.enable = true;
-  services.displayManager.gdm.enable = true;
-  services.displayManager.gdm.autoSuspend = false;
-  services.displayManager.defaultSession = "niri";
+
+  # greetd + tuigreet: minimal Wayland greeter that launches the niri session
+  # directly. Replaces GDM — its GNOME-Shell Wayland greeter fails to start on
+  # the nvidia desktop (greeter session dies before the compositor comes up),
+  # and niri needs no full desktop manager.
+  services.greetd = {
+    enable = true;
+    settings.default_session = {
+      command = "${pkgs.tuigreet}/bin/tuigreet --time --remember --cmd ${config.programs.niri.package}/bin/niri-session";
+      user = "greeter";
+    };
+  };
+
   services.desktopManager.gnome.enable = false;
   
   # Disable GNOME GCR SSH agent to avoid conflict

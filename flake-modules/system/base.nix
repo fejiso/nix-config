@@ -63,7 +63,9 @@
     # kmscon - modern TTY with TrueType/emoji support
     services.kmscon = {
       enable = true;
-      hwRender = true;
+      # Software rendering: kmscon's GL renderer segfaults against the nvidia
+      # driver, crashing every secondary VT. CPU-rendered consoles are fine.
+      hwRender = false;
       fonts = [
         { name = "FiraCode Nerd Font Mono"; package = pkgs.nerd-fonts.fira-code; }
         { name = "Noto Color Emoji"; package = pkgs.noto-fonts-color-emoji; }
