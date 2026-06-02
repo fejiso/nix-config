@@ -7,6 +7,11 @@
 {
   services.netbird.enable = true;
 
+  # Prevent netbird from auto-generating /etc/ssh/ssh_config.d/99-netbird.conf,
+  # which forces ProxyCommand `netbird ssh proxy` for all *.netbird.cloud hosts
+  # and breaks distributed nix builds (host-key mismatch vs nix-ssh's OpenSSH).
+  systemd.services.netbird.environment.NB_DISABLE_SSH_CONFIG = "true";
+
   # systemd-resolved (required for Netbird DNS) is configured in networking.nix.
 
   # Custom netbird setup service that uses the setup key

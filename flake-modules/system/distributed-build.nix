@@ -45,9 +45,11 @@ let
       supportedFeatures = [ "kvm" ];
       alwaysOn = false;  # Not always on
     };
-    # Native aarch64 builder (Ubuntu + single-user Nix). Saves hierro from
+    # Native aarch64 builder (Ubuntu + Determinate Nix). Saves hierro from
     # qemu-emulating ARM builds. Uses the regular `ubuntu` login user since
-    # there's no nix-daemon to constrain a `nix-ssh` role account on.
+    # there's no nix-daemon to constrain a `nix-ssh` role account on. Legacy
+    # `ssh://` protocol because amp1's nix (2.31.5) and hierro's nix-daemon
+    # (2.34.7) disagree on ssh-ng wire format mid-build.
     amp1 = {
       system = "aarch64-linux";
       maxJobs = 4;
@@ -55,6 +57,7 @@ let
       supportedFeatures = [ ];
       alwaysOn = true;
       sshUser = "ubuntu";
+      protocol = "ssh";
     };
   };
 
@@ -73,7 +76,7 @@ let
     maxJobs = host.maxJobs;
     speedFactor = host.speedFactor * 2; # Double speed factor for remote machines to prefer them
     supportedFeatures = host.supportedFeatures;
-    protocol = "ssh-ng";
+    protocol = host.protocol or "ssh-ng";
   } // (lib.optionalAttrs ((keys.${name}.hostPublicKey or "") != "") {
     publicHostKey = if lib.hasPrefix "ssh-ed25519 " keys.${name}.hostPublicKey
       then lib.substring 12 (lib.stringLength keys.${name}.hostPublicKey) keys.${name}.hostPublicKey
