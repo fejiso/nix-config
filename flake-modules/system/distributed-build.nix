@@ -12,14 +12,14 @@ let
   buildHosts = {
     butthead = {
       system = "x86_64-linux";
-      maxJobs = 8;
-      speedFactor = 3;  # Desktop with good CPU
+      maxJobs = 4;
+      speedFactor = 4;  # Desktop with good CPU
       supportedFeatures = [ "kvm" "big-parallel" ];
       alwaysOn = true;  # Always available for cache
     };
     hierro = {
       system = "x86_64-linux";
-      maxJobs = 8;
+      maxJobs = 2;
       speedFactor = 3;  # Server with good CPU
       supportedFeatures = [ "kvm" "big-parallel" ];
       alwaysOn = true;  # Always available for cache
@@ -27,21 +27,21 @@ let
     blacktop = {
       system = "x86_64-linux";
       maxJobs = 4;
-      speedFactor = 2;  # Laptop
+      speedFactor = 1;  # Laptop
       supportedFeatures = [ "kvm" ];
       alwaysOn = false;  # Laptop, not always on
     };
     elitedex = {
       system = "x86_64-linux";
       maxJobs = 4;
-      speedFactor = 2;
+      speedFactor = 1;
       supportedFeatures = [ "kvm" ];
       alwaysOn = false;  # Not always on
     };
     lenovix = {
       system = "x86_64-linux";
       maxJobs = 4;
-      speedFactor = 2;
+      speedFactor = 1;
       supportedFeatures = [ "kvm" ];
       alwaysOn = false;  # Not always on
     };
@@ -53,19 +53,26 @@ let
     amp1 = {
       system = "aarch64-linux";
       maxJobs = 4;
-      speedFactor = 3;
+      speedFactor = 1;
       supportedFeatures = [ ];
       alwaysOn = true;
       sshUser = "ubuntu";
       protocol = "ssh";
+      # Ubuntu host with Determinate Nix — no NixOS-managed nix-serve, so
+      # don't advertise it as a substituter (avoids `Failed to connect to
+      # amp1.netbird.cloud port 5000` spam during every fetch).
+      serveCache = false;
     };
   };
 
   # Build list of other hosts (exclude current host)
   otherHosts = lib.filterAttrs (name: _: name != hostname) buildHosts;
 
-  # Only always-on hosts for substituters (exclude current host)
-  alwaysOnHosts = lib.filterAttrs (name: host: name != hostname && host.alwaysOn) buildHosts;
+  # Hosts that serve a nix-serve binary cache. Defaults to `alwaysOn`,
+  # overridable per-host (e.g. amp1, which runs Determinate Nix on Ubuntu).
+  cacheHosts = lib.filterAttrs
+    (name: host: name != hostname && host.alwaysOn && (host.serveCache or true))
+    buildHosts;
 
   # Convert to nix.buildMachines format
   buildMachines = lib.mapAttrsToList (name: host: {
@@ -74,7 +81,7 @@ let
     sshUser = host.sshUser or "nix-ssh";
     sshKey = config.sops.secrets.nix-builder-key.path;
     maxJobs = host.maxJobs;
-    speedFactor = host.speedFactor * 2; # Double speed factor for remote machines to prefer them
+    speedFactor = host.speedFactor;
     supportedFeatures = host.supportedFeatures;
     protocol = host.protocol or "ssh-ng";
   } // (lib.optionalAttrs ((keys.${name}.hostPublicKey or "") != "") {
@@ -83,8 +90,8 @@ let
       else keys.${name}.hostPublicKey;
   })) otherHosts;
 
-  # Generate substituter URLs only for always-on hosts
-  substituters = lib.mapAttrsToList (name: _: "http://${name}.netbird.cloud:5000") alwaysOnHosts;
+  # Generate substituter URLs only for hosts that actually serve a cache.
+  substituters = lib.mapAttrsToList (name: _: "http://${name}.netbird.cloud:5000") cacheHosts;
 
   # Generate trusted public keys for all hosts
   trustedPublicKeys = lib.flatten (lib.mapAttrsToList (name: _: 
@@ -116,6 +123,9 @@ in
     warn-dirty = false;
     # Limit local builds to encourage distribution
     max-jobs = lib.mkDefault (if buildHosts?${hostname} then buildHosts.${hostname}.maxJobs else 2);
+    # Cores per build job (slot). hierro builds locally (distributedBuilds
+    # off), so give it 24; every other host caps each slot at 4.
+    cores = if hostname == "hierro" then 24 else 4;
     # Allow z-247 user to be a trusted user for remote builds
     trusted-users = [ "z-247" ];
     extra-substituters = substituters;
@@ -126,8 +136,10 @@ in
   # Configure remote builders
   nix.buildMachines = buildMachines;
 
-  # Distribute builds to remote machines
-  nix.distributedBuilds = true;
+  # Distribute builds to remote machines. hierro is excluded: it builds
+  # everything locally, which also stops its daemon from re-delegating
+  # inbound build requests (the mutual-builder deadlock).
+  nix.distributedBuilds = hostname != "hierro";
 
   # Accept inbound remote-build connections on the shared nix-ssh role account.
   # Creates user `nix-ssh` whose shell is locked to `nix-store --serve --write`.

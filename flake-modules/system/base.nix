@@ -68,9 +68,17 @@
       hwRender = false;
       fonts = [
         { name = "FiraCode Nerd Font Mono"; package = pkgs.nerd-fonts.fira-code; }
-        { name = "Noto Color Emoji"; package = pkgs.noto-fonts-color-emoji; }
+        # Monochrome (outline) emoji — kmscon's freetype renderer SEGVs on
+        # color/bitmap CBDT glyphs (Noto Color Emoji), so use Noto Emoji.
+        { name = "Noto Emoji"; package = pkgs.noto-fonts-monochrome-emoji; }
       ];
-      extraConfig = "font-size=14";
+      # Use the pango engine, not kmscon's freetype backend: the latter
+      # SEGVs in render_glyph against freetype 2.14 (it's deprecated/removed
+      # upstream). pango renders via mod-pango.so and avoids the crash.
+      extraConfig = ''
+        font-size=14
+        font-engine=pango
+      '';
     };
     services.xserver.xkb = {
       layout = "us";
