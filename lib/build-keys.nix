@@ -28,5 +28,12 @@
       hostPublicKey = "AAAAC3NzaC1lZDI1NTE5AAAAIKjSXKkOBTwOny1O6ssb4yFOuntAKh07qiDjhJnVRXV2";
       nixPublicKey = "";
     };
+    # Aarch64 builder (Ubuntu 22.04, single-user Nix). Login user is `ubuntu`
+    # because there's no nix-daemon / no /etc/nix/nix.conf to configure a
+    # role account against.
+    amp1 = {
+      hostPublicKey = "AAAAC3NzaC1lZDI1NTE5AAAAIAM47unCeN2EA3ORIgufS2hGSDQ2DPNE5AOeo7Gki91X";
+      nixPublicKey = "";
+    };
   };
 }

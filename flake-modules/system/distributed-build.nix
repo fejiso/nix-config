@@ -45,6 +45,17 @@ let
       supportedFeatures = [ "kvm" ];
       alwaysOn = false;  # Not always on
     };
+    # Native aarch64 builder (Ubuntu + single-user Nix). Saves hierro from
+    # qemu-emulating ARM builds. Uses the regular `ubuntu` login user since
+    # there's no nix-daemon to constrain a `nix-ssh` role account on.
+    amp1 = {
+      system = "aarch64-linux";
+      maxJobs = 4;
+      speedFactor = 3;
+      supportedFeatures = [ ];
+      alwaysOn = true;
+      sshUser = "ubuntu";
+    };
   };
 
   # Build list of other hosts (exclude current host)
@@ -57,7 +68,7 @@ let
   buildMachines = lib.mapAttrsToList (name: host: {
     hostName = "${name}.netbird.cloud";
     system = host.system;
-    sshUser = "nix-ssh";
+    sshUser = host.sshUser or "nix-ssh";
     sshKey = config.sops.secrets.nix-builder-key.path;
     maxJobs = host.maxJobs;
     speedFactor = host.speedFactor * 2; # Double speed factor for remote machines to prefer them
@@ -77,8 +88,20 @@ let
     if (keys.${name}.nixPublicKey or "") != "" then [ keys.${name}.nixPublicKey ] else []
   ) buildHosts);
 
+  # System-wide SSH known_hosts entry for each fleet member that has a
+  # recorded hostPublicKey. Removes the chicken-and-egg where `nix-daemon`
+  # can't TOFU host keys non-interactively.
+  knownHostsConfig = lib.mapAttrs' (name: host:
+    lib.nameValuePair "fleet-${name}" {
+      hostNames = [ "${name}.netbird.cloud" ];
+      publicKey = "ssh-ed25519 ${keys.${name}.hostPublicKey}";
+    }
+  ) (lib.filterAttrs (name: _: (keys.${name}.hostPublicKey or "") != "") buildHosts);
+
 in
 {
+  programs.ssh.knownHosts = knownHostsConfig;
+
   # Nix configuration
   nix.settings = {
     builders-use-substitutes = true;
