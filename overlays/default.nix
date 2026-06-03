@@ -23,6 +23,19 @@
     # pipx 1.8.0 tests fail against newer `packaging` library (whitespace
     # formatting mismatches in test_package_specifier). Runtime is unaffected.
     pipx = prev.pipx.overridePythonAttrs (_: { doCheck = false; });
+
+    # niri 26.04 leaks VRAM whenever monitors are powered off (e.g. hypridle's
+    # 30-min `power-off-monitors`), eventually filling the GPU and starving
+    # CUDA training on butthead. Upstream: niri-wm/niri#3295; the fix is the
+    # still-unmerged PR #3910. Rather than build a third-party fork branch, we
+    # apply that PR's diff on top of nixpkgs' official v26.04 release source.
+    # The patch applies cleanly to v26.04 and is code-only (Cargo.lock and thus
+    # cargoHash unchanged). Drop this once the fix lands in a nixpkgs niri bump.
+    niri = prev.niri.overrideAttrs (old: {
+      patches = (old.patches or [ ]) ++ [
+        ./patches/niri-3910-vram-leak-monitors-off.patch
+      ];
+    });
   };
 
   # When applied, the unstable nixpkgs set (declared in the flake inputs) will
