@@ -19,8 +19,10 @@
     };
   };
 
-  # Disable NixOS SSH agent - GPG agent handles SSH via enableSshSupport
-  programs.ssh.startAgent = false;
+  # Plain in-memory SSH agent. gpg-agent's enableSshSupport is off because its
+  # pinentry-curses prompt is unusable under niri/Wayland; ssh-add caches the
+  # key in memory and prompts in the same terminal instead.
+  programs.ssh.startAgent = true;
 
   # Enable CUPS for printing
   services.printing = {
