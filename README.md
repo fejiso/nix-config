@@ -1,97 +1,186 @@
 # Multi-Platform Nix Configuration
 
-This repository contains a comprehensive Nix configuration for managing multiple systems across different platforms:
-- NixOS (Linux) - x86_64 and ARM64 (aarch64)
+This repository contains a comprehensive Nix configuration for managing multiple
+systems across different platforms:
+
+- NixOS (Linux) — x86_64 and ARM64 (aarch64)
 - macOS (via nix-darwin)
-- Non-NixOS Linux systems (via standalone home-manager)
+- Non-NixOS Linux systems (via standalone home-manager, e.g. Ubuntu)
 - ARM single-board computers with SD card image generation
+
+The flake follows the **dendritic** pattern: it is built with
+[flake-parts](https://github.com/hercules-ci/flake-parts) and
+[import-tree](https://github.com/vic/import-tree), so every file under
+`flake-modules/` is automatically imported as a flake-parts module. There is no
+central wiring file — modules contribute to shared option trees and hosts compose
+them. See [Repository Structure](#repository-structure) below.
 
 ## What this provides
 
 This flake-based configuration supports:
 
-- **x86_64 NixOS systems**: `elitedex`, `lenovix`, `hispanas`, `a8`, `blacktop`, `hierro`, `butthead`, `snuffles`
-- **ARM64 NixOS systems**: `rpi3` (Raspberry Pi 3), `pine64` (Pine64 SBC)
-- **macOS system**: `work-laptop` (aarch64-darwin)
-- **Standalone home-manager configurations**: for non-NixOS Linux systems (`devdesktop`)
+- **x86_64 NixOS systems**: `elitedex`, `lenovix`, `hispanas`, `a8`, `blacktop`,
+  `hierro`, `butthead`, `snuffles`
+- **ARM64 NixOS systems**: `rpi3` (Raspberry Pi 3), `pine64` (Pine64 SBC),
+  `xpi-s905x3` (Amlogic S905X3 TV box)
+- **macOS system**: `work-laptop` (aarch64-darwin, via nix-darwin)
+- **Standalone home-manager configurations** (non-NixOS Linux):
+  `superfer@devdesktop` (x86_64 Ubuntu) and `ubuntu@amp1` (aarch64 Ubuntu,
+  also used as a native ARM remote builder)
 - **SD card image generation**: Bootable images for ARM single-board computers
-- **Cross-platform support**: for aarch64/x86_64 on both Linux and Darwin
+  (`rpi3`, `pine64`, `xpi-s905x3`)
+- **Cross-platform support**: aarch64/x86_64 on both Linux and Darwin
+
+## Channels & toolchain
+
+- **nixpkgs**: `nixos-26.05` (stable), with `nixpkgs-unstable` and
+  `nixpkgs-master` available as additional inputs for selective pinning
+- **home-manager**: `release-26.05`
+- **Deployment**: [Colmena](https://github.com/zhaofengli/colmena) for NixOS
+  hosts and [deploy-rs](https://github.com/serokell/deploy-rs) for
+  home-manager activations on foreign distros
+- **Containers**: rootless Podman managed declaratively with
+  [quadlet-nix](https://github.com/SEIAROTg/quadlet-nix)
+- **Secrets**: [sops-nix](https://github.com/Mic92/sops-nix)
 
 # Repository Structure
 
-This configuration is organized as follows:
+The configuration is organized as follows:
 
-- **hosts/**: Contains system-specific configurations
-  - **common/**: Shared configurations for all systems
-    - **nixos/**: Common NixOS configurations
-    - **home/**: Common home-manager configurations
-  - **elitedex/**, **lenovix/**, **hispanas/**, **a8/**, **blacktop/**, **hierro/**, **butthead/**, **snuffles/**: x86_64 NixOS system configurations
-  - **rpi3/**, **pine64/**: ARM64 NixOS system configurations with SD card image support
-  - **work-laptop/**: macOS (Darwin) configuration
-  - **devdesktop/**: Standalone home-manager configuration
+- **`flake.nix`**: Minimal entrypoint — declares inputs and hands the whole
+  `flake-modules/` tree to flake-parts via `import-tree`.
 
-- **modules/**: Custom modules
-  - **nixos/**: NixOS modules
-  - **home-manager/**: Home-manager modules
-  - **darwin/**: Darwin modules
+- **`flake-modules/`**: Every `.nix` file here is a flake-parts module, imported
+  automatically. Organized into:
+  - **`hosts/`**: One file per machine. Each host *composes* feature modules
+    (`config.flake.modules.nixos.<name>` / `…homeManager.<name>`) and registers
+    its `nixosConfigurations` / `darwinConfigurations` / `homeConfigurations`,
+    plus its Colmena node and (for ARM) its SD image output.
+  - **`system/`**: Foundation NixOS modules merged into the
+    `flake.modules.nixos.default` that every host imports (nix settings,
+    networking, netbird, users, security, sops, services, podman, seedlink,
+    socks-proxy, distributed builds, …).
+  - **`system-modules/`**: Opt-in NixOS feature modules
+    (`flake.modules.nixos.<name>`) — desktop, laptop, development, emulation,
+    media, downloads, tdarr, adsb, quadlet-containers, novasdr, openclaw,
+    backup, storage-box mount, network-watchdog, embedded, etc.
+  - **`home/`**: Foundation home-manager modules merged into
+    `flake.modules.homeManager.default` (base, shell, terminal, tools, git, …).
+  - **`home-modules/`**: Opt-in home-manager feature modules (niri, sway, fish,
+    zsh, wezterm, zellij, tmux, mpd, beets, tidalcycles, gpg, kanshi,
+    atuin-server, dev-heavy, …).
+  - **`options.nix`**: Declares the `flake.modules.{nixos,homeManager}` option
+    trees that the dendritic pattern accumulates into.
+  - **`colmena.nix`** / **`deploy.nix`**: Deployment outputs (Colmena hive and
+    deploy-rs nodes).
+  - **`sd-images.nix`**, **`overlays.nix`**, **`formatter.nix`**, **`meta.nix`**:
+    SD image / overlay / formatter / target-systems plumbing.
 
-- **overlays/**: Custom package overlays
+- **`hosts/<name>/`**: Per-host *machine-specific* files (hardware
+  configuration, host-only tweaks, `home/`, and for ARM hosts `nixos/sd-image.nix`).
+  These are imported by the matching `flake-modules/hosts/<name>.nix`.
 
-- **secrets/**: Encrypted secrets managed by sops-nix
+- **`modules/darwin/`**: Darwin-specific module(s) for the macOS host.
+
+- **`overlays/`**: Custom package overlays (exposed via `flake-modules/overlays.nix`).
+
+- **`secrets/`**: Encrypted secrets managed by sops-nix.
+
+## How a host is composed
+
+Each host file picks a base plus opt-in features. For example, `butthead`
+(the media/server hub):
+
+```nix
+baseModules = [
+  config.flake.modules.nixos.default          # always-on foundation
+  config.flake.modules.nixos.desktop
+  config.flake.modules.nixos.media-services
+  config.flake.modules.nixos.download-services
+  config.flake.modules.nixos.quadlet-containers
+  config.flake.modules.nixos.tdarr-worker
+  # … plus home-manager opt-ins for user z-247
+  "${inputs.self}/hosts/butthead/nixos"       # machine-specific files
+];
+```
+
+The same `baseModules` list feeds both `nixosConfigurations.butthead` (for
+`nixos-rebuild`) and `colmenaNodes.butthead` (for remote deployment).
+
+### Host roles at a glance
+
+| Host         | Platform        | Type            | Role |
+|--------------|-----------------|-----------------|------|
+| `elitedex`   | x86_64-linux    | NixOS           | Desktop + emulation |
+| `lenovix`    | x86_64-linux    | NixOS           | Minimal laptop |
+| `blacktop`   | x86_64-linux    | NixOS           | Desktop/laptop, development, tdarr worker, ADS-B |
+| `butthead`   | x86_64-linux    | NixOS           | Media/download/container hub (quadlet, nspawn, tdarr) |
+| `hierro`     | x86_64-linux    | NixOS           | Build host, development, OpenClaw |
+| `hispanas`   | x86_64-linux    | NixOS           | SDR (NovaSDR), desktop, development |
+| `snuffles`   | x86_64-linux    | NixOS           | ADS-B receiver + feeders, network-watchdog |
+| `a8`         | x86_64-linux    | NixOS           | Minimal base host |
+| `rpi3`       | aarch64-linux   | NixOS + SD img  | Raspberry Pi 3, embedded |
+| `pine64`     | aarch64-linux   | NixOS + SD img  | Pine64 SBC, embedded |
+| `xpi-s905x3` | aarch64-linux   | NixOS + SD img  | Amlogic S905X3 box, embedded |
+| `work-laptop`| aarch64-darwin  | nix-darwin      | macOS work machine |
+| `devdesktop` | x86_64-linux    | home-manager    | Standalone HM on Ubuntu (`superfer@devdesktop`) |
+| `amp1`       | aarch64-linux   | home-manager    | Standalone HM on Ubuntu + native ARM builder (`ubuntu@amp1`) |
 
 ## Key Features
 
-This configuration includes:
-
-1. **Multi-platform support**: Works across NixOS (x86_64 & ARM64), macOS, and non-NixOS Linux systems
-2. **ARM/Embedded support**: SD card image generation for Raspberry Pi 3 and Pine64 with automatic btrfs conversion
-3. **Nixpkgs channels**: Uses nixos-25.11 stable with access to unstable when needed
-4. **Secrets management**: Integrated with sops-nix for secure secrets handling
-5. **Hardware support**: Leverages nixos-hardware for optimized hardware configurations (including Raspberry Pi 3)
-6. **Custom modules**: Organized modular configuration for both NixOS and home-manager
-7. **Custom overlays**: Package modifications and additions
-8. **Special packages**: Integration with airspy-adsb-bin for ADS-B tracking
-9. **Desktop environment**: Niri window manager with Waybar status bar
-10. **Development tools**: Comprehensive development setup with Git, Fish shell, Zellij terminal multiplexer, aarch64 emulation
-11. **NFS integration**: Automated NFS mount management
-12. **Distributed builds**: Support for distributed Nix builds across systems
-13. **Netbird VPN**: Integrated mesh VPN solution
-14. **Colmena deployment**: Orchestrated deployment across all NixOS hosts (x86_64 and ARM)
+1. **Dendritic flake-parts layout**: modules self-register into shared option
+   trees; hosts compose features à la carte — no monolithic `flake.nix`.
+2. **Multi-platform support**: NixOS (x86_64 & ARM64), macOS (nix-darwin), and
+   non-NixOS Linux (standalone home-manager).
+3. **ARM/Embedded support**: SD card image generation for Raspberry Pi 3,
+   Pine64, and Amlogic S905X3, with automatic ext4→btrfs conversion on first boot.
+4. **Dual deployment**: Colmena for NixOS hosts, deploy-rs for home-manager on
+   foreign distros (e.g. `amp1`).
+5. **Distributed builds**: x86_64 builders plus `amp1` as a native aarch64
+   remote builder, with a `nix-serve` binary cache.
+6. **Rootless containers**: declarative Podman via quadlet-nix — media stack
+   (Sonarr/Radarr/Lidarr/Prowlarr/Emby/qBittorrent/SABnzbd/Gluetun, …) and
+   utility containers, plus systemd-nspawn where needed.
+7. **Secrets management**: sops-nix for netbird keys, VPN/API credentials,
+   backup passwords, Pushover tokens, etc.
+8. **Netbird mesh VPN**: all hosts join the mesh (`wt0` interface); several
+   services are firewalled to mesh-only.
+9. **Backups**: Kopia-based snapshot backups (migrated from Borg) and a Hetzner
+   Storage Box CIFS mount.
+10. **Specialized services**: ADS-B flight tracking (readsb + feeders), SDR
+    (NovaSDR), SeedLink seismic-data relays, Tdarr transcoding, OpenClaw,
+    TGTG watcher.
+11. **Desktop**: Niri Wayland compositor (Sway also available), with the full
+    home-manager environment (fish/zsh, wezterm, zellij/tmux, git+GPG, atuin, …).
+12. **Hardware support**: nixos-hardware profiles (including Raspberry Pi 3).
 
 ## Usage
 
 ### NixOS Systems
-
-This configuration supports multiple NixOS systems:
-- **x86_64**: `elitedex`, `lenovix`, `hispanas`, `a8`, `blacktop`, `hierro`, `butthead`, `snuffles`
-- **ARM64**: `rpi3` (Raspberry Pi 3), `pine64` (Pine64 single-board computer)
-
-#### Building and Activating NixOS Configurations
 
 ```bash
 # Apply configuration (replace hostname with your system name)
 sudo nixos-rebuild switch --flake .#hostname
 
 # Examples - x86_64 hosts:
-sudo nixos-rebuild switch --flake .#elitedex
 sudo nixos-rebuild switch --flake .#butthead
 sudo nixos-rebuild switch --flake .#hierro
 
-# Examples - ARM64 hosts:
+# Examples - ARM64 hosts (on-device or via emulation/remote builder):
 sudo nixos-rebuild switch --flake .#rpi3
-sudo nixos-rebuild switch --flake .#pine64
+sudo nixos-rebuild switch --flake .#xpi-s905x3
 
 # Build without activating
 sudo nixos-rebuild build --flake .#hostname
 
-# Test configuration (builds and activates temporarily for current boot only)
+# Test (activate for current boot only)
 sudo nixos-rebuild test --flake .#hostname
 
-# Build for a specific system remotely
-nixos-rebuild build --flake .#hostname --target-host user@hostname --use-remote-sudo
+# Build/deploy a host remotely
+nixos-rebuild switch --flake .#hostname --target-host user@hostname --use-remote-sudo
 ```
 
-#### Checking NixOS Configuration
+#### Checking & rolling back
 
 ```bash
 # Show what would be built/changed
@@ -104,573 +193,256 @@ sudo nix-env --list-generations --profile /nix/var/nix/profiles/system
 sudo nixos-rebuild switch --rollback
 ```
 
-### ARM Single-Board Computers (Raspberry Pi 3 & Pine64)
+### macOS System (Darwin)
 
-This configuration includes support for ARM single-board computers with bootable SD card image generation.
+For `work-laptop` (aarch64-darwin):
 
-#### Supported Devices
+```bash
+darwin-rebuild switch --flake .#work-laptop   # apply
+darwin-rebuild build  --flake .#work-laptop   # build only
+darwin-rebuild check  --flake .#work-laptop   # check
+darwin-rebuild generations                    # list generations
+darwin-rebuild switch --rollback              # roll back
+```
 
-- **Raspberry Pi 3** (`rpi3`): Full Raspberry Pi 3B/3B+ support using 64-bit mode (aarch64)
-- **Pine64** (`pine64`): Pine64 single-board computer support
+### Standalone Home Manager (non-NixOS Linux)
 
-#### Prerequisites: Enable ARM64 Emulation
+Two standalone home-manager configurations are provided:
+- `superfer@devdesktop` — x86_64 Ubuntu
+- `ubuntu@amp1` — aarch64 Ubuntu (also a remote ARM builder)
 
-Before building SD card images, enable aarch64 emulation on your x86_64 build machine. This is automatically enabled on hosts with `development.enable = true`:
-- `blacktop`
-- `butthead`
-- `hierro`
+```bash
+# Apply
+home-manager switch --flake .#superfer@devdesktop
+home-manager switch --flake .#ubuntu@amp1
 
-The emulation uses QEMU binfmt and is configured in `modules/nixos/development.nix`:
+# Build only / dry run
+home-manager build   --flake .#superfer@devdesktop
+home-manager dry-run --flake .#superfer@devdesktop
+
+# Generations / rollback
+home-manager generations
+home-manager switch --rollback
+```
+
+If you don't have home-manager installed: `nix shell nixpkgs#home-manager`.
+
+`amp1` is normally deployed remotely with deploy-rs — see below.
+
+### Deployment
+
+This flake exposes **two** deployment tools, both runnable directly from the flake:
+
+#### Colmena (NixOS hosts)
+
+```bash
+nix run .#colmena -- apply              # deploy to all NixOS hosts
+nix run .#colmena -- apply --on butthead
+nix run .#colmena -- apply --on butthead --on blacktop
+nix run .#colmena -- build              # build without deploying
+nix run .#colmena -- apply --dry-run    # show plan
+nix run .#colmena -- exec --on hierro uptime
+```
+
+All NixOS hosts are registered as Colmena nodes. ARM hosts (`rpi3`, `pine64`,
+`xpi-s905x3`) have `targetHost = null` (build locally / on-device rather than
+SSH push). Colmena deploys via SSH as root; ensure SSH keys are configured.
+
+#### deploy-rs (home-manager on foreign distros)
+
+`deploy-rs` handles home-manager activations on non-NixOS hosts (currently
+`amp1` over Netbird):
+
+```bash
+nix run .#deploy -- .#amp1     # deploy ubuntu@amp1 home-manager profile
+nix run .#deploy               # deploy all deploy-rs nodes
+```
+
+`deploy-rs` validators also run as part of `nix flake check`.
+
+### ARM Single-Board Computers
+
+Supported devices with bootable SD card image generation:
+- **Raspberry Pi 3** (`rpi3`) — RPi 3B/3B+ in 64-bit mode
+- **Pine64** (`pine64`)
+- **Amlogic S905X3** (`xpi-s905x3`) — generic S905X3 TV box
+
+#### Prerequisites: aarch64 emulation
+
+Building ARM images on an x86_64 machine needs aarch64 emulation, enabled
+automatically on hosts using the `development` module (e.g. `blacktop`,
+`butthead`, `hierro`):
+
 ```nix
 boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
 ```
 
-After enabling, rebuild your system:
-```bash
-sudo nixos-rebuild switch --flake .#hostname
-```
+Alternatively, build natively using the `amp1` aarch64 remote builder.
 
-#### Building SD Card Images
-
-Build compressed SD card images (`.img.zst` format):
+#### Building SD card images
 
 ```bash
-# Build Raspberry Pi 3 SD image (takes 1-4 hours on first build with emulation)
 nix build .#images.rpi3
-
-# Build Pine64 SD image
 nix build .#images.pine64
+nix build .#images.xpi-s905x3
 
-# Images are created in result/sd-image/
 ls -lh result/sd-image/*.img.zst
 ```
 
-**Note:** First build will be slow due to QEMU emulation (10-50x slower than native). Subsequent builds use the Nix binary cache and are much faster.
+First emulated builds are slow (10–50× slower than native); subsequent builds
+use the binary cache.
 
-#### Writing SD Card Images
-
-Write the image to an SD card (replace `/dev/sdX` with your actual SD card device):
-
-```bash
-# Decompress and write in one command
-zstd -d result/sd-image/nixos-rpi3-*.img.zst -c | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
-
-# Or decompress first, then write
-unzstd result/sd-image/nixos-rpi3-*.img.zst
-sudo dd if=nixos-rpi3-*.img of=/dev/sdX bs=4M status=progress conv=fsync
-```
-
-#### First Boot and Automatic btrfs Conversion
-
-The SD images boot with **ext4** initially, but automatically convert to **btrfs** on first boot:
-
-1. **First boot**: System boots from ext4 SD card image
-2. **Conversion trigger**: A systemd service detects ext4 and prepares conversion
-3. **Automatic reboot**: System reboots after 5 seconds
-4. **Second boot**: During initrd, `btrfs-convert` runs:
-   - Filesystem is converted from ext4 to btrfs
-   - A `@` subvolume is created
-   - All files are moved into the subvolume
-   - Compression is enabled (zstd)
-5. **Normal operation**: System continues with btrfs + compression
-
-The conversion is handled by `modules/nixos/btrfs-convert-firstboot.nix` and only runs once. The original ext4 filesystem is kept in `ext2_saved/` directory for rollback if needed.
-
-#### Ongoing Management
-
-After initial boot and network configuration, ARM systems can be managed like any other NixOS host:
-
-**Via Colmena (recommended):**
-```bash
-# Deploy configuration updates
-colmena deploy --on rpi3
-colmena deploy --on pine64
-
-# Deploy to all hosts
-colmena deploy
-```
-
-**Via nixos-rebuild (on device):**
-```bash
-ssh z-247@rpi3
-sudo nixos-rebuild switch --flake github:yourusername/nix-config#rpi3
-```
-
-**Via remote rebuild:**
-```bash
-nixos-rebuild switch --flake .#rpi3 --target-host rpi3 --use-remote-sudo
-```
-
-#### Features Enabled on ARM Hosts
-
-ARM hosts inherit all common features through `hosts/common/nixos/`:
-- User accounts (z-247) with SSH keys
-- Netbird mesh VPN (automatically connects to 100.107.0.0/16 network)
-- NFS mounts (if enabled)
-- SOPS secrets management
-- Home-manager integration
-- All system services and configurations
-
-**Embedded-specific optimizations** (via `modules/nixos/embedded.nix`):
-- Lighter system packages (wine and x86-specific tools removed)
-- Increased zram swap (50% vs 10% for better performance on limited RAM)
-- Serial console configuration (ttyAMA0 for RPi3, ttyS0 for Pine64)
-- Disabled x86-specific hardware support (Intel graphics, 32-bit compatibility)
-- Aggressive garbage collection and journald limits
-- Optimized for SD card longevity
-
-#### ARM-Specific Configuration Files
-
-Each ARM host has:
-- `default.nix`: Main configuration with embedded optimizations
-- `hardware-configuration.nix`: Platform-specific settings (kernel, filesystem, firmware)
-- `sd-image.nix`: SD image generation settings (only used during image build)
-- `home/default.nix`: User home-manager configuration
-
-#### Troubleshooting ARM Builds
-
-**Build fails with "unsupported system":**
-- Ensure `boot.binfmt.emulatedSystems = [ "aarch64-linux" ];` is enabled on build host
-- Rebuild build host after enabling emulation
-
-**SD card won't boot:**
-- Verify SD card was written correctly: `sudo fdisk -l /dev/sdX`
-- Try a different SD card (use high-quality cards: SanDisk Extreme, Samsung EVO)
-- Check serial console output for boot messages
-
-**btrfs conversion fails:**
-- Boot into recovery and manually run: `btrfs-convert /dev/mmcblk0p2`
-- Check available space (conversion needs ~20% free space)
-- If conversion fails, system remains on ext4 and still works
-
-### macOS System (Darwin)
-
-For the macOS system (`work-laptop` on aarch64-darwin):
-
-#### Building and Activating Darwin Configuration
+#### Writing an image
 
 ```bash
-# Apply configuration
-darwin-rebuild switch --flake .#work-laptop
-
-# Build without activating
-darwin-rebuild build --flake .#work-laptop
-
-# Check what would be built/changed
-darwin-rebuild check --flake .#work-laptop
+# Decompress and write in one go (replace /dev/sdX with your card)
+zstd -d result/sd-image/*-rpi3-*.img.zst -c | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 
-#### Managing Darwin Generations
+#### First boot & automatic btrfs conversion
 
-```bash
-# List generations
-darwin-rebuild generations
+Images boot **ext4** initially and convert to **btrfs** (with zstd compression)
+on first boot, via `flake-modules/system-modules/btrfs-convert-firstboot.nix`:
 
-# Roll back to previous generation
-darwin-rebuild switch --rollback
-```
+1. First boot from ext4; a systemd service detects ext4 and triggers conversion.
+2. System reboots; during initrd `btrfs-convert` runs, creating an `@` subvolume.
+3. Compression is enabled and the system continues on btrfs.
 
-### Standalone Home Manager
+The original ext4 image is kept in `ext2_saved/` for rollback. The dual-output
+mechanism (regular config vs. `sd-image.nix`) is described in
+[the FAQ](#how-the-dual-output-sd-card-image-system-works).
 
-For non-NixOS Linux systems, this configuration supports one host: `devdesktop` (for user `superfer`).
+#### Embedded optimizations
 
-#### Building and Activating Home Manager Configurations
-
-```bash
-# For superfer user on devdesktop
-home-manager switch --flake .#superfer@devdesktop
-
-# Build without activating
-home-manager build --flake .#username@hostname
-
-# Show what would be built/changed
-home-manager dry-run --flake .#username@hostname
-```
-
-If you don't have home-manager installed, you can install it with:
-```bash
-nix shell nixpkgs#home-manager
-```
-
-#### Managing Home Manager Generations
-
-```bash
-# List generations
-home-manager generations
-
-# Roll back to previous generation
-home-manager switch --rollback
-```
-
-### Colmena Deployment
-
-This configuration includes Colmena for orchestrated deployment across all NixOS hosts (both x86_64 and ARM).
-
-#### Deploying to All Hosts
-
-```bash
-# Deploy to all hosts in parallel
-colmena apply
-
-# Build configurations without deploying
-colmena build
-
-# Show deployment plan
-colmena apply --dry-run
-```
-
-#### Deploying to Specific Hosts
-
-```bash
-# Deploy to a single host
-colmena apply --on hostname
-
-# Deploy to multiple hosts
-colmena apply --on host1 --on host2 --on host3
-
-# Examples
-colmena apply --on rpi3
-colmena apply --on butthead --on blacktop
-```
-
-#### Colmena Node Information
-
-```bash
-# Show information about all nodes
-colmena node-info
-
-# Show evaluation output for a specific node
-colmena eval -E '{nodes, ...}: nodes.rpi3.config.networking.hostName'
-```
-
-#### Registered Colmena Hosts
-
-All NixOS hosts are registered in Colmena:
-- **x86_64**: elitedex, lenovix, hispanas, a8, blacktop, hierro, butthead, snuffles
-- **ARM64**: rpi3, pine64
-
-Colmena deploys via SSH as root. Ensure SSH keys are properly configured for remote access.
+ARM hosts use `flake-modules/system-modules/embedded.nix`: lighter package set,
+larger zram swap, serial console (`ttyAMA0` for RPi3, `ttyS0` for Pine64/S905X3),
+no x86-specific hardware, and aggressive GC / journald limits for SD longevity.
 
 ### Updating Dependencies
 
-To update all flake inputs to their latest versions:
 ```bash
+# Update all inputs
 nix flake update
-```
 
-To update a specific input:
-```bash
-nix flake lock --update-input nixpkgs
-nix flake lock --update-input home-manager
-nix flake lock --update-input nixos-hardware
-nix flake lock --update-input nix-darwin
-nix flake lock --update-input sops-nix
-nix flake lock --update-input airspy-adsb-bin
-```
+# Update a specific input
+nix flake update nixpkgs
+nix flake update home-manager nixos-hardware sops-nix
 
-To check the status of your inputs (what's available for update):
-```bash
+# Inspect inputs
 nix flake metadata
-nix flake info
 ```
 
-### Building and Running Specific Packages
+Key inputs: `nixpkgs` (26.05), `nixpkgs-unstable`, `nixpkgs-master`,
+`home-manager`, `flake-parts`, `import-tree`, `nixos-hardware`, `nix-darwin`,
+`sops-nix`, `colmena`, `deploy-rs`, `quadlet-nix`, `airspy-adsb-bin`, `gqc`.
 
-You can build and run specific packages defined in your flake:
+### Inspecting flake outputs
 
 ```bash
-# Build a package
-nix build .#<package-name>
-
-# Run a package without installing
-nix run .#<package-name>
-
-# Enter a development shell with specific packages
-nix develop .#<devShell-name>
+nix flake show     # all configurations, images, packages, deploy nodes, …
+nix flake check    # evaluate + run deploy-rs checks
 ```
 
-### Checking Flake Outputs
+## Working with the configuration
 
-To see all available outputs from your flake:
-```bash
-nix flake show
-```
+### Adding a host
 
-This will display all available:
-- NixOS configurations (x86_64 and ARM64)
-- Home Manager configurations
-- Darwin configurations
-- SD card images (for ARM devices)
-- Packages
-- Development shells
-- Colmena deployment configurations
-- And other outputs defined in your flake
+1. Create `flake-modules/hosts/<name>.nix` that composes
+   `config.flake.modules.nixos.default` plus any opt-in features and registers
+   `flake.nixosConfigurations.<name>` (and `flake.colmenaNodes.<name>`).
+2. Put machine-specific files (hardware config, host tweaks) under
+   `hosts/<name>/nixos/` and import them with `"${inputs.self}/hosts/<name>/nixos"`.
+3. For ARM SBCs, also add `flake.images.<name>` and a `hosts/<name>/nixos/sd-image.nix`.
 
-# What next?
+import-tree picks the file up automatically — no central list to edit.
 
-## Use home-manager as a NixOS module
+### Adding a feature module
 
-If you prefer to build your home configuration together with your NixOS one,
-it's pretty simple.
+- **NixOS**: create a file under `flake-modules/system-modules/` that writes to
+  `flake.modules.nixos.<name>`, then add `config.flake.modules.nixos.<name>` to
+  the hosts that want it. Always-on behavior goes in `flake-modules/system/`
+  (merged into `…nixos.default`).
+- **home-manager**: same pattern under `flake-modules/home-modules/`
+  (opt-in) or `flake-modules/home/` (always-on), targeting
+  `flake.modules.homeManager.<name>`.
 
-Simply remove the `homeConfigurations` block from the `flake.nix` file; then
-add this to your NixOS configuration (either directly on
-`nixos/configuration.nix` or on a separate file and import it):
+### Custom modules in this configuration
 
-```nix
-{ inputs, outputs, ... }: {
-  imports = [
-    # Import home-manager's NixOS module
-    inputs.home-manager.nixosModules.home-manager
-  ];
+#### Foundation — always-on (`flake-modules/system/`)
 
-  home-manager = {
-    extraSpecialArgs = { inherit inputs outputs; };
-    users = {
-      # Import your home-manager configuration
-      your-username = import ../home-manager/home.nix;
-    };
-  };
-}
-```
+`base`, `nix`, `networking`, `netbird`, `users`, `security`, `sops`, `services`,
+`podman`, `seedlink`, `socks-proxy`, `distributed-build`, `home-manager`,
+`external-modules`.
 
-In this setup, the `home-manager` tool will not be installed (see
-[nix-community/home-manager#4342](https://github.com/nix-community/home-manager/pull/4342)).
-To rebuild your home configuration, use `nixos-rebuild` instead.
+#### Opt-in NixOS features (`flake-modules/system-modules/`)
 
-But if you want to install the `home-manager` tool anyways, you can add the
-package into your configuration:
-
-```nix
-# To install it for a specific user
-users.users = {
-  your-username = {
-    packages = [ inputs.home-manager.packages.${pkgs.system}.default ];
-  };
-};
-
-# To install it globally
-environment.systemPackages =
-  [ inputs.home-manager.packages.${pkgs.system}.default ];
-```
-
-## Adding more hosts or users
-
-You can organize them by hostname and username on `nixos` and `home-manager`
-directories, be sure to also add them to `flake.nix`.
-
-You can take a look at my (beware, here be reproductible dragons)
-[configuration repo](https://github.com/misterio77/nix-config) for ideas.
-
-NixOS makes it easy to share common configuration between hosts (you might want
-to create a common directory for these), while keeping everything in sync.
-home-manager can help you sync your environment (from editor to WM and
-everything in between) anywhere you use it. Have fun!
-
-## User password and secrets
-
-You have basically two ways of setting up default passwords:
-- By default, you'll be prompted for a root password when installing with
-  `nixos-install`. After you reboot, be sure to add a password to your own
-  account and lock root using `sudo passwd -l root`.
-- Alternatively, you can specify `initialPassword` for your user. This will
-  give your account a default password, be sure to change it after rebooting!
-  If you do, you should pass `--no-root-passwd` to `nixos-install`, to skip
-  setting a password on the root account.
-
-If you don't want to set your password imperatively, you can also use
-`passwordFile` for safely and declaratively setting a password from a file
-outside the nix store.
-
-There's also [more advanced options for secret
-management](https://nixos.wiki/wiki/Comparison_of_secret_managing_schemes),
-including some that can include them (encrypted) into your config repo and/or
-nix store, be sure to check them out if you're interested.
-
-## Dotfile management with home-manager
-
-Besides just adding packages to your environment, home-manager can also manage
-your dotfiles. I strongly recommend you do, it's awesome!
-
-For full nix goodness, check out the home-manager options with `man
-home-configuration.nix`. Using them, you'll be able to fully configure any
-program with nix syntax and its powerful abstractions.
-
-Alternatively, if you're still not ready to rewrite all your configs to nix
-syntax, there's home-manager options (such as `xdg.configFile`) for including
-files from your config repository into your usual dot directories. Add your
-existing dotfiles to this repo and try it out!
-
-## Try opt-in persistance
-
-You might have noticed that there's impurity in your NixOS system, in the form
-of configuration files and other cruft your system generates when running. What
-if you change them in a whim to get something working and forget about it?
-Boom, your system is not fully reproductible anymore.
-
-You can instead fully delete your `/` and `/home` on every boot! Nix is okay
-with a empty root on boot (all you need is `/boot` and `/nix`), and will
-happily reapply your configurations.
-
-There's two main approaches to this: mount a `tmpfs` (RAM disk) to `/`, or
-(using a filesystem such as btrfs or zfs) mount a blank snapshot and reset it
-on boot.
-
-For stuff that can't be managed through nix (such as games downloaded from
-steam, or logs), use [impermanence](https://github.com/nix-community/impermanence)
-for mounting stuff you to keep to a separate partition/volume (such as
-`/nix/persist` or `/persist`). This makes everything vanish by default, and you
-can keep track of what you specifically asked to be kept.
-
-Here's some awesome blog posts about it:
-- [Erase your darlings](https://grahamc.com/blog/erase-your-darlings)
-- [Encrypted BTRFS with Opt-In State on
-  NixOS](https://mt-caret.github.io/blog/posts/2020-06-29-optin-state.html)
-- [NixOS: tmpfs as root](https://elis.nu/blog/2020/05/nixos-tmpfs-as-root/) and
-  [tmpfs as home](https://elis.nu/blog/2020/06/nixos-tmpfs-as-home/)
-
-Note that for `home-manager` to work correctly here, you need to set up its
-NixOS module, as described in the [previous section](#use-home-manager-as-a-nixos-module).
-
-## Adding custom packages
-
-Something you want to use that's not in nixpkgs yet? You can easily build and
-iterate on a derivation (package) from this very repository.
-
-To add custom packages:
-
-1. Create a `pkgs` directory in the repository root
-2. Create a folder with the desired package name inside `pkgs`
-3. Add a `default.nix` file containing the derivation
-4. Create a `pkgs/default.nix` file to expose your packages
-
-You'll be able to refer to that package from anywhere in your
-home-manager/nixos configurations, build them with `nix build .#package-name`,
-or bring them into your shell with `nix shell .#package-name`.
-
-See [the manual](https://nixos.org/manual/nixpkgs/stable/) for some tips on how
-to package stuff.
-
-## Adding overlays
-
-Found some outdated package on nixpkgs you need the latest version of? Perhaps
-you want to apply a patch to fix a behaviour you don't like? Nix makes it easy
-and manageble with overlays!
-
-Use the `overlays/default.nix` file for this.
-
-If you're creating patches, you can keep them on the `overlays` folder as well.
-
-See [the wiki article](https://nixos.wiki/wiki/Overlays) to see how it all
-works.
-
-## Adding your own modules
-
-Got some configurations you want to create an abstraction of? Modules are the
-answer. These awesome files can expose _options_ and implement _configurations_
-based on how the options are set.
-
-Create a file for them on either `modules/nixos` or `modules/home-manager`. Be
-sure to also add them to the listing at `modules/nixos/default.nix` or
-`modules/home-manager/default.nix`.
-
-See [the wiki article](https://nixos.wiki/wiki/Module) to learn more about
-them.
-
-### Custom Modules in This Configuration
-
-This configuration includes several custom modules:
-
-#### NixOS Modules (`modules/nixos/`)
-
-- **`desktop.nix`**: Desktop environment configuration (Niri window manager, Steam, GDM)
-- **`laptop.nix`**: Laptop-specific settings (TLP power management, touchpad configuration)
-- **`development.nix`**: Development tools (PlatformIO, Arduino, embedded programming, aarch64 emulation)
-- **`emulation.nix`**: Retro gaming emulation (RetroArch, MAME, Dolphin, etc.)
-- **`embedded.nix`**: Optimizations for ARM/embedded devices (lighter packages, increased zram, serial console)
-- **`btrfs-convert-firstboot.nix`**: Automatic ext4-to-btrfs conversion on first boot for SD card images
-- **`tdarr-worker.nix`**: Tdarr transcoding worker node configuration
-- **`media-services.nix`**: Podman-based media services (Sonarr, Radarr, Lidarr, Jellyfin, Emby)
-- **`download-services.nix`**: Download clients (qBittorrent, Deluge, SABnzbd)
-- **`adsb-readsb.nix`**: ADS-B receiver configuration for flight tracking
-- **`adsb-feeders.nix`**: ADS-B data feeders (FlightAware, FlightRadar24, etc.)
-- **`nfs-mounts.nix`**: Automated NFS mount management
+- **`desktop.nix`**: Wayland desktop (Niri/Sway, greeter, Steam)
+- **`laptop.nix`**: Laptop power management / touchpad
+- **`development.nix`**: Dev tools, embedded programming, aarch64 emulation
+- **`emulation.nix`**: Retro-gaming emulation (RetroArch, MAME, …)
+- **`embedded.nix`**: ARM/SBC optimizations
+- **`btrfs-convert-firstboot.nix`**: ext4→btrfs conversion for SD images
+- **`media-services.nix`** / **`media-podman.nix`**: media server stack and the
+  shared rootless `media-podman` user/group
+- **`download-services.nix`**: download clients
+- **`quadlet-containers.nix`**: declarative rootless Podman containers (media
+  stack, Gluetun VPN, utilities) via quadlet-nix
+- **`tdarr.nix`** / **`tdarr-worker.nix`**: Tdarr transcoding server / worker
+- **`adsb-readsb.nix`** / **`adsb-feeders.nix`**: ADS-B receiver and feeders
+- **`novasdr.nix`**: RTL-SDR / NovaSDR web interface
+- **`openclaw.nix`**: self-hosted OpenClaw service
+- **`backup.nix`**: Kopia snapshot backups
+- **`storagebox-mount.nix`**: Hetzner Storage Box CIFS mount
+- **`network-watchdog.nix`**: reboot on prolonged connectivity loss
+- **`nfs-mounts.nix`**: automated NFS mounts
 - **`systemd-nspawn.nix`**: systemd container support
 - **`tgtg-watcher.nix`**: Too Good To Go monitoring service
 
-#### Home-Manager Modules (`modules/home-manager/`)
+#### Opt-in home-manager features (`flake-modules/home-modules/`)
 
-- **`fish.nix`**: Fish shell configuration with custom functions and aliases
-- **`git.nix`**: Git configuration with GPG signing
-- **`niri.nix`**: Niri Wayland compositor configuration
-- **`sway.nix`**: Sway window manager configuration
-- **`tidalcycles.nix`**: TidalCycles live coding environment
-- **`mpd.nix`**: Music Player Daemon setup
-- **`beets.nix`**: Music library management
-- **`nethack.nix`**: NetHack game configuration
-- **`wezterm.nix`**: WezTerm terminal emulator
-- **`zellij.nix`**: Zellij terminal multiplexer
-- **`kanshi.nix`**: Dynamic display configuration for Wayland
-- **`gpg.nix`** / **`gpg-agent.nix`**: GPG and GPG agent setup
-- **`dev-heavy.nix`**: Heavy development tools (Arduino IDE, etc.)
+`niri`, `sway`, `hyprlock`, `kanshi`, `fish`, `zsh`, `wezterm`, `zellij`,
+`tmux`, `git`, `gpg`/`gpg-agent`, `keychain`, `mpd`, `beets`, `tidalcycles`,
+`nethack`, `ideavim`, `android-tools`, `atuin-server`, `dev-heavy`.
+
+### Overlays
+
+Custom overlays live in `overlays/` and are exposed via
+`flake-modules/overlays.nix`. Keep any patches alongside them.
 
 # Troubleshooting / FAQ
 
 ## Nix says my repo files don't exist, even though they do!
 
-Nix flakes only see files that git is currently tracked, so just `git add .`
-and you should be good to go. Files on `.gitignore`, of course, are invisible
-to nix - this is to guarantee your build won't depend on anything that is not
-on your repo.
+Nix flakes only see files tracked by git, so `git add .` first. Files in
+`.gitignore` are invisible to nix — this keeps builds reproducible.
 
-## Nix installs the wrong version of software/fails to find new software
+## Nix installs the wrong version / can't find new software
 
-The nix dependencies (such as `nixpkgs`) used by your configuration will
-strictly follow the `flake.lock` file, using the commits written into it when
-you (re)generated.
-
-To update your flake inputs, simply use `nix flake update`.
+Dependencies follow `flake.lock`. Run `nix flake update` to refresh.
 
 ## ARM images fail to build with "unsupported system"
 
-Make sure you've enabled aarch64 emulation on your build host:
-1. Add `boot.binfmt.emulatedSystems = [ "aarch64-linux" ];` to your configuration
+Enable aarch64 emulation on the build host (or build via the `amp1` aarch64
+remote builder):
+
+1. Add `boot.binfmt.emulatedSystems = [ "aarch64-linux" ];`
 2. Rebuild: `sudo nixos-rebuild switch`
 3. Verify: `cat /proc/sys/fs/binfmt_misc/qemu-aarch64`
 
-Alternatively, enable the development module which includes aarch64 emulation:
-```nix
-development.enable = true;
-```
+Hosts with the `development` module already enable this.
 
 ## How the dual-output SD card image system works
 
-This configuration uses a dual-output approach for ARM devices:
+ARM devices use a dual-output approach:
 
-1. **SD Image Configuration** (`hosts/*/nixos/sd-image.nix`):
-   - Only imported during image builds via `mkSdImageSystem`
-   - Creates bootable ext4 SD card images
-   - Overrides filesystem settings for initial boot
-   - Not used during regular system rebuilds
+1. **SD image config** (`hosts/<name>/nixos/sd-image.nix`): imported only when
+   building `flake.images.<name>`; produces a bootable **ext4** image and
+   overrides filesystem settings for first boot. Not used in normal rebuilds.
+2. **Regular config** (`hosts/<name>/nixos/` + the dendritic feature modules):
+   the actual running system — **btrfs** with compression, managed via Colmena
+   and `nixos-rebuild`.
+3. **Automatic conversion**: bridges the two — runs once on first boot to
+   convert ext4→btrfs with no manual steps.
 
-2. **Regular Configuration** (`hosts/*/nixos/default.nix`):
-   - Used for ongoing management after first boot
-   - Specifies btrfs with compression
-   - Works with Colmena and nixos-rebuild
-   - The actual running system configuration
-
-3. **Automatic Conversion**:
-   - Bridge between SD image (ext4) and regular config (btrfs)
-   - Runs once on first boot
-   - Seamlessly converts filesystem without user intervention
-
-This approach allows:
-- Easy initial deployment (write SD image)
-- Full NixOS configuration management (colmena, nixos-rebuild)
-- Optimal filesystem (btrfs with compression)
-- No manual conversion steps
-
-<!--
-# Learning resources
-TODO
--->
+This gives easy initial deployment (write the SD image), full ongoing
+configuration management, and an optimal compressed btrfs root.
