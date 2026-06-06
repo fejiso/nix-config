@@ -1,77 +1,153 @@
 flakeArgs: {
   flake.modules.nixos.tdarr-worker =
+# Tdarr distributed transcoding — native NixOS services (services.tdarr from
+# nixpkgs), replacing the previous rootless-podman/quadlet deployment.
+#
+# Config/permissions/directories are kept identical to the container setup:
+#   - runs as media-podman:media-services (so existing /var/lib/tdarr data,
+#     created by the rootless containers, stays owned correctly)
+#   - server data dir /var/lib/tdarr (local per host — "local config")
+#   - media + transcode cache live on the shared NFS mounts at paths that are
+#     IDENTICAL on the server and every node (required for "mapped" nodes).
 { config, lib, pkgs, ... }:
 
 with lib;
 
+let
+  cfg = config.services.tdarr-worker;
+  mediaPaths = attrValues cfg.mediaDirectories;
+  rwPaths = mediaPaths ++ [ cfg.transcodeCache ];
+  nodeUnit = "tdarr-node-${cfg.nodeId}";
+in
 {
   imports = [
-    flakeArgs.config.flake.modules.nixos.tdarr
     flakeArgs.config.flake.modules.nixos.media-podman
   ];
 
   options.services.tdarr-worker = {
-    enable = mkEnableOption "Tdarr worker node with all dependencies";
+    enable = mkEnableOption "Tdarr worker node (native NixOS service)";
 
     serverEnabled = mkOption {
       type = types.bool;
       default = false;
-      description = "Also enable Tdarr server on this host";
+      description = "Also run the Tdarr server on this host";
     };
 
     nodeId = mkOption {
       type = types.str;
       default = "${config.networking.hostName}_worker";
-      description = "Node ID name";
+      description = "Node ID / display name";
     };
 
     serverIP = mkOption {
       type = types.str;
       default = "butthead.netbird.cloud";
-      description = "Tdarr server address";
+      description = "Tdarr server address (used when serverEnabled = false)";
     };
 
     serverPort = mkOption {
       type = types.port;
       default = 8266;
-      description = "Tdarr server port";
+      description = "Tdarr server API port";
+    };
+
+    webUIPort = mkOption {
+      type = types.port;
+      default = 8265;
+      description = "Tdarr web UI port (server only)";
     };
 
     mediaDirectories = mkOption {
-      type = types.attrs;
+      type = types.attrsOf types.str;
       default = {
         tv = "/mnt/Series";
         movies = "/mnt/Movies";
       };
-      description = "Media directories to mount";
+      description = ''
+        Media directories the server/node must read and write. Paths MUST be
+        identical across the server and every node (Tdarr "mapped" nodes look
+        files up by the exact library path stored on the server). They are
+        provided here by the shared NFS mounts.
+      '';
     };
 
     transcodeCache = mkOption {
       type = types.str;
-      default = "/var/lib/tdarr/transcode-cache";
-      description = "Directory for transcode temporary files";
+      default = "/mnt/downloadtemp/tdarr-cache";
+      description = "Shared transcode cache directory (identical path on all nodes)";
+    };
+
+    user = mkOption {
+      type = types.str;
+      default = "media-podman";
+      description = "User to run Tdarr as";
+    };
+
+    group = mkOption {
+      type = types.str;
+      default = "media-services";
+      description = "Group to run Tdarr as";
     };
   };
 
-  config = mkIf config.services.tdarr-worker.enable {
-    services.tdarr-podman = {
-      enable = true;
-      server.enable = config.services.tdarr-worker.serverEnabled;
-      node = {
-        enable = true;
-        nodeId = config.services.tdarr-worker.nodeId;
-        serverIP = config.services.tdarr-worker.serverIP;
-        serverPort = config.services.tdarr-worker.serverPort;
+  config = mkIf cfg.enable {
+    services.tdarr = {
+      user = cfg.user;
+      group = cfg.group;
+      dataDir = "/var/lib/tdarr";
+
+      server = {
+        enable = cfg.serverEnabled;
+        serverIP = "0.0.0.0";
+        serverPort = cfg.serverPort;
+        webUIPort = cfg.webUIPort;
+        # Firewalling is handled below (netbird interface only).
+        openFirewall = false;
       };
-      mediaDirectories = config.services.tdarr-worker.mediaDirectories;
-      transcodeCache = config.services.tdarr-worker.transcodeCache;
+
+      nodes.${cfg.nodeId} = {
+        name = cfg.nodeId;
+        type = "mapped";
+        serverURL =
+          if cfg.serverEnabled
+          then "http://127.0.0.1:${toString cfg.serverPort}"
+          else "http://${cfg.serverIP}:${toString cfg.serverPort}";
+      };
     };
 
-    # Enable podman for quadlet containers
-    virtualisation.podman = {
-      enable = true;
-      dockerCompat = false;
-    };
+    # Shared transcode cache. Match the permissive mode the container used so
+    # the server and every node can write transcoded output here.
+    systemd.tmpfiles.rules = [
+      "d ${cfg.transcodeCache} 0777 ${cfg.user} ${cfg.group} -"
+    ];
+
+    # The upstream units harden with ProtectSystem=strict and only allow writes
+    # to their own data dir. Grant write access to the media + cache paths, GPU
+    # access for hardware transcoding, and order the units after the NFS mounts.
+    systemd.services = mkMerge [
+      (mkIf cfg.serverEnabled {
+        tdarr-server = {
+          unitConfig.RequiresMountsFor = rwPaths;
+          serviceConfig = {
+            ReadWritePaths = mkAfter rwPaths;
+            SupplementaryGroups = [ "render" "video" ];
+          };
+        };
+      })
+      {
+        ${nodeUnit} = {
+          unitConfig.RequiresMountsFor = rwPaths;
+          serviceConfig = {
+            ReadWritePaths = mkAfter rwPaths;
+            SupplementaryGroups = [ "render" "video" ];
+          };
+        };
+      }
+    ];
+
+    # Tdarr server/web traffic is between netbird peers only.
+    networking.firewall.interfaces.wt0.allowedTCPPorts =
+      mkIf cfg.serverEnabled [ cfg.webUIPort cfg.serverPort ];
   };
 }
 ;

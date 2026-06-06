@@ -52,10 +52,9 @@
     KbdInteractiveAuthentication = lib.mkForce true;
   };
   
-  # Tdarr worker node
+  # Tdarr worker node (native NixOS service)
   services.tdarr-worker = {
     enable = true;
-    transcodeCache = "/mnt/downloadtemp/tdarr-cache";
   };
 
   # OpenClaw AI assistant

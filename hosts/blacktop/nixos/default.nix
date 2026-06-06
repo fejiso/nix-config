@@ -47,10 +47,9 @@
   # Host-specific networking
   networking.hostName = "blacktop";
 
-  # Tdarr worker node
+  # Tdarr worker node (native NixOS service)
   services.tdarr-worker = {
     enable = true;
-    transcodeCache = "/mnt/downloadtemp/tdarr-cache";
   };
 
   # System state version

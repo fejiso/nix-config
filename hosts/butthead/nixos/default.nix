@@ -25,13 +25,17 @@ let
     fi
     echo "data01 at ''${USE_PCT}% — migrating files ($MODE, $AGE_FLAG)"
 
-    MEDIA_SERVICES="tdarr.service lidarr.service sonarr.service radarr.service lazylibrarian.service sabnzbd.service"
+    # Rootless-podman quadlet services (run under the media-podman user)
+    MEDIA_SERVICES="lidarr.service sonarr.service radarr.service lazylibrarian.service sabnzbd.service"
+    # Native system services (tdarr is now native, not a container)
+    SYSTEM_MEDIA_SERVICES="tdarr-server.service tdarr-node-*.service"
 
     stop_services() {
       echo "Stopping media services..."
       for svc in $MEDIA_SERVICES; do
         ${pkgs.systemd}/bin/systemctl --user -M media-podman@ stop "$svc" 2>/dev/null || true
       done
+      ${pkgs.systemd}/bin/systemctl stop $SYSTEM_MEDIA_SERVICES 2>/dev/null || true
     }
 
     start_services() {
@@ -39,6 +43,7 @@ let
       for svc in $MEDIA_SERVICES; do
         ${pkgs.systemd}/bin/systemctl --user -M media-podman@ start "$svc" 2>/dev/null || true
       done
+      ${pkgs.systemd}/bin/systemctl start $SYSTEM_MEDIA_SERVICES 2>/dev/null || true
     }
 
     # Ensure services are restarted on exit (even on failure)
@@ -454,15 +459,11 @@ in
     };
   };
 
-  # Tdarr transcoding server and worker
+  # Tdarr transcoding server and worker (native NixOS services).
+  # Uses the unified /mnt/* paths shared (identically) across all nodes via NFS.
   services.tdarr-worker = {
     enable = true;
     serverEnabled = true;
-    mediaDirectories = {
-      tv = "/mnt/user/Series";
-      movies = "/mnt/user/Movies";
-    };
-    transcodeCache = "/mnt/user/downloadtemp/tdarr-cache";
   };
 
   # Additional packages for media server functionality
