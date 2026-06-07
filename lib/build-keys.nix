@@ -2,8 +2,10 @@
 {
   # Shared SSH pubkey for the role account `nix-ssh` on every builder.
   # Private half lives in secrets/nix-builder.yaml as a sops secret deployed to
-  # /run/secrets/nix-builder-key. Safe to share because nix-ssh's shell is
-  # locked to `nix-store --serve --write` by the nix.sshServe module.
+  # /run/secrets/nix-builder-key. Safe to share because nix-ssh's forced command
+  # is locked to `nix-daemon --stdio --option builders ""` (see
+  # flake-modules/system/distributed-build.nix) — inbound builds only, no
+  # re-delegation.
   nixBuilderPublicKey =
     "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIET73bXt5BAGlLTmYQh4JZGq6I3cfAUoihP/nk+KqQZo nix-builder@fleet";
 

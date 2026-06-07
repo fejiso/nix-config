@@ -126,8 +126,17 @@ in
     # Cores per build job (slot). hierro builds locally (distributedBuilds
     # off), so give it 24; every other host caps each slot at 4.
     cores = if hostname == "hierro" then 24 else 4;
-    # Allow z-247 user to be a trusted user for remote builds
-    trusted-users = [ "z-247" ];
+    # Allow z-247 user to be a trusted user for remote builds. `nix-ssh` (the
+    # locked role account remote builders connect as) must also be trusted so
+    # it can receive *unsigned* build-input pushes over `nix-store --serve`.
+    # Without this, copying a locally-built, unsigned input to a remote builder
+    # fails with "cannot add path … lacks a signature by a trusted key" (peer
+    # substitution still works because nix-serve signs at serve-time, but the
+    # ssh build-input path does not).
+    trusted-users = [ "z-247" "nix-ssh" ];
+    # Sign locally-built paths with this host's nix-serve key (already in every
+    # peer's trusted-public-keys) so they're trusted wherever they're copied.
+    secret-key-files = "/var/lib/nix-serve/cache-priv-key.pem";
     extra-substituters = substituters;
     trusted-substituters = substituters;
     trusted-public-keys = trustedPublicKeys;
@@ -136,19 +145,40 @@ in
   # Configure remote builders
   nix.buildMachines = buildMachines;
 
-  # Distribute builds to remote machines. hierro is excluded: it builds
-  # everything locally, which also stops its daemon from re-delegating
-  # inbound build requests (the mutual-builder deadlock).
-  nix.distributedBuilds = hostname != "hierro";
+  # Every host distributes its OWN builds to any peer. The mutual-builder
+  # deadlock is prevented on the *inbound* side instead (see nix-ssh below):
+  # a build that arrives over ssh is pinned to build locally and never
+  # re-delegated, so cycles like butthead → lenovix → butthead can't form.
+  nix.distributedBuilds = true;
 
   # Accept inbound remote-build connections on the shared nix-ssh role account.
-  # Creates user `nix-ssh` whose shell is locked to `nix-store --serve --write`.
-  nix.sshServe = {
-    enable = true;
-    protocol = "ssh-ng";
-    write = true;
-    keys = [ buildKeys.nixBuilderPublicKey ];
+  # Rolled by hand instead of `nix.sshServe` so the forced command can pin
+  # `builders=""`: a build that ARRIVES here over ssh-ng is built locally and
+  # never re-delegated to another remote. This is the half that breaks the
+  # mutual-builder deadlock while still letting every host distribute its own
+  # builds (distributedBuilds = true above). The per-connection `nix-daemon
+  # --stdio` is a distinct process from this host's system daemon, so pinning
+  # its builders empty does not affect the host's own outbound distribution.
+  users.users.nix-ssh = {
+    description = "Nix SSH store user";
+    isSystemUser = true;
+    group = "nix-ssh";
+    shell = pkgs.bashInteractive;
+    openssh.authorizedKeys.keys = [ buildKeys.nixBuilderPublicKey ];
   };
+  users.groups.nix-ssh = { };
+
+  services.openssh.enable = true;
+  services.openssh.extraConfig = ''
+    Match User nix-ssh
+      AllowAgentForwarding no
+      AllowTcpForwarding no
+      PermitTTY no
+      PermitTunnel no
+      X11Forwarding no
+      ForceCommand ${config.nix.package.out}/bin/nix-daemon --stdio --option builders ""
+    Match All
+  '';
 
   # Configure binary cache serving
   services.nix-serve = {

@@ -77,6 +77,19 @@ in
       description = "Shared transcode cache directory (identical path on all nodes)";
     };
 
+    extraPackages = mkOption {
+      type = types.listOf types.package;
+      default = with pkgs; [ dovi-tool hdr10plus_tool mkvtoolnix-cli ];
+      defaultText = literalExpression "with pkgs; [ dovi-tool hdr10plus_tool mkvtoolnix-cli ]";
+      description = ''
+        Extra packages placed on the Tdarr server/node PATH, for plugins and
+        flows that shell out to external tools — e.g. Dolby Vision / HDR10+
+        handling (dovi_tool, hdr10plus_tool) and remuxing (mkvextract/mkvmerge).
+        The bundled container images shipped these; native installs do not, so
+        provide them here. ffmpeg is bundled with Tdarr itself.
+      '';
+    };
+
     user = mkOption {
       type = types.str;
       default = "media-podman";
@@ -127,6 +140,7 @@ in
     systemd.services = mkMerge [
       (mkIf cfg.serverEnabled {
         tdarr-server = {
+          path = cfg.extraPackages;
           unitConfig.RequiresMountsFor = rwPaths;
           serviceConfig = {
             ReadWritePaths = mkAfter rwPaths;
@@ -136,6 +150,7 @@ in
       })
       {
         ${nodeUnit} = {
+          path = cfg.extraPackages;
           unitConfig.RequiresMountsFor = rwPaths;
           serviceConfig = {
             ReadWritePaths = mkAfter rwPaths;
