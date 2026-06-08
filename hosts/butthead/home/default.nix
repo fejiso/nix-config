@@ -14,6 +14,10 @@
   # Enable desktop programs (shares config with blacktop)
   programs.niri.enable = true;
 
+  # Bridge desktop audio to the Bose SoundTouch over wifi (select the
+  # "Bose SoundTouch" sink, then run `bose-play` / `bose-stop`).
+  services.boseSoundtouch.enable = true;
+
   # Enable Android development tools
   programs.android-tools.enable = true;
 

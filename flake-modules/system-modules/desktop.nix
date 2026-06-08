@@ -13,6 +13,20 @@
   # Window managers
   programs.niri.enable = true;
 
+  # PAM stack for hyprlock — without /etc/pam.d/hyprlock the lock screen can
+  # never authenticate the unlock (hyprlock reads its own PAM service). This is
+  # system-level, so home-manager's programs.hyprlock can't provide it.
+  security.pam.services.hyprlock = {};
+
+  # DLNA audio bridge via pa-dlna (home module services.boseSoundtouch):
+  #  - TCP 8092: pa-dlna HTTP server the renderer pulls the audio stream from.
+  #  - UDP 1901: fixed port for SSDP M-SEARCH responses (unicast from the device;
+  #    the stateful firewall won't tie them to the multicast query, so it must be
+  #    explicitly open or discovery silently finds nothing).
+  #  - UDP 1900: SSDP NOTIFY announcements.
+  networking.firewall.allowedTCPPorts = [ 8092 ];
+  networking.firewall.allowedUDPPorts = [ 1900 1901 ];
+
   # Gaming
   programs.steam = {
     enable = true;

@@ -10,6 +10,8 @@
       config.flake.modules.homeManager.kanshi
       config.flake.modules.homeManager.niri
       config.flake.modules.homeManager.sway
+      config.flake.modules.homeManager.hyprlock
+      config.flake.modules.homeManager.bose-soundtouch
     ];
   };
 }
