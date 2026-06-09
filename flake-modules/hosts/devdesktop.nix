@@ -10,6 +10,11 @@
       pkgs = import inputs.nixpkgs {
         system = "x86_64-linux";
         config.allowUnfree = true;
+        overlays = [
+          inputs.self.overlays.additions
+          inputs.self.overlays.modifications
+          inputs.self.overlays.unstable-packages
+        ];
       };
       extraSpecialArgs = {
         inherit inputs;
@@ -18,6 +23,7 @@
       };
       modules = [
         config.flake.modules.homeManager.default
+        config.flake.modules.homeManager.development
         "${inputs.self}/hosts/devdesktop/home"
       ];
     };

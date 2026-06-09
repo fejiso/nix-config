@@ -31,6 +31,11 @@
     amazon-ecr-credential-helper
   ];
 
+  # Use the Amazon-provisioned claude (~/.toolbox/bin/claude), not the nixpkgs
+  # build. package = null keeps home-manager managing claude-code settings but
+  # installs no binary, so it never shadows the toolbox one on PATH.
+  programs.claude-code.package = null;
+
   # Enable atuin server
   services.atuin-server = {
     enable = true;
