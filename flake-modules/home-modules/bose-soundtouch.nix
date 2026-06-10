@@ -21,6 +21,18 @@
 
   let
     cfg = config.services.boseSoundtouch;
+    # pa-dlna picks the first encoder in `selection` whose MIME type the
+    # renderer accepts. We prefer lossless FLAC (the SoundTouch supports it),
+    # then MP3, then L16 PCM for renderers that do neither.
+    configText = ''
+      # Managed by Nix (services.boseSoundtouch).
+      [DEFAULT]
+      selection =
+    '' + concatMapStringsSep "\n" (e: "\t${e},") cfg.encoders + "\n"
+      + "# The Bose SoundTouch advertises SetNextAVTransportURI but faults on it\n"
+      + "# ('401 Invalid Action'), which tears down the stream. pa-dlna only\n"
+      + "# issues that action to push per-track metadata, so disable it.\n"
+      + "track_metadata = ${if cfg.trackMetadata then "yes" else "no"}\n";
   in
   {
     options.services.boseSoundtouch = {
@@ -49,6 +61,27 @@
         type = types.enum [ "debug" "info" "warning" "error" ];
         default = "info";
         description = "pa-dlna log level (journald).";
+      };
+
+      encoders = mkOption {
+        type = types.listOf types.str;
+        default = [ "FlacEncoder" "FFMpegFlacEncoder" "Mp3Encoder" "FFMpegMp3Encoder" "L16Encoder" ];
+        description = ''
+          Ordered list of pa-dlna encoder class names. Each renderer gets the
+          first one whose audio format it supports — lossless FLAC by default.
+          See `pa-dlna --dump-default` for the available encoder names.
+        '';
+      };
+
+      trackMetadata = mkOption {
+        type = types.bool;
+        default = false;
+        description = ''
+          Push per-track metadata (title/artist) to the renderer. Requires the
+          renderer to actually implement the SetNextAVTransportURI UPnP action.
+          The Bose SoundTouch advertises it but returns "401 Invalid Action"
+          when called, which tears down playback — so this defaults to false.
+        '';
       };
     };
 
@@ -82,6 +115,8 @@
         };
         Install.WantedBy = [ "default.target" ];
       };
+
+      xdg.configFile."pa-dlna/pa-dlna.conf".text = configText;
     };
   };
 }

@@ -144,6 +144,11 @@ in
   # Enable container support for media services
   boot.enableContainers = true;
 
+  # SoundCork — local Bose SoundTouch cloud replacement (unlocks the SoundTouch
+  # 30 after Bose's cloud shutdown). Module: flake-modules/system-modules/soundcork.nix.
+  # Set baseUrl to butthead's LAN IP if the speaker can't resolve "butthead".
+  services.soundcork.enable = true;
+
   # Enable Podman for nginx-proxy-manager
   virtualisation.podman = {
     enable = true;

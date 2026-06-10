@@ -1,0 +1,28 @@
+Skip non-UPnP services instead of rejecting the whole device.
+
+pa-dlna parses every service listed in a device description and fetches its
+SCPD, expecting the `urn:schemas-upnp-org:` namespace. The Bose SoundTouch
+advertises a Tencent "QPlay" service whose SCPD uses
+`urn:schemas-tencent-com:service-1-0`, so upnp_org_etree() raises
+UPnPXMLError('No namespace starting with urn:schemas-upnp-org:') and the entire
+MediaRenderer (AVTransport/RenderingControl/ConnectionManager) is discarded —
+no sink is ever created. Skip services whose serviceType is not in the UPnP
+namespace; pa-dlna doesn't use QPlay anyway.
+
+Upstream: https://gitlab.com/xdegaye/pa-dlna
+--- a/pa_dlna/upnp/upnp.py
++++ b/pa_dlna/upnp/upnp.py
+@@ -308,6 +308,13 @@
+             if 'serviceId' not in d:
+                 raise UPnPXMLError("Missing 'serviceId' element")
+
++            # Skip non-UPnP services (e.g. the Tencent 'QPlay' service the
++            # Bose SoundTouch advertises) whose SCPD uses a non-upnp
++            # namespace and would otherwise make upnp_org_etree() reject
++            # the whole device.
++            if not d.get('serviceType', '').startswith(
++                    'urn:schemas-upnp-org:'):
++                continue
+             serviceId = d['serviceId']
+             self.serviceList[serviceId] = await (
+                                 UPnPService(self, self.root_device, d)._run())

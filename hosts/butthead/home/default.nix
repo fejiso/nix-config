@@ -14,9 +14,10 @@
   # Enable desktop programs (shares config with blacktop)
   programs.niri.enable = true;
 
-  # Bridge desktop audio to the Bose SoundTouch over wifi (select the
-  # "Bose SoundTouch" sink, then run `bose-play` / `bose-stop`).
+  # DLNA audio bridge (pa-dlna): the Bose SoundTouch shows up as a PipeWire sink.
   services.boseSoundtouch.enable = true;
+  # NB: the soundcork cloud-replacement server is a *system* service, enabled in
+  # hosts/butthead/nixos/default.nix (services.soundcork), not here.
 
   # Enable Android development tools
   programs.android-tools.enable = true;

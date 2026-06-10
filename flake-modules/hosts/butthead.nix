@@ -11,6 +11,7 @@ let
     config.flake.modules.nixos.tgtg-watcher
     config.flake.modules.nixos.emulation
     config.flake.modules.nixos.quadlet-containers
+    config.flake.modules.nixos.soundcork
     {
       home-manager.users.z-247.imports = [
         config.flake.modules.homeManager.development

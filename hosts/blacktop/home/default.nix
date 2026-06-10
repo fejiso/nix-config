@@ -16,8 +16,7 @@
   # Enable Niri
   programs.niri.enable = true;
 
-  # Bridge desktop audio to the Bose SoundTouch over wifi (select the
-  # "Bose SoundTouch" sink, then run `bose-play` / `bose-stop`).
+  # DLNA audio bridge (pa-dlna): the Bose SoundTouch shows up as a PipeWire sink.
   services.boseSoundtouch.enable = true;
 
   # Enable TidalCycles

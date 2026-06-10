@@ -90,6 +90,16 @@ in {
     buildGo123Module = goProxyDirect prev.buildGo123Module;
     buildGo124Module = goProxyDirect prev.buildGo124Module;
     buildGo125Module = goProxyDirect prev.buildGo125Module;
+    # pa-dlna 1.2 rejects an entire UPnP device if ANY of its services has a
+    # non-UPnP SCPD namespace. The Bose SoundTouch advertises a Tencent "QPlay"
+    # service (urn:schemas-tencent-com:...) next to the standard MediaRenderer
+    # services, so pa-dlna throws and never creates a sink. Patch it to skip
+    # non-UPnP services. Drop if fixed upstream.
+    pa-dlna = prev.pa-dlna.overrideAttrs (old: {
+      patches = (old.patches or [ ]) ++ [
+        ./patches/pa-dlna-skip-non-upnp-services.patch
+      ];
+    });
   };
 
   # When applied, the unstable nixpkgs set (declared in the flake inputs) will
