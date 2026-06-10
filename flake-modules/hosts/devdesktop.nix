@@ -14,6 +14,9 @@
           inputs.self.overlays.additions
           inputs.self.overlays.modifications
           inputs.self.overlays.unstable-packages
+          # devdesktop's corp network sinkholes proxy.golang.org; force Go
+          # vendor fetches through GOPROXY=direct. See overlays/default.nix.
+          inputs.self.overlays.go-proxy-direct
         ];
       };
       extraSpecialArgs = {

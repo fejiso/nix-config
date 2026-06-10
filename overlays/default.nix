@@ -65,31 +65,6 @@ in {
       ];
     });
 
-    # Corp network sinkholes proxy.golang.org and sum.golang.org (the TLS cert
-    # served is for chalupa-dns-sinkhole.corp.amazon.com), so the default
-    # GOPROXY can't fetch module zips — every buildGoModule vendor fetch (the
-    # `*-go-modules` fixed-output derivation) fails, e.g. sops-nix's
-    # sops-install-secrets. GOPROXY=direct fetches modules straight from their
-    # VCS (github etc.), which IS reachable; GOSUMDB=off skips the
-    # equally-sinkholed checksum database. Integrity is still guaranteed by
-    # Nix's vendorHash, so disabling the sumdb is safe.
-    #
-    # It MUST be set inside the build sandbox, not via `env`: GOPROXY is listed
-    # in the go-modules FOD's `impureEnvVars` (build-support/go/module.nix), so
-    # any `env.GOPROXY` is clobbered at build time by the daemon's ambient
-    # GOPROXY (empty -> Go falls back to its baked-in proxy default). We
-    # therefore export it in the modules derivation's preBuild via
-    # overrideModAttrs, composing with any the package already defines. Only
-    # the FOD needs this; the main build phase already runs with GOPROXY=off
-    # against the vendored output.
-    #
-    # Note: this changes the derivation hash of every Go package, so prebuilt
-    # binaries from cache.nixos.org won't be reused — but on this network those
-    # uncached builds would fail to fetch deps anyway.
-    buildGoModule = goProxyDirect prev.buildGoModule;
-    buildGo123Module = goProxyDirect prev.buildGo123Module;
-    buildGo124Module = goProxyDirect prev.buildGo124Module;
-    buildGo125Module = goProxyDirect prev.buildGo125Module;
     # pa-dlna 1.2 rejects an entire UPnP device if ANY of its services has a
     # non-UPnP SCPD namespace. The Bose SoundTouch advertises a Tencent "QPlay"
     # service (urn:schemas-tencent-com:...) next to the standard MediaRenderer
@@ -100,6 +75,40 @@ in {
         ./patches/pa-dlna-skip-non-upnp-services.patch
       ];
     });
+  };
+
+  # Force every buildGo*Module vendor fetch through GOPROXY=direct / GOSUMDB=off.
+  #
+  # This is applied ONLY on devdesktop (a corp machine), NOT globally: that
+  # network sinkholes proxy.golang.org and sum.golang.org (the TLS cert served
+  # is for chalupa-dns-sinkhole.corp.amazon.com), so the default GOPROXY can't
+  # fetch module zips — every `*-go-modules` fixed-output derivation fails (e.g.
+  # sops-nix's sops-install-secrets). GOPROXY=direct fetches modules straight
+  # from their VCS (github etc.), which IS reachable; GOSUMDB=off skips the
+  # equally-sinkholed checksum database. Integrity is still guaranteed by Nix's
+  # vendorHash, so disabling the sumdb is safe.
+  #
+  # We do NOT want this elsewhere: on normal networks proxy.golang.org is
+  # reachable and gives module zips + binary-cache hits, whereas `direct` makes
+  # dependency-heavy packages (e.g. rclone) issue hundreds of `git ls-remote`
+  # calls that GitHub rate-limits with HTTP 401, breaking the build.
+  #
+  # It MUST be set inside the build sandbox, not via `env`: GOPROXY is listed
+  # in the go-modules FOD's `impureEnvVars` (build-support/go/module.nix), so
+  # any `env.GOPROXY` is clobbered at build time by the daemon's ambient
+  # GOPROXY (empty -> Go falls back to its baked-in proxy default). We therefore
+  # export it in the modules derivation's preBuild via overrideModAttrs,
+  # composing with any the package already defines. Only the FOD needs this; the
+  # main build phase already runs with GOPROXY=off against the vendored output.
+  #
+  # Note: this changes the derivation hash of every Go package, so prebuilt
+  # binaries from cache.nixos.org won't be reused — but on devdesktop's network
+  # those uncached builds would fail to fetch deps anyway.
+  go-proxy-direct = _final: prev: {
+    buildGoModule = goProxyDirect prev.buildGoModule;
+    buildGo123Module = goProxyDirect prev.buildGo123Module;
+    buildGo124Module = goProxyDirect prev.buildGo124Module;
+    buildGo125Module = goProxyDirect prev.buildGo125Module;
   };
 
   # When applied, the unstable nixpkgs set (declared in the flake inputs) will
