@@ -37,9 +37,6 @@
 
     # Airspy ADS-B source
     airspy-adsb-bin.url = "github:fejiso/airspy_adsb/master";
-
-    # GQC container
-    gqc.url = "git+file:///home/z-247/dev/gqc";
   };
 
   outputs = inputs:

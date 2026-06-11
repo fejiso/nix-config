@@ -21,7 +21,6 @@
       config.flake.modules.homeManager.mpd
       config.flake.modules.homeManager.nethack
       config.flake.modules.homeManager.tidalcycles
-      config.flake.modules.homeManager.tmux
       config.flake.modules.homeManager.wezterm
       config.flake.modules.homeManager.zellij
       config.flake.modules.homeManager.zsh

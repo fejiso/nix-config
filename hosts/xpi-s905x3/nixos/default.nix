@@ -29,5 +29,6 @@
   boot.loader.systemd-boot.enable = lib.mkForce false;
   boot.loader.efi.canTouchEfiVariables = lib.mkForce false;
 
-  # NixOS version inherited from common/nixos
+  # Install-time NixOS release; do not bump on upgrades.
+  system.stateVersion = "25.05";
 }

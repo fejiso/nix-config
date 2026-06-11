@@ -334,7 +334,7 @@ nix flake metadata
 
 Key inputs: `nixpkgs` (26.05), `nixpkgs-unstable`, `nixpkgs-master`,
 `home-manager`, `flake-parts`, `import-tree`, `nixos-hardware`, `nix-darwin`,
-`sops-nix`, `colmena`, `deploy-rs`, `quadlet-nix`, `airspy-adsb-bin`, `gqc`.
+`sops-nix`, `colmena`, `deploy-rs`, `quadlet-nix`, `airspy-adsb-bin`.
 
 ### Inspecting flake outputs
 

@@ -116,4 +116,6 @@
     options = ["compress=zstd"];
   };
 
+  # Install-time NixOS release; do not bump on upgrades.
+  system.stateVersion = "25.05";
 }

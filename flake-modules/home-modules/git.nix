@@ -10,11 +10,16 @@
         name = "Fernando Jiménez";
         email = "fer@fer.xyz";
       };
+      init.defaultBranch = "main";
+      pull.rebase = true;
       alias = {
         st = "status";
         ci = "commit";
         br = "branch";
         co = "checkout";
+        unstage = "reset HEAD --";
+        last = "log -1 HEAD";
+        visual = "!gitk";
         df = "diff";
         lg = "log -p";
         l1 = "log --graph --decorate --pretty=oneline --abbrev-commit";
@@ -62,10 +67,13 @@
         };
       };
       core = {
+        editor = "vim";
         whitespace = "fix,-indent-with-non-tab,trailing-space,cr-at-eol";
       };
+      # "simple" was forced over "tracking" back when this was split across two
+      # modules; keep the winning value now that they're merged.
       push = {
-        default = "tracking";
+        default = "simple";
       };
       merge = {
         tool = "vimdiff";

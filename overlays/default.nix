@@ -104,12 +104,15 @@ in {
   # Note: this changes the derivation hash of every Go package, so prebuilt
   # binaries from cache.nixos.org won't be reused — but on devdesktop's network
   # those uncached builds would fail to fetch deps anyway.
-  go-proxy-direct = _final: prev: {
-    buildGoModule = goProxyDirect prev.buildGoModule;
-    buildGo123Module = goProxyDirect prev.buildGo123Module;
-    buildGo124Module = goProxyDirect prev.buildGo124Module;
-    buildGo125Module = goProxyDirect prev.buildGo125Module;
-  };
+  # Wrap every builder matching buildGo*Module (buildGoModule, buildGo123Module,
+  # buildGo124Module, ...) rather than a hardcoded list, so new versioned
+  # builders added by nixpkgs bumps are covered automatically. The filter only
+  # inspects attribute *names*, so it doesn't force evaluation of package values.
+  go-proxy-direct = _final: prev:
+    inputs.nixpkgs.lib.mapAttrs (_: goProxyDirect)
+      (inputs.nixpkgs.lib.filterAttrs
+        (n: _: builtins.match "buildGo[0-9]*Module" n != null)
+        prev);
 
   # When applied, the unstable nixpkgs set (declared in the flake inputs) will
   # be accessible through 'pkgs.unstable'

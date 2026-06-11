@@ -1,7 +1,8 @@
 { inputs, config, ... }:
-let
-  baseModules = [
-    config.flake.modules.nixos.default
+import ../../lib/mk-host.nix {
+  inherit inputs config;
+  name = "butthead";
+  modules = [
     config.flake.modules.nixos.desktop
     config.flake.modules.nixos.systemd-nspawn
     config.flake.modules.nixos.media-services
@@ -12,32 +13,12 @@ let
     config.flake.modules.nixos.emulation
     config.flake.modules.nixos.quadlet-containers
     config.flake.modules.nixos.soundcork
-    {
-      home-manager.users.z-247.imports = [
-        config.flake.modules.homeManager.development
-        config.flake.modules.homeManager.desktop
-      ];
-    }
-    "${inputs.self}/hosts/butthead/nixos"
+    config.flake.modules.nixos.media-storage
+    config.flake.modules.nixos.nginx-proxy-manager
+    config.flake.modules.nixos.haos-vm
   ];
-in
-{
-  flake.nixosConfigurations.butthead = inputs.nixpkgs.lib.nixosSystem {
-    system = "x86_64-linux";
-    specialArgs = {
-      inherit inputs;
-      outputs = inputs.self;
-      hostname = "butthead";
-    };
-    modules = baseModules;
-  };
-
-  flake.colmenaNodes.butthead = {
-    deployment = {
-      targetHost = "butthead";
-      targetUser = "root";
-    };
-    imports = baseModules;
-    _module.args.hostname = "butthead";
-  };
+  homeModules = [
+    config.flake.modules.homeManager.development
+    config.flake.modules.homeManager.desktop
+  ];
 }

@@ -1,4 +1,6 @@
-{ ... }: {
+{ config, ... }: let
+  homeModules = config.flake.modules.homeManager;
+in {
   flake.modules.homeManager.development =
 # Development tools configuration
 {
@@ -8,6 +10,11 @@
   inputs,
   ...
 }: {
+  imports = [
+    # opencode + OpenRouter, dev machines only
+    homeModules.opencode
+  ];
+
   home.packages = with pkgs; [
     # Programming languages
     python3
@@ -23,8 +30,6 @@
     # Development tools
     jetbrains.idea
     postman
-    cmake
-    clang
     gnumake
     llvmPackages.openmp
 

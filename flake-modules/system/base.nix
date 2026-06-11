@@ -196,6 +196,7 @@
     programs.fish.enable = true;
     programs.dconf.enable = true;
 
-    system.stateVersion = "25.05";
+    # Fallback only — every host should pin its own install-time stateVersion.
+    system.stateVersion = lib.mkDefault "25.05";
   };
 }
