@@ -67,7 +67,7 @@ The configuration is organized as follows:
   - **`home/`**: Foundation home-manager modules merged into
     `flake.modules.homeManager.default` (base, shell, terminal, tools, git, …).
   - **`home-modules/`**: Opt-in home-manager feature modules (niri, sway, fish,
-    zsh, wezterm, zellij, tmux, mpd, beets, tidalcycles, gpg, kanshi,
+    zsh, wezterm, zellij, git, mpd, beets, tidalcycles, gpg, kanshi,
     atuin-server, dev-heavy, …).
   - **`options.nix`**: Declares the `flake.modules.{nixos,homeManager}` option
     trees that the dendritic pattern accumulates into.
@@ -80,7 +80,8 @@ The configuration is organized as follows:
   configuration, host-only tweaks, `home/`, and for ARM hosts `nixos/sd-image.nix`).
   These are imported by the matching `flake-modules/hosts/<name>.nix`.
 
-- **`modules/darwin/`**: Darwin-specific module(s) for the macOS host.
+- **`modules/darwin/`**: Placeholder for custom Darwin modules (currently
+  empty; the macOS host is configured in `hosts/work-laptop/darwin/`).
 
 - **`overlays/`**: Custom package overlays (exposed via `flake-modules/overlays.nix`).
 
@@ -92,20 +93,29 @@ Each host file picks a base plus opt-in features. For example, `butthead`
 (the media/server hub):
 
 ```nix
-baseModules = [
-  config.flake.modules.nixos.default          # always-on foundation
-  config.flake.modules.nixos.desktop
-  config.flake.modules.nixos.media-services
-  config.flake.modules.nixos.download-services
-  config.flake.modules.nixos.quadlet-containers
-  config.flake.modules.nixos.tdarr-worker
-  # … plus home-manager opt-ins for user z-247
-  "${inputs.self}/hosts/butthead/nixos"       # machine-specific files
-];
+# flake-modules/hosts/butthead.nix
+import ../../lib/mk-host.nix {
+  inherit inputs config;
+  name = "butthead";
+  modules = [                                  # opt-in features on top of `default`
+    config.flake.modules.nixos.desktop
+    config.flake.modules.nixos.media-services
+    config.flake.modules.nixos.download-services
+    config.flake.modules.nixos.quadlet-containers
+    config.flake.modules.nixos.tdarr-worker
+    # …
+  ];
+  homeModules = [                              # home-manager opt-ins for user z-247
+    config.flake.modules.homeManager.development
+    config.flake.modules.homeManager.desktop
+  ];
+}
 ```
 
-The same `baseModules` list feeds both `nixosConfigurations.butthead` (for
-`nixos-rebuild`) and `colmenaNodes.butthead` (for remote deployment).
+`lib/mk-host.nix` expands this into matching `nixosConfigurations.butthead`
+(for `nixos-rebuild`) and `colmenaNodes.butthead` (for remote deployment) from
+the same module list, appending `hosts/butthead/nixos` (machine-specific files)
+automatically. ARM hosts pass `sdImage = true` to also get `images.<name>`.
 
 ### Host roles at a glance
 
@@ -401,7 +411,7 @@ import-tree picks the file up automatically — no central list to edit.
 #### Opt-in home-manager features (`flake-modules/home-modules/`)
 
 `niri`, `sway`, `hyprlock`, `kanshi`, `fish`, `zsh`, `wezterm`, `zellij`,
-`tmux`, `git`, `gpg`/`gpg-agent`, `keychain`, `mpd`, `beets`, `tidalcycles`,
+`git`, `gpg`/`gpg-agent`, `keychain`, `mpd`, `beets`, `tidalcycles`,
 `nethack`, `ideavim`, `android-tools`, `atuin-server`, `dev-heavy`.
 
 ### Overlays

@@ -1,22 +1,27 @@
 # Multi-Platform Nix Configuration
 
-This configuration supports multiple systems with shared common configuration:
+This configuration supports multiple systems with shared common configuration
+(dendritic flake-parts layout — see README.md for the full architecture).
 
 **System Versions:**
-- **NixOS**: 25.05 (stable)
-- **Home Manager**: master/unstable (latest features)
-- **Darwin**: Following NixOS 25.05
+- **NixOS**: 26.05 (stable, `nixos-26.05`); `nixpkgs-unstable` and
+  `nixpkgs-master` are available as extra inputs for selective pinning
+- **Home Manager**: `release-26.05`
+- **Darwin**: nix-darwin against the same nixpkgs
 
 ## Systems
 
-### NixOS Systems (Full system + home-manager) - User: z-247
-- **elitedex**: Desktop system with GNOME
-- **lenovix**: Laptop system with power management
-- **a8**: Server/headless system
+See the "Host roles at a glance" table in README.md for the full list. In
+short:
 
-### Non-NixOS Systems (Home-manager only) - User: superfer
-- **devdesktop**: Amazon Linux development machine
-- **work-laptop**: macOS laptop with Darwin
+### NixOS systems (full system + home-manager) — user: z-247
+`a8`, `blacktop`, `butthead`, `elitedex`, `hierro`, `hispanas`, `lenovix`,
+`snuffles`, plus ARM/SD-image hosts `pine64`, `rpi3`, `xpi-s905x3`.
+
+### Non-NixOS systems (home-manager only) — user: superfer/ubuntu
+- **devdesktop**: Amazon Linux development machine (`superfer@devdesktop`)
+- **amp1**: Ubuntu ARM builder (`ubuntu@amp1`)
+- **work-laptop**: macOS laptop with nix-darwin
 
 ## Usage
 
@@ -32,14 +37,12 @@ This configuration supports multiple systems with shared common configuration:
 
 2. **Build and switch**:
    ```bash
-   # For elitedex
-   sudo nixos-rebuild switch --flake .#elitedex
-   
-   # For lenovix
-   sudo nixos-rebuild switch --flake .#lenovix
-   
-   # For a8
-   sudo nixos-rebuild switch --flake .#a8
+   sudo nixos-rebuild switch --flake .#HOSTNAME
+   ```
+
+3. **Remote deployment** (all NixOS hosts at once, or per host):
+   ```bash
+   colmena apply --on HOSTNAME   # or omit --on for all
    ```
 
 ### Amazon Linux (devdesktop)
@@ -57,7 +60,7 @@ This configuration supports multiple systems with shared common configuration:
 
 3. **Install home-manager and apply config**:
    ```bash
-   nix run home-manager/master -- switch --flake .#superfer@devdesktop
+   nix run home-manager -- switch --flake .#superfer@devdesktop
    ```
 
 ### macOS (work-laptop)
@@ -80,47 +83,48 @@ This configuration supports multiple systems with shared common configuration:
 ## Configuration Structure
 
 ```
-├── flake.nix                 # Main flake configuration
-├── hosts/
-│   ├── common/
-│   │   ├── nixos/             # Common NixOS configuration
-│   │   ├── home-nixos/        # Common home config for NixOS (z-247)
-│   │   └── home-standalone/   # Common home config for standalone (superfer)
-│   ├── elitedex/
-│   │   ├── nixos/           # EliteDX NixOS config
-│   │   └── home/            # EliteDX home config
-│   ├── lenovix/
-│   │   ├── nixos/           # Lenovix NixOS config
-│   │   └── home/            # Lenovix home config
-│   ├── a8/
-│   │   ├── nixos/           # A8 NixOS config
-│   │   └── home/            # A8 home config
-│   ├── devdesktop/
-│   │   └── home/            # Amazon Linux home config
-│   └── work-laptop/
-│       ├── darwin/          # macOS system config
-│       └── home/            # macOS home config
-├── modules/
-│   ├── nixos/               # Custom NixOS modules
-│   ├── home-manager/        # Custom home-manager modules
-│   └── darwin/              # Custom Darwin modules
-├── overlays/                # Nixpkgs overlays
-└── pkgs/                    # Custom packages
+├── flake.nix                  # Inputs + flake-parts/import-tree bootstrap
+├── flake-modules/             # ALL flake logic (auto-imported by import-tree)
+│   ├── hosts/<name>.nix       # One file per host (most use lib/mk-host.nix)
+│   ├── system/                # Foundation NixOS modules (merged into `default`)
+│   ├── system-modules/        # Opt-in NixOS feature modules
+│   ├── home/                  # Foundation home-manager modules
+│   └── home-modules/          # Opt-in home-manager feature modules
+├── hosts/<name>/              # Machine-specific files per host
+│   ├── nixos/                 # hardware-configuration.nix + host tweaks
+│   ├── home/                  # host-specific home-manager config
+│   └── darwin/                # (work-laptop only) macOS system config
+├── lib/                       # mk-host.nix and other helpers
+├── overlays/                  # Nixpkgs overlays + patches
+├── scripts/                   # Maintenance scripts (snapraid, builders, …)
+└── secrets/                   # sops-nix encrypted secrets
 ```
 
 ## Customization
 
 ### Adding New Hosts
 
-1. Create host directory: `mkdir -p hosts/HOSTNAME/{nixos,home}` (or just `home` for non-NixOS)
-2. Add configuration files in the host directory
-3. Add the host to `flake.nix` in the appropriate section
+1. Create the host directory: `mkdir -p hosts/HOSTNAME/nixos` (plus `home/` if
+   it has host-specific home-manager config) and add
+   `hardware-configuration.nix` + `default.nix` there.
+2. Create `flake-modules/hosts/HOSTNAME.nix` using the helper:
+   ```nix
+   { inputs, config, ... }:
+   import ../../lib/mk-host.nix {
+     inherit inputs config;
+     name = "HOSTNAME";
+     modules = [ /* opt-in flake.modules.nixos.* */ ];
+   }
+   ```
+   It is auto-imported by import-tree — no flake.nix changes needed.
+3. `git add` the new files (flakes only see tracked files), then build.
 
 ### Modifying Common Configuration
 
-- Edit files in `hosts/common/nixos/` for NixOS-wide changes
-- Edit files in `hosts/common/home/` for home-manager changes across all systems
-- Edit files in `hosts/common/home-standalone/` for home-manager changes across standalone systems (superfer)
+- `flake-modules/system/` for changes to every NixOS host
+- `flake-modules/system-modules/` for opt-in NixOS features
+- `flake-modules/home/` for home-manager changes across all systems
+- `flake-modules/home-modules/` for opt-in home-manager features
 
 ### Host-Specific Configuration
 
@@ -133,7 +137,8 @@ This configuration supports multiple systems with shared common configuration:
 
 2. **Git Integration**: This configuration assumes git tracking. Make sure to `git add` new files before building.
 
-3. **Secrets Management**: Consider using tools like `sops-nix` or `agenix` for managing secrets across systems.
+3. **Secrets Management**: Secrets are managed with sops-nix (see
+   `secrets/` and `.sops.yaml`; bootstrap a new machine with `setup-sops.sh`).
 
 4. **Updates**: Run `nix flake update` to update all inputs, then rebuild your systems.
 

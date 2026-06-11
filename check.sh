@@ -10,21 +10,24 @@ nix --extra-experimental-features 'nix-command flakes' flake check --no-build
 
 echo "✅ Flake configuration is valid!"
 
+# List configurations dynamically from the flake outputs so this never goes
+# stale as hosts are added/removed.
+list() {
+  nix eval --raw ".#$1" \
+    --apply 'attrs: builtins.concatStringsSep "\n" (map (n: "  - " + n) (builtins.attrNames attrs))'
+  echo ""
+}
+
 echo "📋 Available configurations:"
 echo ""
 echo "NixOS Systems:"
-echo "  - elitedex (desktop)"
-echo "  - lenovix (laptop)" 
-echo "  - a8 (server)"
-echo "  - blacktop (desktop/laptop)"
-echo "  - hierro (server)"
-echo "  - butthead (desktop/media server)"
+list nixosConfigurations
 echo ""
 echo "Home-manager only:"
-echo "  - superfer@devdesktop (Amazon Linux)"
+list homeConfigurations
 echo ""
 echo "Darwin systems:"
-echo "  - work-laptop (macOS)"
+list darwinConfigurations
 echo ""
 
 echo "🚀 To build a configuration:"

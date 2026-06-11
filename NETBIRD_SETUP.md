@@ -26,9 +26,9 @@ This configuration adds NetBird VPN to all NixOS hosts with the setup key secure
 Deploy to your NixOS hosts:
 
 ```bash
-# For each host
-sudo nixos-rebuild switch --flake .#elitedx
-sudo nixos-rebuild switch --flake .#lenovix  
+# For each host (any name from `nixosConfigurations`, e.g.)
+sudo nixos-rebuild switch --flake .#elitedex
+sudo nixos-rebuild switch --flake .#lenovix
 sudo nixos-rebuild switch --flake .#a8
 ```
 
