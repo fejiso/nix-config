@@ -12,6 +12,12 @@
       model = "openrouter/anthropic/claude-sonnet-4.5";
       provider.openrouter.options.apiKey =
         "{file:${config.sops.secrets.openrouter-api-key.path}}";
+      # enable the built-in LSP servers (off by default)
+      lsp = true;
+    };
+    tui.keybinds = {
+      # default is ctrl+p, which clashes elsewhere
+      command_list = "ctrl+i";
     };
   };
 
