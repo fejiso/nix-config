@@ -344,6 +344,7 @@ with lib;
           Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
 
           Ctrl+Alt+Delete { spawn-sh "noctalia msg session lock"; }
+          Mod+Shift+Q { spawn-sh "noctalia msg session lock"; }
 
           Mod+Shift+P { power-off-monitors; }
 
