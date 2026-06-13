@@ -37,9 +37,9 @@
         mode = "0444";
       };
 
-      anthropic-api-key = {
-        sopsFile = "${inputs.self}/secrets/openclaw.yaml";
-        key = "anthropic_api_key";
+      openrouter-api-key = {
+        sopsFile = "${inputs.self}/secrets/openrouter.yaml";
+        key = "openrouter_api_key";
         mode = "0444";
       };
 

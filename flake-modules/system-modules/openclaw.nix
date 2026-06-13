@@ -8,7 +8,7 @@ with lib;
 let
   cfg = config.services.openclaw;
   tokenFile = config.sops.secrets.openclaw-gateway-token.path;
-  anthropicKeyFile = config.sops.secrets.anthropic-api-key.path;
+  openrouterKeyFile = config.sops.secrets.openrouter-api-key.path;
 in {
   options.services.openclaw = {
     enable = mkEnableOption "OpenClaw AI assistant";
@@ -27,7 +27,7 @@ in {
 
     model = mkOption {
       type = types.str;
-      default = "anthropic/claude-sonnet-4";
+      default = "openrouter/meta-llama/llama-3.3-70b-instruct:free";
       description = "Default LLM model to use";
     };
   };
@@ -77,10 +77,10 @@ in {
       script = ''
         mkdir -p /run/secrets
         GATEWAY_TOKEN=$(cat ${tokenFile})
-        ANTHROPIC_KEY=$(cat ${anthropicKeyFile})
+        OPENROUTER_KEY=$(cat ${openrouterKeyFile})
         cat > /run/secrets/openclaw-env << EOF
         OPENCLAW_GATEWAY_TOKEN=$GATEWAY_TOKEN
-        ANTHROPIC_API_KEY=$ANTHROPIC_KEY
+        OPENROUTER_API_KEY=$OPENROUTER_KEY
         EOF
         chmod 600 /run/secrets/openclaw-env
       '';
