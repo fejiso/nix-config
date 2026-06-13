@@ -10,122 +10,7 @@ with lib;
   };
 
   config = mkIf config.programs.niri.enable {
-    home.packages = with pkgs; [ niri waybar brightnessctl wireplumber hyprlock hypridle pavucontrol awww xwayland-satellite wlopm git curl wl-clipboard cliphist ];
-
-    # Disable swayidle, use hypridle instead
-    services.swayidle.enable = false;
-    
-    # Enable and configure hypridle service
-    services.hypridle = {
-      enable = true;
-      settings = {
-        general = {
-          lock_cmd = "pidof hyprlock || hyprlock";
-          unlock_cmd = "notify-send 'unlock!'";
-          before_sleep_cmd = "loginctl lock-session";
-          after_sleep_cmd = "niri msg action power-on-monitors";
-        };
-        
-        listener = [
-          {
-            timeout = 900; # 15 minutes
-            on-timeout = "loginctl lock-session";
-          }
-          {
-            timeout = 1800; # 30 minutes
-            on-timeout = "niri msg action power-off-monitors";
-            on-resume = "niri msg action power-on-monitors";
-          }
-        ];
-      };
-    };
-
-    # Wallpaper script
-    home.file.".local/bin/set-wallpaper.sh" = {
-      text = ''
-        #!${pkgs.bash}/bin/bash
-
-        WALLPAPER_DIR="$HOME/.local/share/wallpapers/dharmx-walls"
-        WALLS_REPO="https://github.com/dharmx/walls.git"
-
-        # Bail out cleanly when no awww-daemon is running (e.g. during a
-        # nixos-rebuild switch with no active Wayland session). Without this
-        # the script exits 1 and the systemd unit ends up failed, which
-        # blocks sd-switch on the next activation.
-        if ! compgen -G "''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/wayland-*-awww-daemon.sock" > /dev/null; then
-            echo "awww-daemon socket not present, skipping wallpaper update"
-            exit 0
-        fi
-
-        # Create wallpaper directory if it doesn't exist
-        mkdir -p "$WALLPAPER_DIR"
-        
-        # Clone or update the wallpaper repository
-        if [ ! -d "$WALLPAPER_DIR/.git" ]; then
-            echo "Cloning wallpaper repository..."
-            git clone "$WALLS_REPO" "$WALLPAPER_DIR"
-        else
-            echo "Updating wallpaper repository..."
-            cd "$WALLPAPER_DIR" && git pull
-        fi
-        
-        # Get list of all image files
-        WALLPAPERS=($(find "$WALLPAPER_DIR" -type f \( -iname "*.jpg" -o -iname "*.jpeg" -o -iname "*.png" -o -iname "*.webp" \) | sort))
-        
-        if [ ''${#WALLPAPERS[@]} -eq 0 ]; then
-            echo "No wallpapers found in $WALLPAPER_DIR"
-            exit 1
-        fi
-        
-        # Get the list of connected displays - use the connector names instead
-        OUTPUTS=$(niri msg outputs | grep -o '([^)]*-[0-9]*)' | tr -d '()')
-        
-        # Set a random wallpaper for each output
-        for output in $OUTPUTS; do
-            random_wallpaper=''${WALLPAPERS[$RANDOM % ''${#WALLPAPERS[@]}]}
-            echo "Setting wallpaper for $output: $random_wallpaper"
-            awww img "$random_wallpaper" --outputs "$output" --transition-type fade --transition-duration 1
-        done
-      '';
-      executable = true;
-    };
-
-    # Systemd user service for wallpaper management.
-    # ConditionPathExistsGlob makes systemd skip the unit (no failure) when the
-    # awww-daemon socket isn't present — happens during nixos-rebuild activation
-    # before the daemon respawns, and would otherwise leave the unit in a
-    # `failed` state that sd-switch escalates to a switch-to-configuration error.
-    systemd.user.services.wallpaper = {
-      Unit = {
-        Description = "Set random wallpaper from dharmx/walls";
-        After = [ "graphical-session.target" ];
-        PartOf = [ "graphical-session.target" ];
-        ConditionPathExistsGlob = "%t/wayland-*-awww-daemon.sock";
-      };
-      Service = {
-        Type = "oneshot";
-        ExecStart = "${config.home.homeDirectory}/.local/bin/set-wallpaper.sh";
-        Environment = "PATH=${pkgs.git}/bin:${pkgs.curl}/bin:${pkgs.awww}/bin:${pkgs.niri}/bin:${pkgs.coreutils}/bin:${pkgs.findutils}/bin:${pkgs.gnugrep}/bin:${pkgs.gawk}/bin";
-      };
-      Install = {
-        WantedBy = [ "graphical-session.target" ];
-      };
-    };
-
-    # Timer to change wallpaper periodically (every 30 minutes)
-    systemd.user.timers.wallpaper = {
-      Unit = {
-        Description = "Change wallpaper every 30 minutes";
-      };
-      Timer = {
-        OnStartupSec = "2min";
-        OnUnitActiveSec = "30min";
-        Unit = "wallpaper.service";
-      };
-      Install = {
-        WantedBy = [ "timers.target" ];
-      };
-    };
+    home.packages = with pkgs; [ niri wireplumber pavucontrol xwayland-satellite wlopm ];
 
     xdg.configFile."niri/config.kdl".text = ''
       input {
@@ -225,6 +110,42 @@ with lib;
           }
       }
 
+      window-rule {
+          geometry-corner-radius 20
+          clip-to-geometry true
+      }
+
+      window-rule {
+          match app-id="dev.noctalia.Noctalia.Settings"
+          open-floating true
+          default-column-width { fixed 1080; }
+          default-window-height { fixed 920; }
+      }
+
+      window-rule {
+          match app-id="firefox"
+          default-column-width { proportion 1.0; }
+          open-on-output "PNP(AOC) 27G2G4 GYGM7HA433965"
+          open-maximized true
+      }
+
+      window-rule {
+          match app-id="strawberry"
+          default-column-width { proportion 1.0; }
+          open-on-output "PNP(AOC) 24B2W1G5 UOWN41A000261"
+          open-on-workspace "2"
+          open-maximized true
+      }
+
+      layer-rule {
+          match namespace="^noctalia-backdrop"
+          place-within-backdrop true
+      }
+
+      debug {
+          honor-xdg-activation-with-invalid-serial
+      }
+
       ${if hostname == "butthead" then ''
       // Butthead: Desktop with AOC monitors only
       output "PNP(AOC) 24B2W1G5 UOWN41A000261" {
@@ -260,32 +181,18 @@ with lib;
       }
       ''}
 
-      window-rule {
-          match app-id="firefox"
-          default-column-width { proportion 1.0; }
-          open-on-output "PNP(AOC) 27G2G4 GYGM7HA433965"
-          open-maximized true
-      }
-
-      window-rule {
-          match app-id="strawberry"
-          default-column-width { proportion 1.0; }
-          open-on-output "PNP(AOC) 24B2W1G5 UOWN41A000261"
-          open-on-workspace "2"
-          open-maximized true
-      }
-
       binds {
           Mod+T { spawn "wezterm"; }
           Mod+Return { spawn "wezterm"; }
-          Mod+D { spawn "fuzzel"; }
-          Mod+P { spawn "fuzzel"; }
-          Mod+Shift+V { spawn "sh" "-c" "cliphist list | fuzzel -d | cliphist decode | wl-copy"; }
           Mod+Q repeat=false { close-window; }
-          
-          XF86AudioRaiseVolume allow-when-locked=true { spawn "sh" "-c" "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1+"; }
-          XF86AudioLowerVolume allow-when-locked=true { spawn "sh" "-c" "wpctl set-volume @DEFAULT_AUDIO_SINK@ 0.1-"; }
-          XF86AudioMute        allow-when-locked=true { spawn "sh" "-c" "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"; }
+
+          Mod+Space { spawn-sh "noctalia msg panel-toggle launcher"; }
+          Mod+S { spawn-sh "noctalia msg panel-toggle control-center"; }
+          Mod+Comma { spawn-sh "noctalia msg settings-toggle"; }
+
+          XF86AudioRaiseVolume allow-when-locked=true { spawn-sh "noctalia msg volume-up"; }
+          XF86AudioLowerVolume allow-when-locked=true { spawn-sh "noctalia msg volume-down"; }
+          XF86AudioMute        allow-when-locked=true { spawn-sh "noctalia msg volume-mute"; }
           XF86AudioMicMute     allow-when-locked=true { spawn "sh" "-c" "wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle"; }
 
           XF86AudioPlay        allow-when-locked=true { spawn "sh" "-c" "playerctl play-pause"; }
@@ -293,9 +200,9 @@ with lib;
           XF86AudioPrev        allow-when-locked=true { spawn "sh" "-c" "playerctl previous"; }
           XF86AudioNext        allow-when-locked=true { spawn "sh" "-c" "playerctl next"; }
 
-          XF86MonBrightnessUp allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "+10%"; }
-          XF86MonBrightnessDown allow-when-locked=true { spawn "brightnessctl" "--class=backlight" "set" "10%-"; }
-          
+          XF86MonBrightnessUp   allow-when-locked=true { spawn-sh "noctalia msg brightness-up"; }
+          XF86MonBrightnessDown allow-when-locked=true { spawn-sh "noctalia msg brightness-down"; }
+
           Mod+WheelScrollDown cooldown-ms=150 { focus-workspace-down; }
           Mod+WheelScrollUp cooldown-ms=150 { focus-workspace-up; }
           Mod+Ctrl+WheelScrollDown cooldown-ms=150 { move-column-to-workspace-down; }
@@ -310,10 +217,10 @@ with lib;
           Mod+Shift+WheelScrollUp { focus-column-left; }
           Mod+Ctrl+Shift+WheelScrollDown { move-column-right; }
           Mod+Ctrl+Shift+WheelScrollUp { move-column-left; }
-          
+
           Mod+TouchpadScrollDown { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "0.02+"; }
           Mod+TouchpadScrollUp   { spawn "wpctl" "set-volume" "@DEFAULT_AUDIO_SINK@" "0.02-"; }
-          
+
           // Focus within workspace (columns horizontally)
           Mod+Left { focus-column-left; }
           Mod+Right { focus-column-right; }
@@ -400,58 +307,51 @@ with lib;
 
           Mod+BracketLeft { consume-or-expel-window-left; }
           Mod+BracketRight { consume-or-expel-window-right; }
-          
-          Mod+Space { switch-focus-between-floating-and-tiling; }
+
           Mod+Tab { focus-window-or-workspace-up; }
           Mod+Shift+Tab { focus-window-or-workspace-down; }
-          
+
           Mod+O repeat=false { toggle-overview; }
           Mod+Question { show-hotkey-overlay; }
-          
-          Mod+Comma { consume-window-into-column; }
+
           Mod+Period { expel-window-from-column; }
-          
+
           Mod+Shift+R { switch-preset-window-height; }
           Mod+Ctrl+R { reset-window-height; }
-          
+
           Mod+Ctrl+F { expand-column-to-available-width; }
-          
+
           Mod+C { center-column; }
           Mod+Ctrl+C { center-visible-columns; }
-          
+
           Mod+Minus { set-column-width "-10%"; }
           Mod+Equal { set-column-width "+10%"; }
-          
+
           Mod+Shift+Minus { set-window-height "-10%"; }
           Mod+Shift+Equal { set-window-height "+10%"; }
-          
+
           Mod+V { toggle-window-floating; }
-          
+
           Mod+Alt+W { toggle-column-tabbed-display; }
-          Mod+W { spawn "${config.home.homeDirectory}/.local/bin/set-wallpaper.sh"; }
-          
+
           Print { screenshot; }
           Ctrl+Alt+Print { screenshot; }
           Ctrl+Print { screenshot-screen; }
           Alt+Print { screenshot-window; }
-          
+
           Mod+Escape allow-inhibiting=false { toggle-keyboard-shortcuts-inhibit; }
-          
-          Ctrl+Alt+Delete { spawn "hyprlock"; }
-          
+
+          Ctrl+Alt+Delete { spawn-sh "noctalia msg session lock"; }
+
           Mod+Shift+P { power-off-monitors; }
-          
+
           Mod+Shift+E { quit; }
       }
 
-      spawn-at-startup "${pkgs.awww}/bin/awww-daemon"
-      spawn-at-startup "sleep 3 && ${config.home.homeDirectory}/.local/bin/set-wallpaper.sh"
-      spawn-at-startup "${pkgs.waybar}/bin/waybar"
-      spawn-at-startup "${pkgs.mako}/bin/mako"
+      spawn-at-startup "noctalia" "--daemon"
       spawn-at-startup "${pkgs.firefox}/bin/firefox"
       spawn-at-startup "${pkgs.strawberry}/bin/strawberry"
       spawn-at-startup "${pkgs.xwayland-satellite}/bin/xwayland-satellite"
-      spawn-at-startup "${pkgs.wl-clipboard}/bin/wl-paste" "--watch" "${pkgs.cliphist}/bin/cliphist" "store"
       spawn-at-startup "${pkgs.logseq}/bin/logseq"
       spawn-at-startup "${pkgs.telegram-desktop}/bin/Telegram"
       spawn-at-startup "${pkgs.spotify}/bin/spotify"

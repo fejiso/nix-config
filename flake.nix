@@ -36,6 +36,12 @@
 
     # Airspy ADS-B source
     airspy-adsb-bin.url = "github:fejiso/airspy_adsb/master";
+
+    # Noctalia desktop shell
+    noctalia = {
+      url = "github:noctalia-dev/noctalia";
+      inputs.nixpkgs.follows = "nixpkgs-unstable";
+    };
   };
 
   outputs = inputs:

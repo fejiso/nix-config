@@ -4,6 +4,7 @@
   flake.modules.homeManager.default = {
     imports = [
       inputs.sops-nix.homeManagerModules.sops
+      inputs.noctalia.homeModules.default
       # All cross-platform topical home-manager modules are loaded by default
       # so existing behavior is preserved; hosts that don't want a feature
       # should set its enable option to false (most are gated on

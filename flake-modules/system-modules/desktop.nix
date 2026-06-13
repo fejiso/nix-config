@@ -13,10 +13,10 @@
   # Window managers
   programs.niri.enable = true;
 
-  # PAM stack for hyprlock — without /etc/pam.d/hyprlock the lock screen can
-  # never authenticate the unlock (hyprlock reads its own PAM service). This is
-  # system-level, so home-manager's programs.hyprlock can't provide it.
-  security.pam.services.hyprlock = {};
+  # Noctalia services: battery, bluetooth, power profiles
+  services.upower.enable = true;
+  hardware.bluetooth.enable = true;
+  services.power-profiles-daemon.enable = lib.mkDefault true;
 
   # DLNA audio bridge via pa-dlna (home module services.boseSoundtouch):
   #  - TCP 8092: pa-dlna HTTP server the renderer pulls the audio stream from.
@@ -79,11 +79,7 @@ services.desktopManager.gnome.enable = lib.mkIf config.services.xserver.enable f
     chromium
     git
     alacritty
-    fuzzel
-    swaylock
     pciutils
-    mako
-    swayidle
     usbutils
     pcsclite
     pcsc-tools
