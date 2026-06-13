@@ -42,9 +42,6 @@
     SUBSYSTEM=="usb", ATTR{idVendor}=="349e", ATTR{idProduct}=="0026", GROUP="plugdev", MODE="0664"
   '';
 
-  # Display manager and desktop environment
-  services.xserver.enable = true;
-
   # greetd + tuigreet: minimal Wayland greeter that launches the niri session
   # directly. Replaces GDM — its GNOME-Shell Wayland greeter fails to start on
   # the nvidia desktop (greeter session dies before the compositor comes up),
@@ -57,7 +54,11 @@
     };
   };
 
-  services.desktopManager.gnome.enable = false;
+  # The greeter user needs GPU access for the Wayland compositor (niri).
+  # The nixpkgs greetd module creates the user but doesn't add video group.
+  users.users.greeter.extraGroups = [ "video" "input" ];
+
+services.desktopManager.gnome.enable = lib.mkIf config.services.xserver.enable false;
   
   # Disable GNOME GCR SSH agent to avoid conflict
   services.gnome.gcr-ssh-agent.enable = false;
