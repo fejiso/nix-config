@@ -187,6 +187,8 @@ with lib;
           Mod+Q repeat=false { close-window; }
 
           Mod+Space { spawn-sh "noctalia msg panel-toggle launcher"; }
+          Mod+D { spawn-sh "noctalia msg panel-toggle launcher"; }
+          Mod+P { spawn-sh "noctalia msg panel-toggle launcher"; }
           Mod+S { spawn-sh "noctalia msg panel-toggle control-center"; }
           Mod+Comma { spawn-sh "noctalia msg settings-toggle"; }
 
