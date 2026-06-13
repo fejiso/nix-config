@@ -50,8 +50,6 @@
     --max-columns-preview
     --smart-case
     --hidden
-    --no-ignore
-    --no-ignore-vcs
     --follow
     --glob=!.git/*
     --glob=!node_modules/*

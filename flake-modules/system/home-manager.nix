@@ -15,7 +15,7 @@
           "${inputs.self}/hosts/${hostname}/home"
         ];
 
-        _module.args.pkgs = lib.mkForce (import inputs.nixpkgs-master {
+        _module.args.pkgs = lib.mkForce (import inputs.nixpkgs-unstable {
           system = pkgs.stdenv.hostPlatform.system;
           config = {
             allowUnfree = true;
