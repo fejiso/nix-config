@@ -23,8 +23,28 @@ keys:
   - &snuffles_age age1t60rm2grrq3zrhpgpgxz4uc3un7wuy93j3nvp6j7uujkn5l52qasclxhdl
 
 creation_rules:
+  # Shared secrets - used by both home-manager (user key) and system services (host keys)
+  - path_regex: 'secrets/(openrouter|opencodego)\.yaml$'
+    age:
+      - *user_ssh
+      - *user_age
+      - *elitedx_ssh
+      - *blacktop_ssh
+      - *hierro_ssh
+      - *butthead_ssh
+      - *lenovix_ssh
+      - *hispanas_ssh
+      - *snuffles_ssh
+      - *elitedex_age
+      - *hierro_age
+      - *blacktop_age
+      - *butthead_age
+      - *lenovix_age
+      - *hispanas_age
+      - *snuffles_age
+
   # Home-manager secrets - use user SSH key
-  - path_regex: 'secrets/(git-credentials-age|beets|music|atuin|openrouter|opencodego)\.yaml$'
+  - path_regex: 'secrets/(git-credentials-age|beets|music|atuin)\.yaml$'
     age:
       - *user_ssh
       - *user_age
