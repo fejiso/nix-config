@@ -82,7 +82,7 @@ in {
         OPENCLAW_GATEWAY_TOKEN=$GATEWAY_TOKEN
         ANTHROPIC_API_KEY=$ANTHROPIC_KEY
         EOF
-        chmod 644 /run/secrets/openclaw-env
+        chmod 600 /run/secrets/openclaw-env
       '';
     };
 

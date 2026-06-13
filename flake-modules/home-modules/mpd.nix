@@ -208,7 +208,7 @@ with lib;
     };
 
     # Note: SOPS secrets (lastfm-password, listenbrainz-token) are defined in
-    # hosts/common/home/default.nix where inputs.self is available
+    # the host sops.nix module via inputs.self.
   };
 }
 ;

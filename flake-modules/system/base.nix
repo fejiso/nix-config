@@ -1,7 +1,7 @@
 { ... }: {
   flake.modules.nixos.default = { inputs, outputs, lib, config, pkgs, hostname, ... }: {
     # Enable backups on all nodes
-    services.backup.enable = true;
+    services.backup.enable = lib.mkDefault true;
 
     nixpkgs = {
       overlays = [
@@ -27,18 +27,18 @@
     ];
 
     # Enable NFS mounts
-    services.nfs-mounts.enable = true;
+    services.nfs-mounts.enable = lib.mkDefault true;
 
     # Enable Hetzner Storage Box mount
-    services.storagebox-mount.enable = true;
+    services.storagebox-mount.enable = lib.mkDefault true;
 
     # Set hostname
     networking.hostName = hostname;
 
     # Bootloader configuration
-    boot.loader.systemd-boot.enable = true;
-    boot.loader.efi.canTouchEfiVariables = true;
-    system.autoUpgrade.enable = true;
+    boot.loader.systemd-boot.enable = lib.mkDefault true;
+    boot.loader.efi.canTouchEfiVariables = lib.mkDefault true;
+    system.autoUpgrade.enable = lib.mkDefault true;
 
     # Locale and timezone
     i18n.defaultLocale = "en_IE.UTF-8";
@@ -62,7 +62,7 @@
 
     # kmscon - modern TTY with TrueType/emoji support
     services.kmscon = {
-      enable = true;
+      enable = lib.mkDefault true;
       # Software rendering: kmscon's GL renderer segfaults against the nvidia
       # driver, crashing every secondary VT. CPU-rendered consoles are fine.
       hwRender = false;
@@ -149,8 +149,8 @@
       intel-media-driver
       libva
     ];
-    hardware.bluetooth.enable = true;
-    services.blueman.enable = true;
+    hardware.bluetooth.enable = lib.mkDefault true;
+    services.blueman.enable = lib.mkDefault true;
 
     # Enable Magic SysRq (REISUB)
     boot.kernel.sysctl."kernel.sysrq" = 1;

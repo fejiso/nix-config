@@ -37,11 +37,22 @@
         history merge
       end
       zoxide init fish | source
+      direnv hook fish | source
+
+      # Ensure DBUS and XDG variables are available (Linux only)
+      if test (uname) = "Linux"
+        if test -z "$DBUS_SESSION_BUS_ADDRESS"
+          set -x DBUS_SESSION_BUS_ADDRESS "unix:path=$XDG_RUNTIME_DIR/bus"
+        end
+        if test -z "$XDG_RUNTIME_DIR"
+          set -x XDG_RUNTIME_DIR "/run/user/"(id -u)
+        end
+      end
+
       set -gx GPG_TTY (tty)
       gpg-connect-agent updatestartuptty /bye >/dev/null
       bind \ct __fzf_open_file
       bind alt-backspace backward-kill-word
-      direnv hook fish | source
 
       set -Ux FZF_DEFAULT_OPTS '-m -s --ansi -x -e --inline-info --history-size=1000000'
       set -Ux FZF_DEFAULT_COMMAND "rg --files -g '!.git'"

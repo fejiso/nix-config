@@ -1,4 +1,4 @@
-# Lenovix specific home-manager configuration
+# Hispanas-specific home-manager configuration
 {
   inputs,
   outputs,

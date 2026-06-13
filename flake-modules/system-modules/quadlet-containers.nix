@@ -271,7 +271,7 @@ in {
           VPNPASS=$(sed -n "2p" /run/secrets/nordvpn-credentials | tr -d "\n\r")
           echo "OPENVPN_USER=$VPNUSER" > /run/secrets/nordvpn-credentials-env
           echo "OPENVPN_PASSWORD=$VPNPASS" >> /run/secrets/nordvpn-credentials-env
-          chmod 644 /run/secrets/nordvpn-credentials-env
+          chmod 600 /run/secrets/nordvpn-credentials-env
         '';
       };
     })
@@ -503,7 +503,7 @@ in {
         script = ''
           SECRET_KEY=$(cat /run/secrets/paperless-secret-key | tr -d "\n\r")
           echo "PAPERLESS_SECRET_KEY=$SECRET_KEY" > /run/secrets/paperless-env
-          chmod 644 /run/secrets/paperless-env
+          chmod 600 /run/secrets/paperless-env
         '';
       };
 

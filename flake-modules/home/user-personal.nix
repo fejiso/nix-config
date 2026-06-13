@@ -1,7 +1,5 @@
 { ... }: {
-  flake.modules.homeManager.default = { lib, ... }: {
-    programs.git = {
-      settings.user.name = lib.mkDefault "Fernando Jiménez";
-    };
+  flake.modules.homeManager.default = { ... }: {
+    # Personal settings that are defaults, overrideable per-host
   };
 }

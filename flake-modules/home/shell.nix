@@ -55,23 +55,6 @@ in {
   # Fish shell configuration
   programs.fish = {
     enable = true;
-    interactiveShellInit = ''
-      # Initialize zoxide
-      zoxide init fish | source
-      
-      # Set up direnv
-      direnv hook fish | source
-      
-      # Ensure DBUS and XDG variables are available (Linux only)
-      if test (uname) = "Linux"
-        if test -z "$DBUS_SESSION_BUS_ADDRESS"
-          set -x DBUS_SESSION_BUS_ADDRESS "unix:path=$XDG_RUNTIME_DIR/bus"
-        end
-        if test -z "$XDG_RUNTIME_DIR"
-          set -x XDG_RUNTIME_DIR "/run/user/"(id -u)
-        end
-      end
-    '';
     shellAliases = {
       ll = "eza -l";
       la = "eza -la";

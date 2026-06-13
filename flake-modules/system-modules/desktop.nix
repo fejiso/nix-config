@@ -48,6 +48,7 @@
   # and niri needs no full desktop manager.
   services.greetd = {
     enable = true;
+    useTextGreeter = true;
     settings.default_session = {
       command = "${pkgs.tuigreet}/bin/tuigreet --time --remember --cmd ${config.programs.niri.package}/bin/niri-session";
       user = "greeter";
@@ -65,14 +66,11 @@ services.desktopManager.gnome.enable = lib.mkIf config.services.xserver.enable f
 
   # User groups and configuration
   users.groups.plugdev = {};
-  users.users.z-247 = {
-    isNormalUser = true;
-    extraGroups = [ "wheel" "networkmanager" "plugdev" "media-services" ];
-    packages = with pkgs; [
-      amazon-q-cli
-      tree
-    ];
-  };
+  users.users.z-247.extraGroups = [ "plugdev" "media-services" ];
+  users.users.z-247.packages = with pkgs; [
+    amazon-q-cli
+    tree
+  ];
 
   # Desktop system packages
   environment.systemPackages = with pkgs; [
