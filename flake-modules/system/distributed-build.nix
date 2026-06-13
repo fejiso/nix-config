@@ -116,8 +116,15 @@ in
   nix.settings = {
     builders-use-substitutes = true;
     connect-timeout = 1;
-    stalled-download-timeout = 5;
-    http-connections = 25;
+    # connect-timeout=1 already fails fast past *offline* peers; this only
+    # applies to peers that connected (alive). Keep it generous so a jittery
+    # netbird link to butthead doesn't abort a large CUDA NAR mid-transfer
+    # (butthead is the sole source for unfree CUDA — no fallback).
+    stalled-download-timeout = 30;
+    # Keep concurrent fetches modest: over a thin netbird link, 25 parallel
+    # streams each get a starved slice and stall out. Fewer = more bandwidth
+    # per NAR, fewer stall-timeouts.
+    http-connections = 10;
     fallback = true;
     narinfo-cache-negative-ttl = 10;
     warn-dirty = false;
