@@ -75,6 +75,13 @@ in {
         ./patches/pa-dlna-skip-non-upnp-services.patch
       ];
     });
+
+    # perl5.42.0-DBD-CSV-0.60 fails 3/73 tests (t/70_csv.t: drop table tests).
+    # Runtime is unaffected. Cascades through parallel-full → system-path.
+    # Drop when fixed upstream in nixpkgs.
+    perlPackages = prev.perlPackages // {
+      DBDCSV = prev.perlPackages.DBDCSV.overrideAttrs (_: { doCheck = false; });
+    };
   };
 
   # Force every buildGo*Module vendor fetch through GOPROXY=direct / GOSUMDB=off.

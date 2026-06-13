@@ -11,18 +11,11 @@
     # opencode moves fast; track unstable
     package = pkgs.unstable.opencode;
     settings = {
-      model = "opencodego/deepseek-v4-pro";
+      model = "opencode-go/deepseek-v4-pro";
       provider.openrouter.options.apiKey =
         "{file:${config.sops.secrets.openrouter-api-key.path}}";
-      provider.opencodego = {
-        npm = "@ai-sdk/openai-compatible";
-        name = "OpenCode Go";
-        options = {
-          baseURL = "https://opencode.ai/zen/go/v1";
-          apiKey = "{file:${config.sops.secrets.opencodego-api-key.path}}";
-        };
-      };
-      # enable the built-in LSP servers (off by default)
+      provider.opencode-go.options.apiKey =
+        "{file:${config.sops.secrets.opencodego-api-key.path}}";
       lsp = true;
     };
     tui.keybinds = {
