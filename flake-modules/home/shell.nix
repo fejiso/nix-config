@@ -147,7 +147,7 @@ in {
   	enable = true;
   };
 
-  programs.gemini-cli = {
+  programs.antigravity-cli = {
     enable = true;
   };
   
