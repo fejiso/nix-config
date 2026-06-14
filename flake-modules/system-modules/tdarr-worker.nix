@@ -18,6 +18,18 @@ let
   mediaPaths = attrValues cfg.mediaDirectories;
   rwPaths = mediaPaths ++ [ cfg.transcodeCache ];
   nodeUnit = "tdarr-node-${cfg.nodeId}";
+  
+  # Extract mount point from a path (e.g., /mnt/downloadtemp/tdarr-cache -> /mnt/downloadtemp)
+  getMountPoint = path:
+    let
+      parts = lib.strings.splitString "/" (lib.strings.removePrefix "/" path);
+      # Take first two components: mnt/<name>
+      mountPath = "/" + (lib.concatStringsSep "/" (lib.take 2 parts));
+    in
+      mountPath;
+  
+  mountPoints = lib.unique (map getMountPoint rwPaths);
+  automountUnits = map (p: builtins.replaceStrings ["/"] ["-"] (lib.strings.removePrefix "/" p) + ".automount") mountPoints;
 in
 {
   imports = [
@@ -137,14 +149,15 @@ in
     # The upstream units harden with ProtectSystem=strict and only allow writes
     # to their own data dir. Grant write access to the media + cache paths, GPU
     # access for hardware transcoding, and order the units after the NFS mounts.
+    # Note: We only depend on actual mount points, not subdirectories within mounts.
     systemd.services = mkMerge [
       (mkIf cfg.serverEnabled {
         tdarr-server = {
           path = cfg.extraPackages;
           unitConfig = {
             RequiresMountsFor = rwPaths;
-            After = map (p: builtins.replaceStrings ["/"] ["-"] (lib.strings.removePrefix "/" p) + ".automount") rwPaths;
-            Wants = map (p: builtins.replaceStrings ["/"] ["-"] (lib.strings.removePrefix "/" p) + ".automount") rwPaths;
+            After = automountUnits;
+            Wants = automountUnits;
           };
           serviceConfig = {
             ReadWritePaths = mkAfter rwPaths;
@@ -157,8 +170,8 @@ in
           path = cfg.extraPackages;
           unitConfig = {
             RequiresMountsFor = rwPaths;
-            After = map (p: builtins.replaceStrings ["/"] ["-"] (lib.strings.removePrefix "/" p) + ".automount") rwPaths;
-            Wants = map (p: builtins.replaceStrings ["/"] ["-"] (lib.strings.removePrefix "/" p) + ".automount") rwPaths;
+            After = automountUnits;
+            Wants = automountUnits;
           };
           serviceConfig = {
             ReadWritePaths = mkAfter rwPaths;

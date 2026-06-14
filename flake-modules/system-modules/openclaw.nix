@@ -33,6 +33,13 @@ in {
   };
 
   config = mkIf cfg.enable {
+    # Enable podman for rootless containers
+    virtualisation.podman = {
+      enable = true;
+      autoPrune.enable = true;
+      defaultNetwork.settings.dns_enabled = true;
+    };
+
     # Create openclaw user for rootless podman
     users.users.openclaw = {
       isSystemUser = true;
@@ -65,24 +72,26 @@ in {
       };
     };
 
-    # Create environment file from secrets
+    # Create environment file from secrets (outside /run/secrets to avoid sops-nix cleanup)
     systemd.services.openclaw-env-setup = {
       description = "Create OpenClaw environment file from secrets";
       wantedBy = [ "multi-user.target" ];
       after = [ "sops-nix.service" ];
+      restartIfChanged = true;
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
       };
       script = ''
-        mkdir -p /run/secrets
+        mkdir -p /run/openclaw
         GATEWAY_TOKEN=$(cat ${tokenFile})
         OPENROUTER_KEY=$(cat ${openrouterKeyFile})
-        cat > /run/secrets/openclaw-env << EOF
+        cat > /run/openclaw/env << EOF
         OPENCLAW_GATEWAY_TOKEN=$GATEWAY_TOKEN
         OPENROUTER_API_KEY=$OPENROUTER_KEY
         EOF
-        chmod 600 /run/secrets/openclaw-env
+        chown openclaw:openclaw /run/openclaw/env
+        chmod 600 /run/openclaw/env
       '';
     };
 
@@ -107,13 +116,20 @@ in {
             OPENCLAW_GATEWAY_PORT = "3080";
             OPENCLAW_AGENT_MODEL = cfg.model;
           };
-          environmentFiles = [ "/run/secrets/openclaw-env" ];
+          environmentFiles = [ "/run/openclaw/env" ];
           autoUpdate = "registry";
           logDriver = "journald";
         };
         serviceConfig = {
+          ExecStartPre = [
+            "${pkgs.coreutils}/bin/timeout 120 ${pkgs.bash}/bin/bash -c 'while [ ! -f /run/openclaw/env ]; do sleep 1; done'"
+          ];
           Restart = "always";
           RestartSec = "900";
+        };
+        unitConfig = {
+          After = [ "openclaw-env-setup.service" ];
+          Wants = [ "openclaw-env-setup.service" ];
         };
       };
     };
