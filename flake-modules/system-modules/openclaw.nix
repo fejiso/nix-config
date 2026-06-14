@@ -115,9 +115,6 @@ in {
           Restart = "always";
           RestartSec = "900";
         };
-        unitConfig = {
-          After = [ "openclaw-env-setup.service" ];
-        };
       };
     };
 
