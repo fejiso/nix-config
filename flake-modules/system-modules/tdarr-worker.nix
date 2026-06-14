@@ -141,7 +141,11 @@ in
       (mkIf cfg.serverEnabled {
         tdarr-server = {
           path = cfg.extraPackages;
-          unitConfig.RequiresMountsFor = rwPaths;
+          unitConfig = {
+            RequiresMountsFor = rwPaths;
+            After = map (p: builtins.replaceStrings ["/"] ["-"] (lib.strings.removePrefix "/" p) + ".automount") rwPaths;
+            Wants = map (p: builtins.replaceStrings ["/"] ["-"] (lib.strings.removePrefix "/" p) + ".automount") rwPaths;
+          };
           serviceConfig = {
             ReadWritePaths = mkAfter rwPaths;
             SupplementaryGroups = [ "render" "video" ];
@@ -151,7 +155,11 @@ in
       {
         ${nodeUnit} = {
           path = cfg.extraPackages;
-          unitConfig.RequiresMountsFor = rwPaths;
+          unitConfig = {
+            RequiresMountsFor = rwPaths;
+            After = map (p: builtins.replaceStrings ["/"] ["-"] (lib.strings.removePrefix "/" p) + ".automount") rwPaths;
+            Wants = map (p: builtins.replaceStrings ["/"] ["-"] (lib.strings.removePrefix "/" p) + ".automount") rwPaths;
+          };
           serviceConfig = {
             ReadWritePaths = mkAfter rwPaths;
             SupplementaryGroups = [ "render" "video" ];
