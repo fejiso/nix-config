@@ -26,7 +26,7 @@
   services.resolved = {
     enable = true;
     settings.Resolve = {
-      DNSSEC = "allow-downgrade";
+      DNSSEC = "no";
       Domains = [ "~." ];
       FallbackDNS = [
         "9.9.9.9#dns.quad9.net"

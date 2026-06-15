@@ -51,42 +51,28 @@ in {
   };
 
   config = mkIf cfg.enable {
-    # Create Kilo Code config directory
-    home.file.".config/kilo".source = pkgs.runCommand "kilo-config" {} ''
-      mkdir -p $out
-      
-      # Write main config file
-      cat > $out/kilo.jsonc << 'EOF'
-{
-  "$schema": "https://app.kilo.ai/config.json",
-  "provider": {
-    "openrouter": {
-      "models": {
-        "anthropic/claude-sonnet-4-20250514": {
-          "options": {
-            "transforms": ["middle-out"]
-          }
-        },
-        "openai/gpt-4o": {},
-        "google/gemini-pro-1.5": {}
-      }
-    },
-    "opencode-go": {
-      "models": {
-        "deepseek-v4-pro": {},
-        "qwen3.7-max": {}
-      }
-    }
-  },
-  "auto_collapse_reasoning": true,
-  "terminal_command_display": true,
-  "experimental": {
-    "batch_tool": true,
-    "codebase_search": true
-  }
-}
-EOF
-    '';
+    # Link only the static config file so ~/.config/kilo/ stays a real
+    # directory and the activation script can write secrets.json into it.
+    home.file.".config/kilo/kilo.jsonc".text = builtins.toJSON {
+      "$schema" = "https://app.kilo.ai/config.json";
+      provider = {
+        openrouter.models = {
+          "anthropic/claude-sonnet-4-20250514".options.transforms = [ "middle-out" ];
+          "openai/gpt-4o" = {};
+          "google/gemini-pro-1.5" = {};
+        };
+        opencode-go.models = {
+          "deepseek-v4-pro" = {};
+          "qwen3.7-max" = {};
+        };
+      };
+      auto_collapse_reasoning = true;
+      terminal_command_display = true;
+      experimental = {
+        batch_tool = true;
+        codebase_search = true;
+      };
+    };
 
     # Activation script to configure Kilo Code API keys
     # This reads the sops secrets and configures Kilo Code
