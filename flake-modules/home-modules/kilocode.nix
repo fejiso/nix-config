@@ -29,6 +29,14 @@ in
 {
   options.programs.kilocode = {
     enable = lib.mkEnableOption "Kilo Code CLI";
+    # Set to null on hosts where the nix bun binary won't run (e.g. devdesktop)
+    # to keep nix-managed config but install kilo from upstream instead.
+    package = lib.mkOption {
+      type = lib.types.nullOr lib.types.package;
+      default = pkgs.unstable.kilo;
+      defaultText = "pkgs.unstable.kilo";
+      description = "The kilo CLI package to install, or null to install none.";
+    };
     # When false (e.g. work machines), install the CLI but deploy no personal
     # OpenRouter config — the user authenticates with work credentials instead.
     personalProviders = lib.mkOption {
@@ -39,7 +47,7 @@ in
   };
 
   config = lib.mkIf cfg.enable (lib.mkMerge [
-    { home.packages = [ pkgs.unstable.kilo ]; }
+    { home.packages = lib.mkIf (cfg.package != null) [ cfg.package ]; }
 
     # Personal OpenRouter config — skipped on machines that opt out (the
     # openrouter sops secret isn't even declared there, via opencode.nix).

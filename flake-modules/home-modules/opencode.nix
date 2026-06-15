@@ -18,8 +18,10 @@
     {
       programs.opencode = {
         enable = lib.mkDefault true;
-        # opencode moves fast; track unstable
-        package = pkgs.unstable.opencode;
+        # opencode moves fast; track unstable. mkDefault so hosts where the
+        # nix bun binary won't run (e.g. devdesktop) can set package = null and
+        # install opencode from upstream while keeping nix-managed config.
+        package = lib.mkDefault pkgs.unstable.opencode;
         tui.keybinds = {
           # default is ctrl+p, which clashes elsewhere
           command_list = "ctrl+i";

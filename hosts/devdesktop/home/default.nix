@@ -34,10 +34,22 @@
   # Personal tools that don't exist or aren't needed on the work machine.
   programs.antigravity-cli.enable = false;
 
-  # Personal OpenRouter/OpenCode Go credentials must not land on the work machine.
-  # opencode-work module (imported in devdesktop.nix) handles the Bedrock config.
-  # kilo is still installed, just without the personal OpenRouter config.
+  # The nix bun-compiled opencode/kilo binaries segfault in the glibc loader on
+  # this corp kernel (amzn2int KVM guest) — their unusual ELF layout trips it,
+  # while ordinary nix binaries run fine. So install both from upstream here,
+  # like the toolbox claude:
+  #   opencode: curl -fsSL https://opencode.ai/install | bash
+  #   kilo:     npm i -g @kilocode/cli   (or: bun install -g @kilocode/cli)
+  #
+  # opencode: the upstream home-manager module errors on package = null
+  # (versionAtLeast on a null version), so disable the nix module outright and
+  # configure the upstream binary directly when the work Bedrock details exist.
+  programs.opencode.enable = lib.mkForce false;
   programs.opencode.personalProviders = false;
+
+  # kilo: keep the module enabled but install no nix binary and deploy no
+  # personal OpenRouter config — the upstream CLI uses work credentials.
+  programs.kilocode.package = null;
   programs.kilocode.personalProviders = false;
 
   # Use the Amazon-provisioned claude (~/.toolbox/bin/claude), not the nixpkgs
