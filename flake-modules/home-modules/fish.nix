@@ -82,7 +82,12 @@
       fish_add_path --path --prepend $HOME/bin
       
       if test "$USER" != "root"
-        ${lib.optionalString (pkgs.stdenv.isDarwin || hostname == "devdesktop") "fish_add_path --path --prepend $HOME/.toolbox/bin"}
+        ${lib.optionalString (pkgs.stdenv.isDarwin || hostname == "devdesktop") ''
+        fish_add_path --path --prepend $HOME/.toolbox/bin
+        # On corp machines the nix bun binaries don't run, so opencode/kilo are
+        # installed from upstream into these dirs — put them on PATH.
+        fish_add_path --path --prepend $HOME/.opencode/bin
+        fish_add_path --path --prepend $HOME/.kilo/bin''}
       end
 
       export ANT_ARGS='-logger org.apache.tools.ant.listener.AnsiColorLogger'
