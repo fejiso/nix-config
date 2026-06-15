@@ -124,9 +124,29 @@ in {
   # When applied, the unstable nixpkgs set (declared in the flake inputs) will
   # be accessible through 'pkgs.unstable'
   unstable-packages = final: _prev: {
-    unstable = import inputs.nixpkgs-unstable {
-      system = final.stdenv.hostPlatform.system;
-      config.allowUnfree = true;
-    };
+    unstable =
+      let
+        unstablePkgs = import inputs.nixpkgs-unstable {
+          system = final.stdenv.hostPlatform.system;
+          config.allowUnfree = true;
+        };
+      in
+      unstablePkgs.extend (ufinal: uprev: {
+        # kilo (kilocode-cli) 7.3.40 builds kilo-console with vite, whose
+        # node_modules scripts carry a #!/usr/bin/env node shebang. The package
+        # runs patchShebangs but has only `bun` in its inputs, so patchShebangs
+        # can't resolve `node` and leaves the broken shebang — vite then fails
+        # with "/usr/bin/env: bad interpreter" in the sandbox. Add nodejs so the
+        # shebang resolves, and re-run patchShebangs after configure (the FOD's
+        # files are read-only, so make them writable first).
+        # Drop once fixed upstream in nixpkgs.
+        kilo = uprev.kilo.overrideAttrs (old: {
+          nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ ufinal.nodejs ];
+          postConfigure = (old.postConfigure or "") + ''
+            chmod -R u+w packages node_modules
+            patchShebangs packages/*/node_modules node_modules
+          '';
+        });
+      });
   };
 }
