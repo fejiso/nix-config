@@ -148,7 +148,7 @@ in {
   };
 
   programs.antigravity-cli = {
-    enable = true;
+    enable = lib.mkDefault true;
   };
   
   # Starship prompt

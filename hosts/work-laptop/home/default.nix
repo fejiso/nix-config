@@ -43,6 +43,8 @@
     email = lib.mkForce "superfer@amazon.com"; # Adjust as needed
   };
 
+  programs.antigravity-cli.enable = false;
+
   # macOS specific programs
   programs.alacritty.settings.window.decorations = lib.mkForce "buttonless";
 

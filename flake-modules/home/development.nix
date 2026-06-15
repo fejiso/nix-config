@@ -53,8 +53,7 @@ in {
     nix-direnv.enable = true;
   };
   
-  # Kilo Code VS Code extension
-  programs.kilocode.enable = true;
+  programs.kilocode.enable = lib.mkDefault true;
   
   # Neovim configuration with LazyVim
   programs.neovim = {

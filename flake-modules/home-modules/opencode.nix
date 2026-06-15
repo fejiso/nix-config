@@ -5,37 +5,52 @@
 #   sops secrets/openrouter.yaml
 # The OpenCode Go API key lives in secrets/opencodego.yaml; edit with:
 #   sops secrets/opencodego.yaml
-{ config, pkgs, inputs, ... }: {
-  programs.opencode = {
-    enable = true;
-    # opencode moves fast; track unstable
-    package = pkgs.unstable.opencode;
-    settings = {
-      model = "opencode-go/deepseek-v4-pro";
-      provider.openrouter.options.apiKey =
-        "{file:${config.sops.secrets.openrouter-api-key.path}}";
-      provider.opencode-go.options.apiKey =
-        "{file:${config.sops.secrets.opencodego-api-key.path}}";
-      lsp = true;
-    };
-    tui.keybinds = {
-      # default is ctrl+p, which clashes elsewhere
-      command_list = "ctrl+i";
-    };
+{ config, lib, pkgs, inputs, ... }: {
+  # personalProviders controls OpenRouter/OpenCode Go secret deployment.
+  # Set to false on work machines that use a different AI backend.
+  options.programs.opencode.personalProviders = lib.mkOption {
+    type = lib.types.bool;
+    default = true;
+    description = "Deploy OpenRouter and OpenCode Go API keys via sops.";
   };
 
-  sops.secrets.openrouter-api-key = {
-    sopsFile = "${inputs.self}/secrets/openrouter.yaml";
-    key = "openrouter_api_key";
-    path = "${config.home.homeDirectory}/.local/share/opencode/openrouter-api-key";
-    mode = "0600";
-  };
-
-  sops.secrets.opencodego-api-key = {
-    sopsFile = "${inputs.self}/secrets/opencodego.yaml";
-    key = "opencodego_api_key";
-    path = "${config.home.homeDirectory}/.local/share/opencode/opencodego-api-key";
-    mode = "0600";
-  };
+  config = lib.mkMerge [
+    {
+      programs.opencode = {
+        enable = lib.mkDefault true;
+        # opencode moves fast; track unstable
+        package = pkgs.unstable.opencode;
+        tui.keybinds = {
+          # default is ctrl+p, which clashes elsewhere
+          command_list = "ctrl+i";
+        };
+      };
+    }
+    # Personal provider settings and secrets — skipped on work machines.
+    (lib.mkIf config.programs.opencode.personalProviders {
+      programs.opencode.settings = {
+        model = "opencode-go/deepseek-v4-pro";
+        provider.openrouter.options.apiKey =
+          "{file:${config.sops.secrets.openrouter-api-key.path}}";
+        provider.opencode-go.options.apiKey =
+          "{file:${config.sops.secrets.opencodego-api-key.path}}";
+        lsp = true;
+      };
+      sops.secrets = {
+        openrouter-api-key = {
+          sopsFile = "${inputs.self}/secrets/openrouter.yaml";
+          key = "openrouter_api_key";
+          path = "${config.home.homeDirectory}/.local/share/opencode/openrouter-api-key";
+          mode = "0600";
+        };
+        opencodego-api-key = {
+          sopsFile = "${inputs.self}/secrets/opencodego.yaml";
+          key = "opencodego_api_key";
+          path = "${config.home.homeDirectory}/.local/share/opencode/opencodego-api-key";
+          mode = "0600";
+        };
+      };
+    })
+  ];
 };
 }

@@ -27,6 +27,7 @@
       modules = [
         config.flake.modules.homeManager.default
         config.flake.modules.homeManager.development
+        config.flake.modules.homeManager.opencode-work
         "${inputs.self}/hosts/devdesktop/home"
       ];
     };
