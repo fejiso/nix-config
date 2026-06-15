@@ -13,6 +13,8 @@ in {
   imports = [
     # opencode + OpenRouter, dev machines only
     homeModules.opencode
+    # Kilo Code VS Code extension
+    homeModules.kilocode
   ];
 
   home.packages = with pkgs; [
@@ -50,6 +52,9 @@ in {
     enableBashIntegration = true;
     nix-direnv.enable = true;
   };
+  
+  # Kilo Code VS Code extension
+  programs.kilocode.enable = true;
   
   # Neovim configuration with LazyVim
   programs.neovim = {
