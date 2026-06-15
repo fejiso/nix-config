@@ -27,21 +27,34 @@ let
 in
 
 {
-  options.programs.kilocode.enable = lib.mkEnableOption "Kilo Code CLI";
-
-  config = lib.mkIf cfg.enable {
-    home.packages = [ pkgs.unstable.kilo ];
-
-    # Earlier generations linked the whole ~/.config/kilo dir (and later
-    # kilo.json) to a read-only store path. Remove any such stale symlink so
-    # the directory is real and writable for both our config and the CLI.
-    home.activation.kiloConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      if [[ -L "$HOME/.config/kilo" ]]; then
-        rm "$HOME/.config/kilo"
-      fi
-      mkdir -p ${configDir}
-      install -m 0644 ${kiloConfig} ${configDir}/kilo.json
-    '';
+  options.programs.kilocode = {
+    enable = lib.mkEnableOption "Kilo Code CLI";
+    # When false (e.g. work machines), install the CLI but deploy no personal
+    # OpenRouter config — the user authenticates with work credentials instead.
+    personalProviders = lib.mkOption {
+      type = lib.types.bool;
+      default = true;
+      description = "Write the personal OpenRouter provider config for kilo.";
+    };
   };
+
+  config = lib.mkIf cfg.enable (lib.mkMerge [
+    { home.packages = [ pkgs.unstable.kilo ]; }
+
+    # Personal OpenRouter config — skipped on machines that opt out (the
+    # openrouter sops secret isn't even declared there, via opencode.nix).
+    (lib.mkIf cfg.personalProviders {
+      # Earlier generations linked the whole ~/.config/kilo dir (and later
+      # kilo.json) to a read-only store path. Remove any such stale symlink so
+      # the directory is real and writable for both our config and the CLI.
+      home.activation.kiloConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        if [[ -L "$HOME/.config/kilo" ]]; then
+          rm "$HOME/.config/kilo"
+        fi
+        mkdir -p ${configDir}
+        install -m 0644 ${kiloConfig} ${configDir}/kilo.json
+      '';
+    })
+  ]);
 };
 }

@@ -36,7 +36,9 @@
 
   # Personal OpenRouter/OpenCode Go credentials must not land on the work machine.
   # opencode-work module (imported in devdesktop.nix) handles the Bedrock config.
+  # kilo is still installed, just without the personal OpenRouter config.
   programs.opencode.personalProviders = false;
+  programs.kilocode.personalProviders = false;
 
   # Use the Amazon-provisioned claude (~/.toolbox/bin/claude), not the nixpkgs
   # build. package = null keeps home-manager managing claude-code settings but
