@@ -1,27 +1,29 @@
 { ... }: {
   flake.modules.homeManager.kilocode =
+# Kilo Code CLI (the `kilo`/`kilocode` binary). At startup the CLI merges
+# global config from ~/.config/kilo/{config.json,kilo.json,kilo.jsonc,...}.
+# kilo is an opencode fork and supports {file:...} substitution, so the
+# OpenRouter key is referenced from the sops secret rather than embedded.
+#
+# kilo.json is written as a real (writable) file rather than a home-manager
+# store symlink: when kilo loads a config without a "$schema" key it rewrites
+# the file in place to inject one (config.ts), which EACCES-fails on a 0444
+# store symlink. We pre-set "$schema" so it won't rewrite, and keep the file
+# writable so any future CLI-managed write succeeds too.
 { config, lib, pkgs, inputs, ... }:
 
 let
   cfg = config.programs.kilocode;
   jsonFormat = pkgs.formats.json { };
 
-  staticConfig = jsonFormat.generate "kilocode-cli-config" {
-    version = "1.0.0";
-    mode = "code";
-    telemetry = false;
-    provider = "openrouter";
-    providers = [
-      {
-        id = "openrouter";
-        provider = "openrouter";
-        openRouterModelId = "anthropic/claude-sonnet-4-20250514";
-        openRouterUseMiddleOutTransform = true;
-      }
-    ];
+  kiloConfig = jsonFormat.generate "kilo.json" {
+    "$schema" = "https://app.kilo.ai/config.json";
+    model = "openrouter/anthropic/claude-sonnet-4-20250514";
+    provider.openrouter.options.apiKey =
+      "{file:${config.sops.secrets.openrouter-api-key.path}}";
   };
 
-  configDir = "${config.home.homeDirectory}/.kilocode/cli";
+  configDir = "${config.home.homeDirectory}/.config/kilo";
 in
 
 {
@@ -30,12 +32,15 @@ in
   config = lib.mkIf cfg.enable {
     home.packages = [ pkgs.unstable.kilo ];
 
-    home.activation.kilocodeConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-      OPENROUTER_KEY=$(cat ${config.sops.secrets.openrouter-api-key.path} 2>/dev/null || echo "")
+    # Earlier generations linked the whole ~/.config/kilo dir (and later
+    # kilo.json) to a read-only store path. Remove any such stale symlink so
+    # the directory is real and writable for both our config and the CLI.
+    home.activation.kiloConfig = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+      if [[ -L "$HOME/.config/kilo" ]]; then
+        rm "$HOME/.config/kilo"
+      fi
       mkdir -p ${configDir}
-      ${lib.getExe pkgs.jq} --arg key "$OPENROUTER_KEY" \
-        '.providers[0].openRouterApiKey = $key' \
-        ${staticConfig} > ${configDir}/config.json
+      install -m 0644 ${kiloConfig} ${configDir}/kilo.json
     '';
   };
 };
