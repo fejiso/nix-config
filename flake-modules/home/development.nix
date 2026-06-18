@@ -15,6 +15,8 @@ in {
     homeModules.opencode
     # Kilo Code VS Code extension
     homeModules.kilocode
+    # pi coding agent
+    homeModules.pi-agent
   ];
 
   home.packages = with pkgs; [
@@ -54,7 +56,8 @@ in {
   };
   
   programs.kilocode.enable = lib.mkDefault true;
-  
+  programs.pi-agent.enable = lib.mkDefault true;
+
   # Neovim configuration with LazyVim
   programs.neovim = {
     enable = true;

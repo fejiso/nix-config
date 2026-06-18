@@ -42,6 +42,13 @@
       url = "github:noctalia-dev/noctalia";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
     };
+
+    # FPGA vendor toolchains (FHS-wrapped; user supplies the installers).
+    # nix-fpga covers Vivado + Quartus; nix-gowin-eda wraps Gowin EDA.
+    # Their own nixpkgs is left unpinned-to-ours on purpose so the vendor
+    # FHS envs build as their authors intend.
+    nix-fpga.url = "git+https://codeberg.org/Rutherther/nix-fpga";
+    nix-gowin-eda.url = "github:scottwillmoore/nix-gowin-eda";
   };
 
   outputs = inputs:

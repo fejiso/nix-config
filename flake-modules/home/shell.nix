@@ -129,6 +129,9 @@ in {
     nix-direnv.enable = true;
   };
 
+  # socat and bubblewrap have no home-manager program modules; install as packages.
+  home.packages = [ pkgs.socat pkgs.bubblewrap ];
+
   # Atuin shell history
   programs.atuin = {
     enable = true;

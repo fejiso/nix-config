@@ -34,6 +34,42 @@
     dedicatedServer.openFirewall = true; # Open ports in the firewall for Source Dedicated Server
   };
 
+  # MeshChatX (meshchatx): all-in-one Reticulum/LXMF client. Run as the official
+  # container — a native nix package is impractical (needs rns 1.3.5 / lxmf 1.0.1
+  # newer than nixpkgs, plus lxst/pycodec2/lxmfy, a pnpm frontend build and native
+  # libs). The image's default command serves the web UI headless on port 8000;
+  # we publish it on localhost only and provide a launcher that opens the browser.
+  # The in-container user is UID 1000, matching z-247, so /var/lib/meshchatx data
+  # is owned by the user. (Serial/LoRa/Bluetooth need device passthrough — add
+  # `extraOptions = [ "--device=..." ]` / dbus socket if you use local hardware.)
+  virtualisation.podman.enable = lib.mkDefault true;
+  virtualisation.oci-containers = {
+    backend = "podman";
+    containers.meshchatx = {
+      # Fully-qualified: the autoupdate label below rejects short names.
+      image = "docker.io/quad4io/meshchatx:latest";
+      autoStart = true;
+      ports = [ "127.0.0.1:48000:8000" ];
+      volumes = [ "/var/lib/meshchatx:/config" ];
+      # Default CMD serves HTTPS with a self-signed cert; add --no-https so the
+      # localhost-only UI is plain HTTP (no cert warning). Reproduces the image's
+      # default command since setting cmd replaces it.
+      cmd = [
+        "meshchatx"
+        "--host=0.0.0.0"
+        "--reticulum-config-dir=/config/.reticulum"
+        "--storage-dir=/config/.reticulum-meshchatx"
+        "--headless"
+        "--no-https"
+      ];
+      # Let the daily podman-auto-update timer (system/podman.nix) refresh it.
+      labels."io.containers.autoupdate" = "registry";
+    };
+  };
+  systemd.tmpfiles.rules = [
+    "d /var/lib/meshchatx 0755 1000 100 -"
+  ];
+
   # Desktop services
   services.pcscd.enable = true;  # Smart card daemon for hardware tokens
   services.udev.packages = [ pkgs.yubikey-personalization ];
@@ -85,6 +121,19 @@ services.desktopManager.gnome.enable = lib.mkIf config.services.xserver.enable f
     pcsc-tools
     spotify
     poppler-utils
+
+    # meshchatx: open the MeshChatX web UI (served by the container above).
+    (writeShellScriptBin "meshchatx" ''
+      exec ${xdg-utils}/bin/xdg-open "http://localhost:48000"
+    '')
+    (makeDesktopItem {
+      name = "meshchatx";
+      desktopName = "MeshChatX";
+      comment = "All-in-one Reticulum / LXMF mesh client";
+      exec = "xdg-open http://localhost:48000";
+      terminal = false;
+      categories = [ "Network" "InstantMessaging" ];
+    })
   ];
 
   # SSH configuration for desktop access

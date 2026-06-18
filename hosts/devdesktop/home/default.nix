@@ -52,6 +52,10 @@
   programs.kilocode.package = null;
   programs.kilocode.personalProviders = false;
 
+  # pi is node-based (not a bun binary), so the nix package runs here — keep it
+  # installed but deploy no personal OpenRouter auth (use work credentials).
+  programs.pi-agent.personalProviders = false;
+
   # Use the Amazon-provisioned claude (~/.toolbox/bin/claude), not the nixpkgs
   # build. package = null keeps home-manager managing claude-code settings but
   # installs no binary, so it never shadows the toolbox one on PATH.
