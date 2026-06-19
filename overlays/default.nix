@@ -52,6 +52,16 @@ in {
     # formatting mismatches in test_package_specifier). Runtime is unaffected.
     pipx = prev.pipx.overridePythonAttrs (_: { doCheck = false; });
 
+    # fastfetch defaults to pulling a heavy media/GUI stack via its optional
+    # image support (imagemagick, chafa) and Enlightenment support
+    # (efl -> ffmpeg -> openapv, chromaprint). None of that is needed to print
+    # system info; disabling it keeps the closure lean on every host and stops
+    # headless/work boxes (devdesktop/gravidesktop) from dragging in ffmpeg.
+    fastfetch = prev.fastfetch.override {
+      imageSupport = false;
+      enlightenmentSupport = false;
+    };
+
     # niri 26.04 leaks VRAM whenever monitors are powered off (e.g. hypridle's
     # 30-min `power-off-monitors`), eventually filling the GPU and starving
     # CUDA training on butthead. Upstream: niri-wm/niri#3295; the fix is the
