@@ -32,8 +32,9 @@ in {
     cmake
     clang
     # Development tools
-    jetbrains.idea
-    postman
+    # NB: GUI IDEs (jetbrains.idea, postman) live in the `desktop` module, not
+    # here — they pull a heavy GUI/media stack (Chromium/Electron → ffmpeg,
+    # pipewire, …) that's useless on headless work boxes (devdesktop/gravidesktop).
     gnumake
     llvmPackages.openmp
 

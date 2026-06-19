@@ -18,6 +18,11 @@ in {
   ];
 
   home.packages = with pkgs; [
+    # GUI development IDEs (moved here from the `development` module so they
+    # only land on real desktops, not headless work boxes).
+    jetbrains.idea
+    postman
+
     # Desktop applications
     telegram-desktop
     logseq
