@@ -82,7 +82,7 @@
       fish_add_path --path --prepend $HOME/bin
       
       if test "$USER" != "root"
-        ${lib.optionalString (pkgs.stdenv.isDarwin || hostname == "devdesktop") ''
+        ${lib.optionalString (pkgs.stdenv.isDarwin || builtins.elem hostname [ "devdesktop" "gravidesktop" ]) ''
         fish_add_path --path --prepend $HOME/.toolbox/bin
         # On corp machines the nix bun binaries don't run, so opencode/kilo are
         # installed from upstream into these dirs — put them on PATH.
