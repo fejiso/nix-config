@@ -1,4 +1,6 @@
-{ ... }: {
+{ config, ... }: let
+  homeModules = config.flake.modules.homeManager;
+in {
   flake.modules.homeManager.desktop =
 # Desktop GUI applications
 {
@@ -7,6 +9,14 @@
   pkgs,
   ...
 }: {
+  # Media modules live here (not in `default`) so they only land on real
+  # desktops — keeps beets/mpd/tidalcycles off devdesktop, work-laptop, amp1.
+  imports = [
+    homeModules.beets
+    homeModules.mpd
+    homeModules.tidalcycles
+  ];
+
   home.packages = with pkgs; [
     # Desktop applications
     telegram-desktop
