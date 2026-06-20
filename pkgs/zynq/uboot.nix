@@ -18,8 +18,20 @@ buildUBoot {
   };
 
   defconfig = "xilinx_zynq_virt_defconfig";
-  # Board select. Use "zynq-zturn-v5" instead for the newer Z-turn board revision.
-  extraMakeFlags = [ "DEVICE_TREE=zynq-zturn" ];
+  # Board select. This is the V5 board revision (ethernet PHY at MDIO addr 3);
+  # the non-v5 DT (phy@0) gives "Could not get PHY for eth0: addr 0" in u-boot.
+  extraMakeFlags = [ "DEVICE_TREE=zynq-zturn-v5" ];
+
+  # Boot NixOS extlinux directly from the FAT (mmc 0:1). The stock distro_bootcmd
+  # only scans *bootable* partitions for extlinux.conf, but the NixOS sd-image
+  # sets the active flag on the btrfs ROOT partition (which u-boot can't read) —
+  # so it never looks at the FAT where extlinux.conf + kernel/initrd/dtb live.
+  # Override bootcmd to sysboot the FAT explicitly; keep distro_bootcmd as a
+  # fallback (e.g. for future netboot).
+  extraConfig = ''
+    CONFIG_USE_BOOTCOMMAND=y
+    CONFIG_BOOTCOMMAND="if mmc dev 0; then sysboot mmc 0:1 any 0x03000000 /extlinux/extlinux.conf; fi; run distro_bootcmd"
+  '';
 
   extraMeta.platforms = [ "armv7l-linux" ];
   filesToInstall = [ "spl/boot.bin" "u-boot.img" ];

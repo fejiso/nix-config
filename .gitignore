@@ -19,3 +19,8 @@ keys.txt
 .Trashes
 ehthumbs.db
 Thumbs.db
+*.img
+*.img.zst
+zturn.img
+/result
+.gemini/

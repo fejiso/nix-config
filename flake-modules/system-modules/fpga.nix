@@ -17,7 +17,66 @@
 #   nix run github:scottwillmoore/nix-gowin-eda#gowin-eda-education
 { config, lib, pkgs, ... }:
 let
-  fpga = inputs.nix-fpga.packages.${pkgs.stdenv.hostPlatform.system};
+  system = pkgs.stdenv.hostPlatform.system;
+  fpga = inputs.nix-fpga.packages.${system};
+
+  # Vivado 2025.2 needs libs nix-fpga's FHS targetPkgs predate (e.g. pixman, for
+  # libxv_tcltasks.so). We can't add them from OUR nixpkgs: this FHS uses an
+  # older glibc, and mixing in glibc-2.42 libs triggers GLIBC_PRIVATE /
+  # __nptl_change_stack_perm crashes. So rebuild the Vivado FHS env from
+  # nix-fpga's OWN nixpkgs (which still has libstdcxx5 etc.), appending the
+  # missing libs. Quartus/Gowin are left on the upstream packages.
+  nfPkgs = import inputs.nix-fpga.inputs.nixpkgs { inherit system; };
+  nfLib = import "${inputs.nix-fpga}/pkgs/common.nix" {
+    pkgs = nfPkgs;
+    inherit (nfPkgs) lib;
+  };
+  vivadoTargetPkgs = (import "${inputs.nix-fpga}/pkgs/xilinx/common.nix").targetPkgs;
+  # Extra runtime libs newer Vivado/Vitis wants but the upstream list omits.
+  vivadoExtraLibs = p: [ p.pixman ];
+
+  # Mirror nix-fpga's vivado/fhs.nix, only with the extra libs appended.
+  mkVivadoFhs = requireInstallDir: nfPkgs.buildFHSEnv {
+    name = "vivado";
+    targetPkgs = p: (vivadoTargetPkgs p) ++ (vivadoExtraLibs p);
+    runScript = ''
+      ${nfLib.runScriptPrefix "vivado" requireInstallDir}
+      if [[ ! -z $INSTALL_DIR ]]; then
+        source $INSTALL_DIR/settings64.sh $INSTALL_DIR
+      fi
+      export LD_LIBRARY_PATH=/lib:$LD_LIBRARY_PATH
+      exec "$@"
+    '';
+    meta.mainProgram = "vivado";
+  };
+
+  # vivado-shell: drops into an FHS bash (used to install + launch Vivado).
+  vivado-shell = nfPkgs.writeShellScriptBin "vivado-shell" ''
+    exec ${nfPkgs.lib.getExe (mkVivadoFhs false)} bash "$@"
+  '';
+  # vivado: the on-PATH wrappers (vivado, xsim, xsdb, …), generated against our
+  # patched FHS env. (.override on fpga.vivado can't reach the inner fhsEnv, so
+  # drive nix-fpga's generator directly with the same executables list.)
+  vivado = nfLib.finalPkgGenerator.override {
+    mainProgram = "vivado";
+    fhsEnv = mkVivadoFhs true;
+    executables = lib.unique [
+      # Vivado bin/
+      "bootgen" "cdoutil" "cdoutil_int" "combine_dfx_bitstreams" "cs_server"
+      "diffbd" "hw_server" "hw_serverpv" "ldlibpath.sh" "loader"
+      "manage_ipcache" "program_ftdi" "rdiArgs.sh" "setEnvAndRunCmd.sh"
+      "setupEnv.sh" "stapl_player" "svf_utility" "symbol_server" "tcflog"
+      "unsetldlibpath.sh" "unwrapped" "updatemem" "vivado" "vlm" "wbtcv" "xar"
+      "xcd" "xcrg" "xelab" "xlicdiag" "xrcserver" "xrt_server" "xsc" "xsdb"
+      "xsim" "xtclsh" "xvc_pcie" "xvhdl" "xvlog"
+      # Vitis bin/
+      "apcc" "hlsArgs.sh" "vitis_hls"
+      # ModelComposer bin/
+      "model_composer" "modelcomposerArgs.sh" "setPatchEnv.sh"
+      # DocNav bin/
+      "AppRun" "docnav" "lib" "libexec" "pdfjs" "plugins" "translations"
+    ];
+  };
 in {
   environment.systemPackages = [
     # Open-source flow — works out of the box, no license:
@@ -29,8 +88,9 @@ in {
     pkgs.openfpgaloader
 
     # Proprietary vendor toolchains (FHS-wrapped; installer supplied by you).
-    fpga.vivado
-    fpga.vivado-shell
+    # Vivado uses our pixman-patched FHS env (see above); Quartus is upstream.
+    vivado
+    vivado-shell
     fpga.quartus
     fpga.quartus-shell
   ];

@@ -58,5 +58,18 @@
   boot.loader.systemd-boot.enable = lib.mkForce false;
   boot.loader.efi.canTouchEfiVariables = lib.mkForce false;
 
+  # Bring-up credential: without a password, the serial console login is
+  # unusable (and SSH is key-only), so a failed network leaves no way in.
+  # TODO: remove once the board is on netbird and reachable over SSH.
+  users.users.root.initialPassword = lib.mkForce "zturn";
+  users.users.z-247.initialPassword = lib.mkForce "zturn";
+
+  # The login "System error" root cause was the btrfs image's `/` being owned by
+  # uid 1000 (make-btrfs-fs bug), which made systemd-tmpfiles refuse every path
+  # ("unsafe path transition", exit 73) so /var/lib/lastlog was never created
+  # and pam_lastlog2 (session required) aborted login. Fixed for all SD hosts in
+  # the shared sd-image-btrfs module (fix-sd-root-ownership runs before
+  # tmpfiles-setup). Nothing z-turn-specific is needed here anymore.
+
   system.stateVersion = "25.05";
 }

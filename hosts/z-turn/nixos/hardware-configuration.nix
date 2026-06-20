@@ -17,9 +17,10 @@
   boot.initrd.availableKernelModules = lib.mkForce [ ];
 
   hardware.deviceTree.enable = true;
-  # linux-xlnx installs the Zynq DTBs flat. Use "zynq-zturn-v5.dtb" for the
-  # newer board revision.
-  hardware.deviceTree.name = "zynq-zturn.dtb";
+  # linux-xlnx installs the Zynq DTBs flat. This board is the V5 revision
+  # (Silicon v3.1): its ethernet PHY is at MDIO address 3, not 0 — the non-v5
+  # DT (phy@0) causes "Could not get PHY for eth0: addr 0" and no link/DHCP.
+  hardware.deviceTree.name = "zynq-zturn-v5.dtb";
 
   # Root filesystem (btrfs, grow-on-boot) and the FAT boot partition come from
   # the shared sd-image-btrfs module (wired in by mk-host for sdImage hosts).
