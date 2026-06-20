@@ -47,6 +47,13 @@
   hardware.graphics.enable = lib.mkForce false;
   hardware.graphics.enable32Bit = lib.mkForce false;
 
+  # ~753 MiB of blobs for discrete GPUs / WiFi / BT this board doesn't have.
+  # The Zynq PS peripherals (GEM ethernet, USB, SD/MMC, UART) need no firmware
+  # upload. If a USB WiFi/BT dongle is ever attached, add only that chip's
+  # firmware to hardware.firmware (check `dmesg | grep -i firmware`).
+  hardware.enableRedistributableFirmware = lib.mkForce false;
+  hardware.firmware = lib.mkForce [ ];
+
   # ARM uses generic-extlinux-compatible, not systemd-boot / UEFI.
   boot.loader.systemd-boot.enable = lib.mkForce false;
   boot.loader.efi.canTouchEfiVariables = lib.mkForce false;
