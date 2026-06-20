@@ -9,9 +9,6 @@
   nixpkgs.hostPlatform = lib.mkDefault "aarch64-linux";
 
   # Boot configuration - Amlogic S905X3 uses vendor u-boot
-  boot.loader.grub.enable = false;
-  boot.loader.generic-extlinux-compatible.enable = true;
-
   # Use latest kernel for best Amlogic SM1 device tree support
   boot.kernelPackages = lib.mkDefault pkgs.linuxPackages_latest;
 
@@ -42,17 +39,6 @@
   };
 
   # File systems - btrfs with compression
-  fileSystems."/" = {
-    device = "/dev/disk/by-label/NIXOS_SD";
-    fsType = "btrfs";
-    options = [ "subvol=@" "compress=zstd" "noatime" ];
-  };
-
-  fileSystems."/boot" = {
-    device = "/dev/disk/by-label/FIRMWARE";
-    fsType = "vfat";
-  };
-
   # No swap on SD card (using zram from embedded.nix)
   swapDevices = [ ];
 

@@ -29,6 +29,9 @@ let
   baseModules =
     [ config.flake.modules.nixos.default ]
     ++ modules
+    # SD hosts get the generic btrfs root (fs + grow); see
+    # flake-modules/system-modules/sd-image-btrfs.nix.
+    ++ lib.optional sdImage config.flake.modules.nixos.sd-image-btrfs
     ++ lib.optional (homeModules != [ ]) {
       home-manager.users.${homeUser}.imports = homeModules;
     }
@@ -54,6 +57,7 @@ in
       (inputs.nixpkgs.lib.nixosSystem {
         inherit system specialArgs;
         modules = baseModules ++ [
+          config.flake.modules.nixos.sd-image-btrfs-build
           "${inputs.self}/hosts/${name}/nixos/sd-image.nix"
         ];
       }).config.system.build.sdImage;

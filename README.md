@@ -21,14 +21,16 @@ This flake-based configuration supports:
 
 - **x86_64 NixOS systems**: `elitedex`, `lenovix`, `hispanas`, `a8`, `blacktop`,
   `hierro`, `butthead`, `snuffles`
-- **ARM64 NixOS systems**: `rpi3` (Raspberry Pi 3), `pine64` (Pine64 SBC),
-  `xpi-s905x3` (Amlogic S905X3 TV box)
+- **ARM NixOS systems**: `rpi3` (Raspberry Pi 3), `pine64` (Pine64 SBC),
+  `xpi-s905x3` (Amlogic S905X3 TV box) — all aarch64 — plus `z-turn`
+  (MYIR Z-turn, Xilinx Zynq-7020 FPGA SoC, **armv7l**, cross-compiled with the
+  `linux-xlnx` / `u-boot-xlnx` forks)
 - **macOS system**: `work-laptop` (aarch64-darwin, via nix-darwin)
 - **Standalone home-manager configurations** (non-NixOS Linux):
   `superfer@devdesktop` (x86_64 Ubuntu) and `ubuntu@amp1` (aarch64 Ubuntu,
   also used as a native ARM remote builder)
-- **SD card image generation**: Bootable images for ARM single-board computers
-  (`rpi3`, `pine64`, `xpi-s905x3`)
+- **SD card image generation**: Bootable **btrfs** images for ARM single-board
+  computers (`rpi3`, `pine64`, `xpi-s905x3`, `z-turn`)
 - **Cross-platform support**: aarch64/x86_64 on both Linux and Darwin
 
 ## Channels & toolchain
@@ -132,6 +134,7 @@ automatically. ARM hosts pass `sdImage = true` to also get `images.<name>`.
 | `rpi3`       | aarch64-linux   | NixOS + SD img  | Raspberry Pi 3, embedded |
 | `pine64`     | aarch64-linux   | NixOS + SD img  | Pine64 SBC, embedded |
 | `xpi-s905x3` | aarch64-linux   | NixOS + SD img  | Amlogic S905X3 box, embedded |
+| `z-turn`     | armv7l-linux    | NixOS + SD img  | MYIR Z-turn (Zynq-7020 FPGA SoC); linux-xlnx/u-boot-xlnx, cross-compiled |
 | `work-laptop`| aarch64-darwin  | nix-darwin      | macOS work machine |
 | `devdesktop` | x86_64-linux    | home-manager    | Standalone HM on Ubuntu (`superfer@devdesktop`) |
 | `amp1`       | aarch64-linux   | home-manager    | Standalone HM on Ubuntu + native ARM builder (`ubuntu@amp1`) |
@@ -142,8 +145,11 @@ automatically. ARM hosts pass `sdImage = true` to also get `images.<name>`.
    trees; hosts compose features à la carte — no monolithic `flake.nix`.
 2. **Multi-platform support**: NixOS (x86_64 & ARM64), macOS (nix-darwin), and
    non-NixOS Linux (standalone home-manager).
-3. **ARM/Embedded support**: SD card image generation for Raspberry Pi 3,
-   Pine64, and Amlogic S905X3, with automatic ext4→btrfs conversion on first boot.
+3. **ARM/Embedded support**: SD card image generation for aarch64 boards
+   (Raspberry Pi 3, Pine64, Amlogic S905X3) and the armv7l Xilinx Zynq-7020
+   (MYIR Z-turn, via the `linux-xlnx`/`u-boot-xlnx` forks, cross-compiled from
+   x86). All build a **btrfs** root directly, grown to fill the card on first
+   boot — generic, shared via `flake-modules/system-modules/sd-image-btrfs.nix`.
 4. **Dual deployment**: Colmena for NixOS hosts, deploy-rs for home-manager on
    foreign distros (e.g. `amp1`).
 5. **Distributed builds**: x86_64 builders plus `amp1` as a native aarch64
@@ -254,9 +260,12 @@ nix run .#colmena -- apply --dry-run    # show plan
 nix run .#colmena -- exec --on hierro uptime
 ```
 
-All NixOS hosts are registered as Colmena nodes. ARM hosts (`rpi3`, `pine64`,
-`xpi-s905x3`) have `targetHost = null` (build locally / on-device rather than
-SSH push). Colmena deploys via SSH as root; ensure SSH keys are configured.
+All NixOS hosts are registered as Colmena nodes. The SD-card ARM hosts `rpi3`,
+`pine64` and `xpi-s905x3` have `targetHost = null` (flash + build on-device
+rather than SSH push). `z-turn` instead sets `targetHost = z-turn.netbird.cloud`,
+so once it's booted and on the mesh it's deployed like any other host — built
+(cross-compiled) on x86 and pushed over SSH. Colmena deploys via SSH as root;
+ensure SSH keys are configured.
 
 #### deploy-rs (home-manager on foreign distros)
 
@@ -273,21 +282,22 @@ nix run .#deploy               # deploy all deploy-rs nodes
 ### ARM Single-Board Computers
 
 Supported devices with bootable SD card image generation:
-- **Raspberry Pi 3** (`rpi3`) — RPi 3B/3B+ in 64-bit mode
-- **Pine64** (`pine64`)
-- **Amlogic S905X3** (`xpi-s905x3`) — generic S905X3 TV box
+- **Raspberry Pi 3** (`rpi3`) — RPi 3B/3B+ in 64-bit mode (aarch64)
+- **Pine64** (`pine64`) — aarch64
+- **Amlogic S905X3** (`xpi-s905x3`) — generic S905X3 TV box (aarch64)
+- **MYIR Z-turn** (`z-turn`) — Xilinx Zynq-7020 FPGA SoC (**armv7l**), built
+  with the `linux-xlnx`/`u-boot-xlnx` forks (u-boot SPL acts as the FSBL — no
+  Vivado needed)
 
-#### Prerequisites: aarch64 emulation
+#### Build hosts
 
-Building ARM images on an x86_64 machine needs aarch64 emulation, enabled
-automatically on hosts using the `development` module (e.g. `blacktop`,
-`butthead`, `hierro`):
-
-```nix
-boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
-```
-
-Alternatively, build natively using the `amp1` aarch64 remote builder.
+- **aarch64 boards** (`rpi3`, `pine64`, `xpi-s905x3`) build natively on the
+  `amp1` aarch64 remote builder, or via aarch64 emulation on x86 hosts that use
+  the `development` module (`boot.binfmt.emulatedSystems = [ "aarch64-linux" ]`).
+- **`z-turn` is cross-compiled** from x86 (there is no armv7l builder and the
+  repo avoids QEMU binfmt) — so it builds as ordinary x86 work, no emulation.
+  The first build compiles the armv7l world from source (no upstream armv7l
+  cache); results are then cached on the netbird `nix-serve`.
 
 #### Building SD card images
 
@@ -295,6 +305,7 @@ Alternatively, build natively using the `amp1` aarch64 remote builder.
 nix build .#images.rpi3
 nix build .#images.pine64
 nix build .#images.xpi-s905x3
+nix build .#images.z-turn          # cross-compiled armv7l; long first build
 
 ls -lh result/sd-image/*.img.zst
 ```
@@ -306,27 +317,32 @@ use the binary cache.
 
 ```bash
 # Decompress and write in one go (replace /dev/sdX with your card)
-zstd -d result/sd-image/*-rpi3-*.img.zst -c | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
+zstd -dc result/sd-image/*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 
-#### First boot & automatic btrfs conversion
+For `z-turn`, set the board's boot-mode jumper to **SD** and attach a serial
+console at `ttyPS0` 115200 to watch u-boot SPL → u-boot → extlinux → NixOS.
 
-Images boot **ext4** initially and convert to **btrfs** (with zstd compression)
-on first boot, via `flake-modules/system-modules/btrfs-convert-firstboot.nix`:
+#### Root filesystem: btrfs, grown on first boot
 
-1. First boot from ext4; a systemd service detects ext4 and triggers conversion.
-2. System reboots; during initrd `btrfs-convert` runs, creating an `@` subvolume.
-3. Compression is enabled and the system continues on btrfs.
+All SD images build a **btrfs** root directly (zstd compression), generically
+via `flake-modules/system-modules/sd-image-btrfs.nix` (wired into every
+`sdImage = true` host by `lib/mk-host.nix`):
 
-The original ext4 image is kept in `ext2_saved/` for rollback. The dual-output
+- The root partition is created with `make-btrfs-fs`, sized to its contents.
+- On first boot the partition is grown to fill the card (`boot.growPartition`)
+  and the btrfs is grown onto it (`x-systemd.growfs`).
+
+There is no longer an ext4 stage or first-boot conversion. The dual-output
 mechanism (regular config vs. `sd-image.nix`) is described in
 [the FAQ](#how-the-dual-output-sd-card-image-system-works).
 
 #### Embedded optimizations
 
 ARM hosts use `flake-modules/system-modules/embedded.nix`: lighter package set,
-larger zram swap, serial console (`ttyAMA0` for RPi3, `ttyS0` for Pine64/S905X3),
-no x86-specific hardware, and aggressive GC / journald limits for SD longevity.
+larger zram swap, serial console (`ttyAMA0` for RPi3, `ttyS0` for Pine64/S905X3,
+`ttyPS0` for the Zynq `z-turn`), no x86-specific hardware, and aggressive GC /
+journald limits for SD longevity.
 
 ### Updating Dependencies
 
@@ -391,7 +407,8 @@ import-tree picks the file up automatically — no central list to edit.
 - **`development.nix`**: Dev tools, embedded programming, aarch64 emulation
 - **`emulation.nix`**: Retro-gaming emulation (RetroArch, MAME, …)
 - **`embedded.nix`**: ARM/SBC optimizations
-- **`btrfs-convert-firstboot.nix`**: ext4→btrfs conversion for SD images
+- **`sd-image-btrfs.nix`**: generic btrfs root for all SD-image hosts (creator,
+  filesystems, grow-on-boot), auto-wired by `lib/mk-host.nix`
 - **`media-services.nix`** / **`media-podman.nix`**: media server stack and the
   shared rootless `media-podman` user/group
 - **`download-services.nix`**: download clients
@@ -445,14 +462,16 @@ Hosts with the `development` module already enable this.
 
 ARM devices use a dual-output approach:
 
-1. **SD image config** (`hosts/<name>/nixos/sd-image.nix`): imported only when
-   building `flake.images.<name>`; produces a bootable **ext4** image and
-   overrides filesystem settings for first boot. Not used in normal rebuilds.
+1. **SD image config** (`hosts/<name>/nixos/sd-image.nix` + the shared
+   `sd-image-btrfs-build` module): imported only when building
+   `flake.images.<name>`; produces a bootable **btrfs** image sized to its
+   contents. Not used in normal rebuilds.
 2. **Regular config** (`hosts/<name>/nixos/` + the dendritic feature modules):
-   the actual running system — **btrfs** with compression, managed via Colmena
-   and `nixos-rebuild`.
-3. **Automatic conversion**: bridges the two — runs once on first boot to
-   convert ext4→btrfs with no manual steps.
+   the actual running system — the same **btrfs** root with compression, managed
+   via Colmena and `nixos-rebuild`.
+3. **Grow on first boot**: the shared `sd-image-btrfs` module enables
+   `boot.growPartition` + `x-systemd.growfs`, so the root partition and btrfs
+   expand to fill the card on the first boot — no ext4 stage or conversion.
 
 This gives easy initial deployment (write the SD image), full ongoing
 configuration management, and an optimal compressed btrfs root.

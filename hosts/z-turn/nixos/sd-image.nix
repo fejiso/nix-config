@@ -1,5 +1,7 @@
 { config, lib, pkgs, modulesPath, ... }:
 
+# Host-specific SD-image bits only; the generic btrfs root (creator, fs, grow,
+# compress, extlinux) comes from the shared sd-image-btrfs module via mk-host.
 let
   uboot = pkgs.ubootZturn;   # u-boot-xlnx (SPL = FSBL), from the additions overlay
 in
@@ -8,22 +10,12 @@ in
     (modulesPath + "/installer/sd-card/sd-image-armv7l-multiplatform.nix")
   ];
 
-  # Image build only needs the ext4 root; drop the /boot/firmware mount.
-  fileSystems = lib.mkForce {
-    "/" = {
-      device = "/dev/disk/by-label/NIXOS_SD";
-      fsType = "ext4";
-    };
-  };
-
   hardware.graphics.enable = lib.mkForce false;
   hardware.graphics.enable32Bit = lib.mkForce false;
 
   image.fileName = "nixos-z-turn-${config.system.nixos.label}-${pkgs.stdenv.hostPlatform.system}.img.zst";
 
   sdImage = {
-    compressImage = true;
-    expandOnBoot = true;
     firmwareSize = 256;   # holds BOOT.BIN + u-boot.img + extlinux + kernel/initrd
 
     # The Zynq bootrom loads BOOT.BIN (u-boot SPL) from the FAT partition, which
@@ -34,9 +26,6 @@ in
       ${config.system.build.installBootLoader} ${config.system.build.toplevel} -d ./firmware
     '';
   };
-
-  boot.loader.grub.enable = false;
-  boot.loader.generic-extlinux-compatible.enable = true;
 
   boot.kernelParams = [ "console=ttyPS0,115200" "console=tty1" ];
 }

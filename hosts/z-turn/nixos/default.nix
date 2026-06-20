@@ -18,9 +18,6 @@
     serialConsole = "ttyPS0";   # Zynq Cadence (xuartps) UART
   };
 
-  # ext4 root, no btrfs.
-  services.btrfs.autoScrub.enable = lib.mkForce false;
-
   # Headless board — trim things from the shared `default` that either don't
   # cross-compile to armv7l or are pointless here:
   #  - gutenprint (CUPS printing) runs a target test binary at build time.

@@ -34,10 +34,12 @@ buildLinux (args // {
     TMPFS_POSIX_ACL = yes;
     TMPFS_XATTR = yes;
 
-    # The xlnx defconfig only has the dead EXT3 symbol; the SD root is ext4, so
-    # build the ext4 driver in (it also handles ext2/3) for boot-time mount.
+    # The xlnx defconfig only has the dead EXT3 symbol; build ext4 (handles
+    # ext2/3 too) and btrfs in so the SD root mounts at boot without an initrd
+    # module (the root is btrfs).
     EXT4_FS = yes;
     EXT4_USE_FOR_EXT2 = yes;
+    BTRFS_FS = yes;
 
     # The Xilinx multimedia stack (DRM display + V4L2 media + HDMI/HDCP) doesn't
     # compile under gcc-15 (e.g. xilinx-hdcp2x-rx.c: implicit FIELD_PREP) and is
