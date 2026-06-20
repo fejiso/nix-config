@@ -60,7 +60,6 @@
 
   # Bring-up credential: without a password, the serial console login is
   # unusable (and SSH is key-only), so a failed network leaves no way in.
-  # TODO: remove once the board is on netbird and reachable over SSH.
   users.users.root.initialPassword = lib.mkForce "zturn";
   users.users.z-247.initialPassword = lib.mkForce "zturn";
 
@@ -71,5 +70,8 @@
   # the shared sd-image-btrfs module (fix-sd-root-ownership runs before
   # tmpfiles-setup). Nothing z-turn-specific is needed here anymore.
 
+  # Make sure bash exists in the system profile (/run/current-system/sw/bin):
+  # the login shell resolves to a bash store path, but anything referencing the
+  # profile path (older passwd entries, scripts) would otherwise fail to exec.
   system.stateVersion = "25.05";
 }
