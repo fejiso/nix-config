@@ -45,8 +45,11 @@
 
     # FPGA vendor toolchains (FHS-wrapped; user supplies the installers).
     # nix-fpga covers Vivado + Quartus; nix-gowin-eda wraps Gowin EDA.
-    # Their own nixpkgs is left unpinned-to-ours on purpose so the vendor
-    # FHS envs build as their authors intend.
+    # NB: do NOT make these follow our nixpkgs — nix-fpga's FHS env references
+    # libstdcxx5, removed from newer nixpkgs, so it only builds against its own
+    # pin. Its FHS glibc is therefore older than the host's (2.42): run the
+    # installer non-interactively (`vivado-shell -c '<installer>'`) so the
+    # interactive shell's glibc-2.42 tools aren't loaded inside the sandbox.
     nix-fpga.url = "git+https://codeberg.org/Rutherther/nix-fpga";
     nix-gowin-eda.url = "github:scottwillmoore/nix-gowin-eda";
   };

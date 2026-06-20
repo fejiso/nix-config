@@ -30,6 +30,10 @@ let
 in {
   # This one brings our custom packages from the 'pkgs' directory
   additions = final: prev: {
+    # Xilinx forks for the MYIR Z-turn (Zynq-7020). Cross-compile when the
+    # consuming config is armv7l (z-turn). See pkgs/zynq/.
+    ubootZturn = final.callPackage ../pkgs/zynq/uboot.nix { };
+    linuxZynqXlnx = final.callPackage ../pkgs/zynq/kernel.nix { };
   };
 
   # This one contains whatever you want to overlay
