@@ -10,6 +10,16 @@ in
     (modulesPath + "/installer/sd-card/sd-image-armv7l-multiplatform.nix")
   ];
 
+  # sd-image-armv7l-multiplatform pulls in profiles/base.nix, an INSTALLER-repair
+  # bundle (efibootmgr, efivar, testdisk, ms-sys, parted, gptfdisk, ccrypt, …)
+  # added unconditionally to systemPackages. On armv7l `efivar` is broken and
+  # won't build, which aborts the image (it's dragged into the man/dbus/fish-
+  # completion buildEnvs). None of it is needed on a permanent Zynq deployment —
+  # the previously-working image had this whole set wiped and booted fine. Drop
+  # the profile entirely; its only other settings are boot.supportedFilesystems
+  # (the embedded module already mkForce-sets these) and a ZFS-only hostId.
+  disabledModules = [ "profiles/base.nix" ];
+
   hardware.graphics.enable = lib.mkForce false;
   hardware.graphics.enable32Bit = lib.mkForce false;
 

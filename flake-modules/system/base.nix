@@ -115,10 +115,8 @@
       zellij
       zoxide
       python3
-      mpv
       file
       pinentry-curses
-      wl-clipboard
       lsof
       nmap
       bind.dnsutils
@@ -126,12 +124,22 @@
       smartmontools
       sqlite
       pipx
-      parallel-full
+      # parallel-full bundles extra perl modules (Text-CSV, Math-Base-Convert for
+      # --csv/--sql) whose build runs pod2text/pod2man with the TARGET perl — which
+      # can't exec on the x86 build host when cross-compiling (Exec format error).
+      # The core `parallel` binary is identical and cross-clean; use it on cross.
+      (if pkgs.stdenv.buildPlatform == pkgs.stdenv.hostPlatform then parallel-full else parallel)
       age
       sops
       ssh-to-age
       rclone
-      inputs.home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
+      # The flake's home-manager is a per-system output with no cross variant, so
+      # on a cross-built board (armv7l z-turn) it forces a NATIVE armv7l build for
+      # which no builder exists. Use the cross-compilable nixpkgs `home-manager`
+      # when build != host; native hosts keep the version-matched flake package.
+      (if pkgs.stdenv.buildPlatform == pkgs.stdenv.hostPlatform
+       then inputs.home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
+       else pkgs.home-manager)
     ];
 
     documentation.nixos.enable = true;

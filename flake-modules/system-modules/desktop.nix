@@ -111,6 +111,8 @@ services.desktopManager.gnome.enable = lib.mkIf config.services.xserver.enable f
   # Desktop system packages
   environment.systemPackages = with pkgs; [
     wget
+    mpv            # media player — moved out of the universal `cli` base (UI/heavy)
+    wl-clipboard   # Wayland clipboard — needs a display; UI-only
     firefox
     chromium
     git

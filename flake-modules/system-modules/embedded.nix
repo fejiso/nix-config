@@ -31,23 +31,17 @@
 
   config = lib.mkMerge [
     (lib.mkIf config.embedded.enable {
-      # Slim system package set. mkForce replaces the WHOLE list, which would
-      # also wipe NixOS' requiredPackages (coreutils/findutils/procps/util-linux),
-      # `nix`, and the auto-added user login shells (`systemShells` — the passwd
-      # shell is the profile path, so dropping it breaks login). Re-include them.
-      environment.systemPackages =
-        lib.mkForce (
-          (lib.filter lib.types.shellPackage.check
-            (lib.unique (lib.mapAttrsToList (_: u: u.shell) config.users.users)))
-          ++ [ config.nix.package ]
-          ++ (with pkgs; [
-            coreutils-full findutils diffutils gnugrep gnused gawk
-            gnutar gzip bzip2 xz zstd
-            util-linux procps less which iproute2 ethtool
-            vim wget curl git htop btop tree unzip ripgrep fd fzf
-            tmux screen file pciutils usbutils
-          ])
-        );
+      # ADDITIVE, not a replacement. Embedded inherits the ENTIRE `cli` base
+      # package set — including the systemd CLI (networkctl/systemctl/journalctl),
+      # plus NixOS' always-on requiredPackages (coreutils/findutils/util-linux/
+      # procps) and the login shells. We only ADD the hardware/diagnostic extras
+      # the base lacks. (An earlier `mkForce [...]` whitelist kept silently
+      # dropping essentials — systemd, shells — so it's gone. Heavy UI/media like
+      # mpv and wl-clipboard aren't in the base; they live in `desktop`, which
+      # embedded doesn't import, so there's nothing to subtract here.)
+      environment.systemPackages = with pkgs; [
+        ethtool iputils tmux screen pciutils usbutils
+      ];
 
       # zram (zstd, 50% for limited RAM)
       zramSwap = {
@@ -68,6 +62,19 @@
       hardware.bluetooth.enable = lib.mkDefault true;
       boot.supportedFilesystems = lib.mkForce [ "btrfs" "ext4" "vfat" "f2fs" "xfs" "ntfs" "cifs" "nfs" ];
       systemd.services.systemd-udev-settle.enable = false;
+
+      # Drop the rendered NixOS manual (HTML option reference + nixos-help):
+      # large and headless-useless.
+      documentation.nixos.enable = lib.mkForce false;
+
+      # Disable the man-db whatis/apropos CACHE (both the build-time index and
+      # the runtime `mandb` service). The cache is a `buildEnv` over every
+      # systemPackage's man output, and on armv7l forcing it pulls a broken
+      # transitive package (`efivar`) that aborts the whole evaluation. The man
+      # pages themselves still install via `documentation.man.enable`, so `man ip`
+      # etc. work — only `apropos`/`whatis` keyword search loses its index.
+      documentation.man.cache.enable = lib.mkForce false;
+      documentation.man.cache.generateAtRuntime = lib.mkForce false;
 
       # Journald volatile (SD longevity)
       services.journald.extraConfig = ''
@@ -112,6 +119,12 @@
       services.nix-serve.enable = lib.mkForce false;
       hardware.enableRedistributableFirmware = lib.mkForce false;
       hardware.firmware = lib.mkForce [ ];
+
+      # efivar is marked broken on armv7l, but it's only pulled in transitively
+      # by man/dbus aggregation buildEnvs (no real UEFI need on a Zynq board).
+      # Allow it to evaluate (per nixpkgs' problems.handlers API) instead of
+      # refusing — this is the single fix for the cascade of efivar eval errors.
+      nixpkgs.config.problems.handlers.efivar.broken = "warn";
     })
   ];
 }
