@@ -20,7 +20,7 @@
     fileSystems."/" = {
       device = "/dev/disk/by-label/NIXOS_SD";
       fsType = "btrfs";
-      options = [ "compress=zstd" "noatime" "x-systemd.growfs" ];
+      options = [ "compress=lzo" "noatime" "x-systemd.growfs" ];
     };
     fileSystems."/boot" = {
       device = "/dev/disk/by-label/FIRMWARE";
@@ -77,12 +77,23 @@
         expandOnBoot = false;
         rootFilesystemCreator = modulesPath + "/../lib/make-btrfs-fs.nix";
       };
-      # The image build only needs the btrfs root; the FAT firmware partition is
-      # populated separately and must not be a required mount during the build.
+      # The FAT firmware partition is populated separately (populateFirmwareCommands)
+      # and must not be a *required* mount during the image build. BUT the system
+      # that boots from the flashed image IS this toplevel, so it still needs the
+      # real root mount OPTIONS (compress/noatime/x-systemd.growfs) and a writable
+      # /boot for kernel updates. Keep both — just mark /boot `nofail` so neither
+      # the build nor an early boot blocks on it. (A bare options-less mkForce here
+      # was leaking into the booted system: stripped root options + unmounted /boot.)
       fileSystems = lib.mkForce {
         "/" = {
           device = "/dev/disk/by-label/NIXOS_SD";
           fsType = "btrfs";
+          options = [ "compress=lzo" "noatime" "x-systemd.growfs" ];
+        };
+        "/boot" = {
+          device = "/dev/disk/by-label/FIRMWARE";
+          fsType = "vfat";
+          options = [ "nofail" ];
         };
       };
     };
