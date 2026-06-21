@@ -4,6 +4,8 @@ import ../../lib/mk-host.nix {
   name = "blacktop";
   modules = [
     config.flake.modules.nixos.desktop
+    config.flake.modules.nixos.desktop-services
+    config.flake.modules.nixos.mesh
     config.flake.modules.nixos.laptop
     config.flake.modules.nixos.development
     config.flake.modules.nixos.emulation
@@ -11,6 +13,7 @@ import ../../lib/mk-host.nix {
     config.flake.modules.nixos.adsb-readsb
   ];
   homeModules = [
+    config.flake.modules.homeManager.linux-default
     config.flake.modules.homeManager.development
     config.flake.modules.homeManager.desktop
   ];

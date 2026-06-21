@@ -1,5 +1,5 @@
 { ... }: {
-  flake.modules.nixos.default = { inputs, outputs, lib, config, pkgs, hostname, ... }: {
+  flake.modules.nixos.cli = { inputs, outputs, lib, config, pkgs, hostname, ... }: {
     # Enable backups on all nodes
     services.backup.enable = lib.mkDefault true;
 
@@ -125,17 +125,12 @@
       ddrescue
       smartmontools
       sqlite
-      python3Packages.rns
-      python3Packages.nomadnet
-      yggdrasil
-      i2pd
       pipx
       parallel-full
       age
       sops
       ssh-to-age
       rclone
-      python3Packages.meshtastic
       inputs.home-manager.packages.${pkgs.stdenv.hostPlatform.system}.default
     ];
 

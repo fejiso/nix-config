@@ -1,5 +1,5 @@
 { config, ... }: {
-  flake.modules.nixos.default = { inputs, outputs, hostname, pkgs, lib, ... }: {
+  flake.modules.nixos.cli = { inputs, outputs, hostname, pkgs, lib, ... }: {
     home-manager = {
       useGlobalPkgs = false;
       useUserPackages = true;
@@ -8,27 +8,43 @@
       backupFileExtension = "hm-backup";
 
       users.z-247 = { ... }: {
-        imports = [
-          # Every NixOS host is Linux, so use linux-default (which transitively
-          # imports default plus Wayland tooling).
-          config.flake.modules.homeManager.linux-default
-          "${inputs.self}/hosts/${hostname}/home"
-        ];
+        # The home CLASS (cli / cli-full / linux-default) is chosen per host via
+        # mk-host's `homeModules`, no longer forced here. Only the optional
+        # per-host home dir is wired in, guarded so hosts without one (e.g.
+        # z-turn) don't break.
+        imports = lib.optional
+          (builtins.pathExists "${inputs.self}/hosts/${hostname}/home")
+          "${inputs.self}/hosts/${hostname}/home";
 
-        _module.args.pkgs = lib.mkForce (import inputs.nixpkgs-unstable {
-          system = pkgs.stdenv.hostPlatform.system;
-          config = {
-            allowUnfree = true;
-            permittedInsecurePackages = [
-              "electron-39.8.10"
+        # Import nixpkgs-unstable with the SAME platform shape as the system: a
+        # cross set on cross hosts (e.g. armv7l z-turn), native otherwise. A plain
+        # `system = hostPlatform.system` would build the home as a *native* target
+        # set, so build-time tools (pandoc for eza's manpages → GHC) resolve to
+        # the target arch and fail to bootstrap. Native hosts (build == host) get
+        # the identical `localSystem`-only set as before, so no rebuild for them.
+        _module.args.pkgs = lib.mkForce (import inputs.nixpkgs-unstable (
+          {
+            config = {
+              allowUnfree = true;
+              permittedInsecurePackages = [
+                "electron-39.8.10"
+              ];
+            };
+            overlays = [
+              outputs.overlays.additions
+              outputs.overlays.modifications
+              outputs.overlays.unstable-packages
             ];
-          };
-          overlays = [
-            outputs.overlays.additions
-            outputs.overlays.modifications
-            outputs.overlays.unstable-packages
-          ];
-        });
+          }
+          // (
+            if pkgs.stdenv.buildPlatform == pkgs.stdenv.hostPlatform
+            then { localSystem = pkgs.stdenv.hostPlatform.system; }
+            else {
+              localSystem = pkgs.stdenv.buildPlatform.system;
+              crossSystem = pkgs.stdenv.hostPlatform.system;
+            }
+          )
+        ));
       };
     };
   };

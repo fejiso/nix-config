@@ -1,5 +1,5 @@
 { ... }: {
-  flake.modules.nixos.default =
+  flake.modules.nixos.cli =
 # Nix configuration
 {
   inputs,

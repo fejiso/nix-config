@@ -7,6 +7,11 @@ import ../../lib/mk-host.nix {
   modules = [
     config.flake.modules.nixos.embedded
   ];
+  # Cross-built (armv7l): a minimal cross-safe home (fish/wezterm/etc. don't
+  # cross-compile). embedded.crossSafe is set in hosts/z-turn/nixos/default.nix.
+  homeModules = [
+    config.flake.modules.homeManager.cli-minimal
+  ];
   # Built on x86 and pushed over SSH (netbird) — Cortex-A9 is too slow to build.
   targetHost = "z-turn.netbird.cloud";
   sdImage = true;

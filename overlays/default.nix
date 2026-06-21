@@ -66,6 +66,20 @@ in {
       enlightenmentSupport = false;
     };
 
+    # fish 4.x doesn't cross-compile: its man-page doc-gen step (`cargo xtask
+    # man-pages`) builds the `xtask` helper, whose pcre2 dependency links the
+    # TARGET (armv7l) pcre2 while xtask is compiled for the build platform (x86)
+    # — the linker rejects the incompatible lib. Skip man-page generation on
+    # cross only (force SPHINX "not found", which gates the man-pages target).
+    # The fish binary, functions, and runtime completions are unaffected; native
+    # hosts keep their man pages. This lets fish build for the armv7l z-turn.
+    fish =
+      if prev.stdenv.buildPlatform == prev.stdenv.hostPlatform
+      then prev.fish
+      else prev.fish.overrideAttrs (old: {
+        cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DSPHINX_EXECUTABLE=SPHINX_EXECUTABLE-NOTFOUND" ];
+      });
+
     # niri 26.04 leaks VRAM whenever monitors are powered off (e.g. hypridle's
     # 30-min `power-off-monitors`), eventually filling the GPU and starving
     # CUDA training on butthead. Upstream: niri-wm/niri#3295; the fix is the

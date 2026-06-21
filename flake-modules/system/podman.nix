@@ -1,5 +1,5 @@
 { ... }: {
-  flake.modules.nixos.default =
+  flake.modules.nixos.cli =
 # Common Podman configuration and auto-update service
 { config, lib, pkgs, ... }:
 

@@ -1,5 +1,5 @@
 { inputs, ... }: {
-  flake.modules.nixos.default =
+  flake.modules.nixos.cli =
 { config, lib, pkgs, hostname, ... }:
 
 with lib;

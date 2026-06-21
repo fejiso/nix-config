@@ -1,5 +1,5 @@
 { inputs, config, ... }: {
-  flake.modules.nixos.default = {
+  flake.modules.nixos.cli = {
     imports = [
       inputs.sops-nix.nixosModules.sops
       inputs.airspy-adsb-bin.nixosModules.airspy-adsb

@@ -4,6 +4,8 @@ import ../../lib/mk-host.nix {
   name = "butthead";
   modules = [
     config.flake.modules.nixos.desktop
+    config.flake.modules.nixos.desktop-services
+    config.flake.modules.nixos.mesh
     config.flake.modules.nixos.systemd-nspawn
     config.flake.modules.nixos.media-services
     config.flake.modules.nixos.download-services
@@ -19,6 +21,7 @@ import ../../lib/mk-host.nix {
     config.flake.modules.nixos.haos-vm
   ];
   homeModules = [
+    config.flake.modules.homeManager.linux-default
     config.flake.modules.homeManager.development
     config.flake.modules.homeManager.desktop
   ];

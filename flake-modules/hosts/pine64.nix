@@ -6,6 +6,9 @@ import ../../lib/mk-host.nix {
   modules = [
     config.flake.modules.nixos.embedded
   ];
+  homeModules = [
+    config.flake.modules.homeManager.default
+  ];
   targetHost = null;
   sdImage = true;
 }
