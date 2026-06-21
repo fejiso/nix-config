@@ -59,7 +59,6 @@ in {
       ll = "eza -l";
       la = "eza -la";
       ls = "eza";
-      cat = "bat";
       cd = "z";  # Use zoxide for cd
     };
   };
@@ -76,7 +75,6 @@ in {
       ll = "eza -l";
       la = "eza -la";
       ls = "eza";
-      cat = "bat";
       cd = "z";  # Use zoxide for cd
     };
     
@@ -106,7 +104,6 @@ in {
       ll = "eza -l";
       la = "eza -la";
       ls = "eza";
-      cat = "bat";
       cd = "z";  # Use zoxide for cd
     };
     initExtra = ''

@@ -41,6 +41,13 @@ buildLinux (args // {
     EXT4_USE_FOR_EXT2 = yes;
     BTRFS_FS = yes;
 
+    # The Z-turn's ethernet PHY is a Micrel/Microchip KSZ9031 (PHY id
+    # 0x00221620). Without its driver the macb falls back to "Generic PHY",
+    # which doesn't run the KSZ9031 init — the link never comes up (carrier=0).
+    # Build the Micrel PHY driver IN (not a module) so it's present when macb
+    # probes the PHY at boot.
+    MICREL_PHY = yes;
+
     # The Xilinx multimedia stack (DRM display + V4L2 media + HDMI/HDCP) doesn't
     # compile under gcc-15 (e.g. xilinx-hdcp2x-rx.c: implicit FIELD_PREP) and is
     # not needed on a headless board. Disable it.

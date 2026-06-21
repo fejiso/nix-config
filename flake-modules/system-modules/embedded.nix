@@ -43,7 +43,7 @@
           ++ (with pkgs; [
             coreutils-full findutils diffutils gnugrep gnused gawk
             gnutar gzip bzip2 xz zstd
-            util-linux procps less which iproute2
+            util-linux procps less which iproute2 ethtool
             vim wget curl git htop btop tree unzip ripgrep fd fzf
             tmux screen file pciutils usbutils
           ])
