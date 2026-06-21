@@ -27,10 +27,6 @@
   users.defaultUserShell = lib.mkForce pkgs.bash;
   users.users.z-247.shell = lib.mkForce pkgs.bash;
 
-  # Drop the Reticulum units (rnsd, lxmd) — they pull python rns/lxmf -> esptool,
-  # which fails to cross-compile. mkForce {} so the units don't reference them.
-  systemd.services.rnsd = lib.mkForce { };
-  systemd.services.lxmd = lib.mkForce { };
   # No display -> no fontconfig (its fc-cache step runs a target binary).
   fonts.fontconfig.enable = lib.mkForce false;
 
@@ -70,8 +66,5 @@
   # the shared sd-image-btrfs module (fix-sd-root-ownership runs before
   # tmpfiles-setup). Nothing z-turn-specific is needed here anymore.
 
-  # Make sure bash exists in the system profile (/run/current-system/sw/bin):
-  # the login shell resolves to a bash store path, but anything referencing the
-  # profile path (older passwd entries, scripts) would otherwise fail to exec.
   system.stateVersion = "25.05";
 }
