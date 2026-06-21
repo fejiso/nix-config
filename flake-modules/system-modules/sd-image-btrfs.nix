@@ -48,6 +48,23 @@
         ExecStart = "${pkgs.coreutils}/bin/chown 0:0 / /nix /nix/store";
       };
     };
+
+    # Grow the btrfs root to fill its partition. growPartition (above) extends
+    # the PARTITION on boot, but `x-systemd.growfs` doesn't reliably grow a btrfs
+    # ROOT here (observed: partition at full 58G, fs stuck at the image's ~5G).
+    # Do it explicitly — `resize max` is idempotent (a no-op once full), so this
+    # is safe on every boot and survives the partition being grown a boot later.
+    systemd.services.grow-btrfs-root = {
+      description = "Grow btrfs / to fill its partition";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "growpart.service" "local-fs.target" ];
+      unitConfig.ConditionPathIsMountPoint = "/";
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = "${pkgs.btrfs-progs}/bin/btrfs filesystem resize max /";
+      };
+    };
   };
 
   # Image-build-only overrides (the `sdImage` option only exists where an
