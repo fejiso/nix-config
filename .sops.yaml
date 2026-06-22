@@ -12,6 +12,7 @@ keys:
   - &butthead_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDa46hBmT7aRcNtTSKRmzTG8VBBrf9dU+GsUMgMzS7ld
   - &hispanas_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICzC0DNxw+lrSBF/lgGMKY2eZJWm1KD1FP47sdakZP9Z
   - &snuffles_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOt+r0UbKvmpLwz13qBbxlHyuL0BZ9sg2/L83Q4FA75S
+  - &z_turn_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAIlRbbVnOt/ttkcUWhtP6dfD0HUzGbkBwZk0FOWOWfR
 
   # Age keys (derived from SSH host keys for sops-nix)
   - &elitedex_age age1pluz63z5cwmen53a58ng4tvjh6yrh8d3xvgvyjkvx7rcltug5anqw0fyyn
@@ -21,6 +22,7 @@ keys:
   - &lenovix_age age18hutz4xq0lk2y0vy0flk5w0qx5as8xlr9k0wd5qshjvglldceq6spxmp02
   - &hispanas_age age1za9qg39ygxc4xlda6elmmk3fq2845j3r2dv6qw3fvkjdtcklhvqsqfvvxv
   - &snuffles_age age1t60rm2grrq3zrhpgpgxz4uc3un7wuy93j3nvp6j7uujkn5l52qasclxhdl
+  - &z_turn_age age15ap0xlg54h6q4k2cvl6pvfst3xag4yp9w0eqwfl5xtlxhsv44esqqhazu5
 
 creation_rules:
   # Shared secrets - used by both home-manager (user key) and system services (host keys)
@@ -35,6 +37,7 @@ creation_rules:
       - *lenovix_ssh
       - *hispanas_ssh
       - *snuffles_ssh
+      - *z_turn_ssh
       - *elitedex_age
       - *hierro_age
       - *blacktop_age
@@ -42,6 +45,7 @@ creation_rules:
       - *lenovix_age
       - *hispanas_age
       - *snuffles_age
+      - *z_turn_age
 
   # Home-manager secrets - use user SSH key
   - path_regex: 'secrets/(git-credentials-age|beets|music|atuin)\.yaml$'
@@ -59,6 +63,7 @@ creation_rules:
       - *lenovix_ssh
       - *hispanas_ssh
       - *snuffles_ssh
+      - *z_turn_ssh
       - *user_ssh
       - *elitedex_age
       - *hierro_age
@@ -67,4 +72,5 @@ creation_rules:
       - *lenovix_age
       - *hispanas_age
       - *snuffles_age
-      
+      - *z_turn_age
+

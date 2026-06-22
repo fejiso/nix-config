@@ -36,8 +36,11 @@
     # login, while x-systemd.growfs fails the same way. Re-root the offending
     # dirs before tmpfiles-setup runs. Idempotent; cheap; first boot is what
     # matters but it's harmless every boot.
+    # Cheap, every boot, before tmpfiles: make-btrfs-fs builds / and /nix owned by
+    # the build uid (1000); systemd-tmpfiles refuses to operate under non-root
+    # parents ("unsafe path transition", fatal at login), so re-own the top dirs.
     systemd.services.fix-sd-root-ownership = {
-      description = "Re-own / and /nix to root (make-btrfs-fs leaves them uid 1000)";
+      description = "Re-own / and /nix to root (make-btrfs-fs builds them uid 1000)";
       wantedBy = [ "sysinit.target" ];
       after = [ "systemd-remount-fs.service" ];
       before = [ "systemd-tmpfiles-setup.service" ];
@@ -45,7 +48,42 @@
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
-        ExecStart = "${pkgs.coreutils}/bin/chown 0:0 / /nix /nix/store";
+        ExecStart = "-${pkgs.coreutils}/bin/chown 0:0 / /nix";
+      };
+    };
+
+    # One-time: make-btrfs-fs also builds every /nix/store *path* as uid 1000,
+    # which trips owner checks (e.g. logrotate refuses non-root configs). The
+    # store is a read-only bind mount, so chowning it directly fails; reach the
+    # underlying inodes through a fresh read-write bind of / (which does not carry
+    # the store's ro sub-mount), recursively re-own, then drop the bind. Gated by a
+    # marker so the slow walk is paid once (nix-daemon-added paths are already
+    # root). Kept off the early-boot path with no start timeout so it can't be
+    # killed mid-walk; re-checks logrotate once done so the deploy comes out clean.
+    systemd.services.reroot-nix-store = {
+      description = "One-time re-own of make-btrfs-fs /nix/store contents to root";
+      wantedBy = [ "multi-user.target" ];
+      # Ordered before owner-sensitive consumers so they see the re-owned store on
+      # first boot. NB: do NOT add an ExecStartPost that restarts an ordered-after
+      # unit (e.g. logrotate-checkconf) synchronously — that's a deadlock (the
+      # restart blocks until that unit starts, which can't until this one finishes).
+      before = [ "logrotate-checkconf.service" ];
+      unitConfig.ConditionPathExists = "!/var/lib/nixos/.sd-store-rerooted";
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        TimeoutStartSec = 0;
+        ExecStart = pkgs.writeShellScript "reroot-nix-store" ''
+          b=/run/sd-reroot
+          ${pkgs.coreutils}/bin/mkdir -p "$b"
+          if ${pkgs.util-linux}/bin/mount --bind / "$b" 2>/dev/null; then
+            ${pkgs.coreutils}/bin/chown -R 0:0 "$b/nix" 2>/dev/null || true
+            ${pkgs.util-linux}/bin/umount "$b" 2>/dev/null || true
+          fi
+          ${pkgs.coreutils}/bin/rmdir "$b" 2>/dev/null || true
+          ${pkgs.coreutils}/bin/mkdir -p /var/lib/nixos
+          ${pkgs.coreutils}/bin/touch /var/lib/nixos/.sd-store-rerooted
+        '';
       };
     };
 

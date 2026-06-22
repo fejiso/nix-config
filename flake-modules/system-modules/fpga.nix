@@ -33,7 +33,12 @@ let
   };
   vivadoTargetPkgs = (import "${inputs.nix-fpga}/pkgs/xilinx/common.nix").targetPkgs;
   # Extra runtime libs newer Vivado/Vitis wants but the upstream list omits.
-  vivadoExtraLibs = p: [ p.pixman ];
+  # pixman + libpng (libpng16.so.16) are both needed by libxv_tcltasks.so.
+  # libGL (libglvnd: libGL.so.1 / libGLX.so.0 / libGLdispatch.so.0) is the
+  # vendor-neutral GL dispatch the GUI links against — without it inside the
+  # FHS, the host's /run/opengl-driver libs aren't reachable and the canvas
+  # renders blank.
+  vivadoExtraLibs = p: [ p.pixman p.libpng p.libGL ];
 
   # Mirror nix-fpga's vivado/fhs.nix, only with the extra libs appended.
   mkVivadoFhs = requireInstallDir: nfPkgs.buildFHSEnv {
