@@ -53,6 +53,17 @@ let
       # Vivado's GUI is Java/AWT; on non-reparenting WMs (niri, sway, i3) the
       # window paints blank without this. Harmless under reparenting WMs.
       export _JAVA_AWT_WM_NONREPARENTING=1
+      # Force Mesa software GL (llvmpipe). The NVIDIA GLX path through
+      # xwayland-satellite crashes Xwayland when Vivado opens a project (the X
+      # connection drops -> _XIOError abort). llvmpipe is plenty for the 2D GUI.
+      export LIBGL_ALWAYS_SOFTWARE=1
+      # Expose the user's home-manager editor wrappers (wezterm, nvim/vim) so
+      # they work as Vivado's custom editor, e.g. `wezterm start nvim`. These are
+      # self-contained nix closures (own interpreter/libs), so they run fine in
+      # the FHS. Also expose the system profile so the open-source EDA tools
+      # above (verilator, gtkwave, sby, ...) are reachable from inside Vivado.
+      # All appended, so Vivado's own bundled toolchain still takes priority.
+      export PATH="$PATH:/run/current-system/sw/bin:/etc/profiles/per-user/$USER/bin:$HOME/.nix-profile/bin"
       exec "$@"
     '';
     meta.mainProgram = "vivado";
@@ -94,6 +105,20 @@ in {
     pkgs.nextpnr
     pkgs.python3Packages.apycula
     pkgs.openfpgaloader
+
+    # Simulation, waveform viewing, linting and formal verification. These are
+    # native nix packages (no FHS needed); they're also put on the FHS PATH (via
+    # /run/current-system/sw/bin in the vivado runScript) so Vivado can call them.
+    pkgs.verilator                  # fast cycle-based Verilog/SystemVerilog sim
+    pkgs.iverilog                   # Icarus: event-driven Verilog sim
+    pkgs.ghdl                       # VHDL simulator (mcode)
+    pkgs.nvc                        # modern VHDL simulator
+    pkgs.gtkwave                    # waveform viewer (VCD/FST)
+    pkgs.surfer                     # modern waveform viewer
+    pkgs.verible                    # SystemVerilog linter/formatter/LS
+    pkgs.python3Packages.cocotb     # Python cosimulation testbenches
+    pkgs.sby                        # SymbiYosys: formal verification front-end
+    pkgs.z3                         # SMT solver backend for formal flows
 
     # Proprietary vendor toolchains (FHS-wrapped; installer supplied by you).
     # Vivado uses our pixman-patched FHS env (see above); Quartus is upstream.
