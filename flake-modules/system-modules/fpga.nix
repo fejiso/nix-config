@@ -50,6 +50,9 @@ let
         source $INSTALL_DIR/settings64.sh $INSTALL_DIR
       fi
       export LD_LIBRARY_PATH=/lib:$LD_LIBRARY_PATH
+      # Vivado's GUI is Java/AWT; on non-reparenting WMs (niri, sway, i3) the
+      # window paints blank without this. Harmless under reparenting WMs.
+      export _JAVA_AWT_WM_NONREPARENTING=1
       exec "$@"
     '';
     meta.mainProgram = "vivado";
