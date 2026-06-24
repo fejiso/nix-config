@@ -110,6 +110,17 @@ in {
     perlPackages = prev.perlPackages // {
       DBDCSV = prev.perlPackages.DBDCSV.overrideAttrs (_: { doCheck = false; });
     };
+
+    # libJudy's JudySLIns does strcpy patterns that glibc 2.42 + _FORTIFY_SOURCE=3
+    # (nixpkgs' default hardening) flags as an overflow, so __strcpy_chk aborts
+    # the caller. This crashes gtkwave the moment it builds a VCD's symbol table
+    # with real (multi-char) signal names: vcd_build_symbols → symadd → JudySLIns
+    # → "*** buffer overflow detected ***: terminated" (SIGABRT). Disable fortify
+    # on judy so gtkwave — which links libJudy.so.1 — stops aborting. Drop if
+    # nixpkgs/judy upstream gains a fortify3-safe fix.
+    judy = prev.judy.overrideAttrs (old: {
+      hardeningDisable = (old.hardeningDisable or [ ]) ++ [ "fortify" "fortify3" ];
+    });
   };
 
   # Force every buildGo*Module vendor fetch through GOPROXY=direct / GOSUMDB=off.
