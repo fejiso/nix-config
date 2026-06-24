@@ -96,6 +96,49 @@ let
       "AppRun" "docnav" "lib" "libexec" "pdfjs" "plugins" "translations"
     ];
   };
+
+  # --- Tang Dynasty (Anlogic TD) IDE — for the Lichee Tang (EG4S20) ----------
+  # The proprietary Anlogic/Sipeed flow (synthesis + place-and-route + bitstream
+  # for the EG4S20); there's no mature open-source route for Anlogic, so TD is
+  # the tool the Lichee-Tang tutorial uses. Like Vivado/Quartus the installer is
+  # licensed/large and user-supplied: download the TD Linux tarball from
+  # dl.sipeed.com/TANG, unpack it, then point this wrapper at it by writing
+  #   ~/.config/td/nix.sh:   export TD_HOME=/opt/Tang_Dynasty/td   # has bin/td
+  # TD is an old Qt IDE, so this lib set is a FIRST CUT — if `td` reports a
+  # missing .so, find it (ldd inside `td-shell`) and append it to tdTargetPkgs,
+  # exactly how the Vivado FHS above was built up. If TD turns out to be 32-bit,
+  # add the same libs under `multiPkgs` (buildFHSEnv) for the i686 set.
+  tdTargetPkgs = p: with p; [
+    stdenv.cc.cc.lib zlib glib glibc
+    xorg.libX11 xorg.libXext xorg.libXrender xorg.libXi xorg.libXrandr
+    xorg.libXfixes xorg.libXcursor xorg.libXScrnSaver xorg.libXtst
+    xorg.libXcomposite xorg.libXdamage xorg.libXt xorg.libSM xorg.libICE
+    xorg.libxcb xorg.libXau xorg.libXdmcp xorg.libXmu xorg.libXpm
+    libGL libGLU freetype fontconfig libpng12 expat dbus.lib
+    nss nspr cups.lib ncurses5 libusb1 e2fsprogs
+  ];
+  tdFhs = pkgs.buildFHSEnv {
+    name = "td-fhs";
+    targetPkgs = tdTargetPkgs;
+    runScript = ''
+      [ -f "$HOME/.config/td/nix.sh" ] && . "$HOME/.config/td/nix.sh"
+      if [ -z "''${TD_HOME:-}" ]; then
+        echo "td: set TD_HOME in ~/.config/td/nix.sh to your unpacked Tang" \
+             "Dynasty dir (the one containing bin/td)" >&2
+      else
+        export PATH="$TD_HOME/bin:$PATH"
+        export LD_LIBRARY_PATH="$TD_HOME/bin:$TD_HOME/lib:''${LD_LIBRARY_PATH:-}"
+      fi
+      # TD's GUI is Qt; mirror the Vivado workarounds for tiling WMs + software GL.
+      export _JAVA_AWT_WM_NONREPARENTING=1
+      export LIBGL_ALWAYS_SOFTWARE=1
+      exec "$@"
+    '';
+    meta.mainProgram = "td-fhs";
+  };
+  # td-shell: FHS bash to install/inspect TD; td: launch the IDE.
+  td-shell = pkgs.writeShellScriptBin "td-shell" ''exec ${lib.getExe tdFhs} bash "$@"'';
+  td       = pkgs.writeShellScriptBin "td"       ''exec ${lib.getExe tdFhs} td "$@"'';
 in {
   environment.systemPackages = [
     # Open-source flow — works out of the box, no license:
@@ -121,11 +164,14 @@ in {
     pkgs.z3                         # SMT solver backend for formal flows
 
     # Proprietary vendor toolchains (FHS-wrapped; installer supplied by you).
-    # Vivado uses our pixman-patched FHS env (see above); Quartus is upstream.
+    # Vivado uses our pixman-patched FHS env (see above); Quartus is upstream;
+    # Tang Dynasty (Anlogic, for the Lichee Tang) is the self-contained FHS above.
     vivado
     vivado-shell
     fpga.quartus
     fpga.quartus-shell
+    td
+    td-shell
   ];
 
   # Device access for JTAG cables / FPGA programmers (Xilinx/Intel cables and
@@ -136,5 +182,14 @@ in {
     fpga.quartus-udev-rules
     pkgs.openfpgaloader
   ];
+
+  # Lichee Tang (Anlogic) onboard JTAG programmer. Its cable enumerates as a
+  # Cypress/Anlogic device (VID 0547 / PID 1002); Tang Dynasty's downloader and
+  # openFPGALoader need non-root access to it. This is Sipeed's own
+  # 91-anlogic-jtag.rules (z-247 is already in plugdev). See
+  # https://tang.sipeed.com/en/getting-started/installing-usb-driver/linux/
+  services.udev.extraRules = ''
+    SUBSYSTEMS=="usb", ATTRS{idVendor}=="0547", ATTRS{idProduct}=="1002", GROUP="plugdev", MODE="0660"
+  '';
 };
 }
