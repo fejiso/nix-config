@@ -126,7 +126,7 @@ in {
     nix-direnv.enable = true;
   };
 
-  home.packages = [ pkgs.socat pkgs.bubblewrap pkgs.pv ];
+  home.packages = [ pkgs.socat pkgs.bubblewrap pkgs.pv pkgs.brotli ];
 
   # Atuin shell history
   programs.atuin = {
