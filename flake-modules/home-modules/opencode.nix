@@ -5,6 +5,8 @@
 #   sops secrets/openrouter.yaml
 # The OpenCode Go API key lives in secrets/opencodego.yaml; edit with:
 #   sops secrets/opencodego.yaml
+# The z.ai (GLM coding plan) API key lives in secrets/zai.yaml; edit with:
+#   sops secrets/zai.yaml
 { config, lib, pkgs, inputs, ... }: {
   # personalProviders controls OpenRouter/OpenCode Go secret deployment.
   # Set to false on work machines that use a different AI backend.
@@ -34,8 +36,19 @@
         model = "opencode-go/deepseek-v4-pro";
         provider.openrouter.options.apiKey =
           "{file:${config.sops.secrets.openrouter-api-key.path}}";
+        # Floor pricing for every OpenRouter model: route to the cheapest
+        # provider. extraBody is merged into each request, so it applies
+        # globally without naming models (the model picker has no :floor entry).
+        provider.openrouter.options.extraBody.provider.sort = "price";
         provider.opencode-go.options.apiKey =
           "{file:${config.sops.secrets.opencodego-api-key.path}}";
+        # z.ai GLM coding plan — OpenAI-compatible coding endpoint. Models come
+        # from the built-in models.dev "zai" registry; we only override the
+        # endpoint/key. Select a GLM model at runtime with /models.
+        provider.zai.options = {
+          baseURL = "https://api.z.ai/api/coding/paas/v4";
+          apiKey = "{file:${config.sops.secrets.zai-api-key.path}}";
+        };
         lsp = true;
       };
       sops.secrets = {
@@ -49,6 +62,12 @@
           sopsFile = "${inputs.self}/secrets/opencodego.yaml";
           key = "opencodego_api_key";
           path = "${config.home.homeDirectory}/.local/share/opencode/opencodego-api-key";
+          mode = "0600";
+        };
+        zai-api-key = {
+          sopsFile = "${inputs.self}/secrets/zai.yaml";
+          key = "zai_api_key";
+          path = "${config.home.homeDirectory}/.local/share/opencode/zai-api-key";
           mode = "0600";
         };
       };

@@ -26,7 +26,7 @@ keys:
 
 creation_rules:
   # Shared secrets - used by both home-manager (user key) and system services (host keys)
-  - path_regex: 'secrets/(openrouter|opencodego)\.yaml$'
+  - path_regex: 'secrets/(openrouter|opencodego|zai)\.yaml$'
     age:
       - *user_ssh
       - *user_age

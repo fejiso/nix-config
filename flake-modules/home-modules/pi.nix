@@ -5,6 +5,10 @@
 # whose `key` field supports "!cmd" execution, so we reference the sops secret
 # via "!cat <path>" — no key in the world-readable nix store, like opencode's
 # {file:...}. Node-based (not a bun binary), so it runs on devdesktop too.
+#
+# z.ai's "ZAI Coding Plan (Global)" is a built-in provider (auth.json key
+# `zai`), so it needs only an api_key entry — pi supplies its own model list,
+# nothing is hardcoded. Like openrouter, the key is read at runtime via "!cat".
 { config, lib, pkgs, ... }:
 
 let
@@ -14,6 +18,10 @@ let
     openrouter = {
       type = "api_key";
       key = "!cat ${config.sops.secrets.openrouter-api-key.path}";
+    };
+    zai = {
+      type = "api_key";
+      key = "!cat ${config.sops.secrets.zai-api-key.path}";
     };
   };
 

@@ -21,6 +21,15 @@ let
     model = "openrouter/anthropic/claude-sonnet-4-20250514";
     provider.openrouter.options.apiKey =
       "{file:${config.sops.secrets.openrouter-api-key.path}}";
+    # Floor pricing for every OpenRouter model: route to the cheapest provider.
+    # extraBody is merged into each request, so it applies globally.
+    provider.openrouter.options.extraBody.provider.sort = "price";
+    # z.ai GLM coding plan — OpenAI-compatible coding endpoint. Models come from
+    # the built-in models.dev "zai" registry; pick one with /models at runtime.
+    provider.zai.options = {
+      baseURL = "https://api.z.ai/api/coding/paas/v4";
+      apiKey = "{file:${config.sops.secrets.zai-api-key.path}}";
+    };
   };
 
   configDir = "${config.home.homeDirectory}/.config/kilo";
