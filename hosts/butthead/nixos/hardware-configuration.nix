@@ -15,7 +15,7 @@
   fileSystems."/" =
     { device = "/dev/mapper/crypted";
       fsType = "btrfs";
-      options = [ "subvol=@" "degraded" "compress=lzo" "noatime" ];
+      options = [ "subvol=@" "degraded" "compress=zstd" "noatime" ];
     };
 
   boot.initrd.luks.devices."crypted" = {
@@ -31,19 +31,19 @@
   fileSystems."/home" =
     { device = "/dev/mapper/crypted";
       fsType = "btrfs";
-      options = [ "subvol=@home" "degraded" "compress=lzo" "noatime" ];
+      options = [ "subvol=@home" "degraded" "compress=zstd" "noatime" ];
     };
 
   fileSystems."/nix" =
     { device = "/dev/mapper/crypted";
       fsType = "btrfs";
-      options = [ "subvol=@nix" "degraded" "compress=lzo" "noatime" ];
+      options = [ "subvol=@nix" "degraded" "compress=zstd" "noatime" ];
     };
 
   fileSystems."/var/log" =
     { device = "/dev/mapper/crypted";
       fsType = "btrfs";
-      options = [ "subvol=@log" "degraded" "compress=lzo" "noatime" ];
+      options = [ "subvol=@log" "degraded" "compress=zstd" "noatime" ];
     };
 
   fileSystems."/boot" =

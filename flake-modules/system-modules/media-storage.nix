@@ -111,57 +111,57 @@ in
     fileSystems."/mnt/data01" = {
       device = "/dev/disk/by-label/data01"; # sdc1 - 953.9G
       fsType = "btrfs";
-      options = [ "defaults" "noatime" "nofail" ];
+      options = [ "defaults" "noatime" "nofail" "compress=zstd" ];
     };
 
     fileSystems."/mnt/data02" = {
       device = "/dev/disk/by-label/data02"; # sda1 - 3.6T
       fsType = "btrfs";
-      options = [ "defaults" "noatime" "nofail" ];
+      options = [ "defaults" "noatime" "nofail" "compress=zstd" ];
     };
 
     fileSystems."/mnt/data03" = {
       device = "/dev/disk/by-label/data03"; # sdb1 - 3.6T
       fsType = "btrfs";
-      options = [ "defaults" "noatime" "nofail" ];
+      options = [ "defaults" "noatime" "nofail" "compress=zstd" ];
     };
 
     fileSystems."/mnt/data04" = {
       device = "/dev/disk/by-label/data04"; # sde1 - 3.6T
       fsType = "btrfs";
-      options = [ "defaults" "noatime" "nofail" ];
+      options = [ "defaults" "noatime" "nofail" "compress=zstd" ];
     };
 
     fileSystems."/mnt/data05" = {
       device = "/dev/disk/by-label/data05"; # sdf1 - 7.3T
       fsType = "btrfs";
-      options = [ "defaults" "noatime" "nofail" ];
+      options = [ "defaults" "noatime" "nofail" "compress=zstd" ];
     };
 
     fileSystems."/mnt/data06" = {
       device = "/dev/disk/by-label/data06"; # sdh1 - 3.6T
       fsType = "btrfs";
-      options = [ "defaults" "noatime" "nofail" ];
+      options = [ "defaults" "noatime" "nofail" "compress=zstd" ];
     };
 
     fileSystems."/mnt/data07" = {
       device = "/dev/disk/by-label/data07";
       fsType = "btrfs";
-      options = [ "defaults" "noatime" "nofail" ];
+      options = [ "defaults" "noatime" "nofail" "compress=zstd" ];
     };
 
     # Parity disk mounts
     fileSystems."/mnt/parity1" = {
       device = "/dev/disk/by-label/parity1"; # sdg1 - 7.3T
       fsType = "btrfs";
-      options = [ "defaults" "noatime" "nofail" ];
+      options = [ "defaults" "noatime" "nofail" "compress=zstd" ];
     };
 
     # Parity2
     fileSystems."/mnt/parity2" = {
       device = "/dev/disk/by-label/parity2"; # sdd1 - 7.3T
       fsType = "btrfs";
-      options = [ "defaults" "noatime" "nofail" ];
+      options = [ "defaults" "noatime" "nofail" "compress=zstd" ];
     };
 
     # MergerFS pool combining all data disks (SSD writes first)

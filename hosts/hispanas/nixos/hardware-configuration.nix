@@ -16,6 +16,7 @@
   fileSystems."/" =
     { device = "/dev/disk/by-uuid/3b045414-1b1b-47a4-b85f-5c8dcdeee7fb";
       fsType = "btrfs";
+      options = [ "compress=zstd" ];
     };
 
   fileSystems."/boot" =
@@ -28,7 +29,7 @@
   {
     device = "/dev/disk/by-uuid/9f722a2b-1ef7-46d5-8b70-78832e9fe3a7";
     fsType = "btrfs";
-    options = [ "nofail" "x-systemd.automount" "x-systemd.idle-timeout=600" ];
+    options = [ "nofail" "x-systemd.automount" "x-systemd.idle-timeout=600" "compress=zstd" ];
   };
 
   swapDevices =
