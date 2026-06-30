@@ -48,6 +48,12 @@
         provider.zai.options = {
           baseURL = "https://api.z.ai/api/coding/paas/v4";
           apiKey = "{file:${config.sops.secrets.zai-api-key.path}}";
+          # GLM-5.x are reasoning models; the coding endpoint defaults thinking
+          # ON and streams `reasoning_content` before any text. When the model
+          # goes reasoning -> tool_call with no intervening text content,
+          # opencode's interleaved-reasoning parser stalls and the prompt hangs
+          # forever. Disable server-side thinking to avoid that path entirely.
+          extraBody.thinking.type = "disabled";
         };
         lsp = true;
       };
