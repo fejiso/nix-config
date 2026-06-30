@@ -42,18 +42,31 @@
         provider.openrouter.options.extraBody.provider.sort = "price";
         provider.opencode-go.options.apiKey =
           "{file:${config.sops.secrets.opencodego-api-key.path}}";
-        # z.ai GLM coding plan — OpenAI-compatible coding endpoint. Models come
-        # from the built-in models.dev "zai" registry; we only override the
-        # endpoint/key. Select a GLM model at runtime with /models.
-        provider.zai.options = {
-          baseURL = "https://api.z.ai/api/coding/paas/v4";
-          apiKey = "{file:${config.sops.secrets.zai-api-key.path}}";
-          # GLM-5.x are reasoning models; the coding endpoint defaults thinking
-          # ON and streams `reasoning_content` before any text. When the model
-          # goes reasoning -> tool_call with no intervening text content,
-          # opencode's interleaved-reasoning parser stalls and the prompt hangs
-          # forever. Disable server-side thinking to avoid that path entirely.
-          extraBody.thinking.type = "disabled";
+        # z.ai GLM coding plan via the ANTHROPIC-compatible endpoint, not the
+        # OpenAI-compatible one. opencode 1.17.9's openai-compatible streaming
+        # against z.ai's `paas/v4` coding endpoint stalls intermittently: a
+        # stream starts, then no chunks arrive and it never completes or errors,
+        # so prompts appear to hang forever (confirmed by proxying requests and
+        # reading opencode's stream logs — the z.ai API itself streams fine via
+        # curl on both endpoints). Routing through @ai-sdk/anthropic uses
+        # opencode's far more battle-tested Anthropic streaming path, which is
+        # also what z.ai officially recommends for Claude Code-style agents.
+        # The Anthropic SDK appends /v1/messages to baseURL and sends the key as
+        # the x-api-key header. Select a GLM model at runtime with /models.
+        provider.zai = {
+          npm = "@ai-sdk/anthropic";
+          name = "Z.AI (GLM, Anthropic)";
+          options = {
+            baseURL = "https://api.z.ai/api/anthropic";
+            apiKey = "{file:${config.sops.secrets.zai-api-key.path}}";
+          };
+          models = {
+            "glm-5.2" = { name = "GLM-5.2"; };
+            "glm-5.1" = { name = "GLM-5.1"; };
+            "glm-5" = { name = "GLM-5"; };
+            "glm-4.7" = { name = "GLM-4.7"; };
+            "glm-4.6" = { name = "GLM-4.6"; };
+          };
         };
         lsp = true;
       };
