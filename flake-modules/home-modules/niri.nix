@@ -355,7 +355,6 @@ with lib;
       spawn-at-startup "${pkgs.firefox}/bin/firefox"
       spawn-at-startup "${pkgs.strawberry}/bin/strawberry"
       spawn-at-startup "${pkgs.xwayland-satellite}/bin/xwayland-satellite"
-      spawn-at-startup "${pkgs.logseq}/bin/logseq"
       spawn-at-startup "${pkgs.telegram-desktop}/bin/Telegram"
       spawn-at-startup "${pkgs.spotify}/bin/spotify"
       spawn-at-startup "steam"

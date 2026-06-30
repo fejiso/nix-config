@@ -25,7 +25,7 @@ in {
 
     # Desktop applications
     telegram-desktop
-    logseq
+    silverbullet
     libreoffice
     zoom-us
     wine
