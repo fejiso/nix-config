@@ -34,6 +34,11 @@ in {
     # consuming config is armv7l (z-turn). See pkgs/zynq/.
     ubootZturn = final.callPackage ../pkgs/zynq/uboot.nix { };
     linuxZynqXlnx = final.callPackage ../pkgs/zynq/kernel.nix { };
+
+    # Xilinx fork for the AMD/Xilinx KR260 (Zynq UltraScale+ ZU2EG, aarch64).
+    # Cross-compile when the consuming config is aarch64 built on x86 (kr260).
+    # Reuses the same linux-xlnx tree/rev as the Zynq-7000 kernel (one FOD).
+    linuxZynqmpXlnx = final.callPackage ../pkgs/zynq/kernel-zynqmp.nix { };
   };
 
   # This one contains whatever you want to overlay

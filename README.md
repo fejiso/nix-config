@@ -24,7 +24,9 @@ This flake-based configuration supports:
 - **ARM NixOS systems**: `rpi3` (Raspberry Pi 3), `pine64` (Pine64 SBC),
   `xpi-s905x3` (Amlogic S905X3 TV box) — all aarch64 — plus `z-turn`
   (MYIR Z-turn, Xilinx Zynq-7020 FPGA SoC, **armv7l**, cross-compiled with the
-  `linux-xlnx` / `u-boot-xlnx` forks)
+  `linux-xlnx` / `u-boot-xlnx` forks) and `kr260` (AMD/Xilinx KR260, Zynq
+  UltraScale+ ZU2EG, **aarch64**, cross-compiled with the `linux-xlnx` ZynqMP
+  defconfig; boots off the on-board QSPI firmware)
 - **macOS system**: `work-laptop` (aarch64-darwin, via nix-darwin)
 - **Standalone home-manager configurations** (non-NixOS Linux):
   `superfer@devdesktop` (x86_64 Ubuntu) and `ubuntu@amp1` (aarch64 Ubuntu,
@@ -135,6 +137,7 @@ automatically. ARM hosts pass `sdImage = true` to also get `images.<name>`.
 | `pine64`     | aarch64-linux   | NixOS + SD img  | Pine64 SBC, embedded |
 | `xpi-s905x3` | aarch64-linux   | NixOS + SD img  | Amlogic S905X3 box, embedded |
 | `z-turn`     | armv7l-linux    | NixOS + SD img  | MYIR Z-turn (Zynq-7020 FPGA SoC); linux-xlnx/u-boot-xlnx, cross-compiled |
+| `kr260`      | aarch64-linux   | NixOS + SD img  | AMD/Xilinx KR260 (Zynq UltraScale+ ZU2EG); linux-xlnx (ZynqMP), cross-compiled; boots off stock QSPI firmware |
 | `work-laptop`| aarch64-darwin  | nix-darwin      | macOS work machine |
 | `devdesktop` | x86_64-linux    | home-manager    | Standalone HM on Ubuntu (`superfer@devdesktop`) |
 | `amp1`       | aarch64-linux   | home-manager    | Standalone HM on Ubuntu + native ARM builder (`ubuntu@amp1`) |
@@ -288,6 +291,9 @@ Supported devices with bootable SD card image generation:
 - **MYIR Z-turn** (`z-turn`) — Xilinx Zynq-7020 FPGA SoC (**armv7l**), built
   with the `linux-xlnx`/`u-boot-xlnx` forks (u-boot SPL acts as the FSBL — no
   Vivado needed)
+- **AMD/Xilinx KR260** (`kr260`) — Zynq UltraScale+ ZU2EG (**aarch64**), built
+  with the `linux-xlnx` ZynqMP defconfig; no BOOT.BIN on the SD (the board's
+  stock QSPI firmware chain-loads extlinux from the SD FAT)
 
 #### Build hosts
 
@@ -298,6 +304,10 @@ Supported devices with bootable SD card image generation:
   repo avoids QEMU binfmt) — so it builds as ordinary x86 work, no emulation.
   The first build compiles the armv7l world from source (no upstream armv7l
   cache); results are then cached on the netbird `nix-serve`.
+- **`kr260`** is likewise **cross-compiled from x86** (aarch64), even though the
+  `amp1` native aarch64 builder exists — it builds as ordinary x86 work and is
+  pushed over SSH (netbird), mirroring `z-turn`. Results cache on the netbird
+  `nix-serve` (and overlap with the aarch64 cache used by the other SBCs).
 
 #### Building SD card images
 
@@ -340,9 +350,9 @@ mechanism (regular config vs. `sd-image.nix`) is described in
 #### Embedded optimizations
 
 ARM hosts use `flake-modules/system-modules/embedded.nix`: lighter package set,
-larger zram swap, serial console (`ttyAMA0` for RPi3, `ttyS0` for Pine64/S905X3,
-`ttyPS0` for the Zynq `z-turn`), no x86-specific hardware, and aggressive GC /
-journald limits for SD longevity.
+   larger zram swap, serial console (`ttyAMA0` for RPi3, `ttyS0` for Pine64/S905X3,
+   `ttyPS0` for the Zynq `z-turn` and Zynq UltraScale+ `kr260`), no x86-specific
+   hardware, and aggressive GC / journald limits for SD longevity.
 
 ### Updating Dependencies
 
