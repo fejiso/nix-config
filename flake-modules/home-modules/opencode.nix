@@ -33,7 +33,7 @@
     # Personal provider settings and secrets — skipped on work machines.
     (lib.mkIf config.programs.opencode.personalProviders {
       programs.opencode.settings = {
-        model = "opencode-go/deepseek-v4-pro";
+        model = "zai-coding-plan/glm-5.2";
         provider.openrouter.options.apiKey =
           "{file:${config.sops.secrets.openrouter-api-key.path}}";
         # Floor pricing for every OpenRouter model: route to the cheapest
@@ -42,32 +42,19 @@
         provider.openrouter.options.extraBody.provider.sort = "price";
         provider.opencode-go.options.apiKey =
           "{file:${config.sops.secrets.opencodego-api-key.path}}";
-        # z.ai GLM coding plan via the ANTHROPIC-compatible endpoint, not the
-        # OpenAI-compatible one. opencode 1.17.9's openai-compatible streaming
-        # against z.ai's `paas/v4` coding endpoint stalls intermittently: a
-        # stream starts, then no chunks arrive and it never completes or errors,
-        # so prompts appear to hang forever (confirmed by proxying requests and
-        # reading opencode's stream logs — the z.ai API itself streams fine via
-        # curl on both endpoints). Routing through @ai-sdk/anthropic uses
-        # opencode's far more battle-tested Anthropic streaming path, which is
-        # also what z.ai officially recommends for Claude Code-style agents.
-        # The Anthropic SDK appends /v1/messages to baseURL and sends the key as
-        # the x-api-key header. Select a GLM model at runtime with /models.
-        provider.zai = {
-          npm = "@ai-sdk/anthropic";
-          name = "Z.AI (GLM, Anthropic)";
-          options = {
-            baseURL = "https://api.z.ai/api/anthropic";
-            apiKey = "{file:${config.sops.secrets.zai-api-key.path}}";
-          };
-          models = {
-            "glm-5.2" = { name = "GLM-5.2"; };
-            "glm-5.1" = { name = "GLM-5.1"; };
-            "glm-5" = { name = "GLM-5"; };
-            "glm-4.7" = { name = "GLM-4.7"; };
-            "glm-4.6" = { name = "GLM-4.6"; };
-          };
-        };
+        # z.ai GLM Coding Plan via the BUILT-IN `zai-coding-plan` provider
+        # (auto-discovered from models.dev). We previously hand-rolled a custom
+        # `provider.zai` that forced @ai-sdk/anthropic against
+        # `api.z.ai/api/anthropic`, but that path hangs in opencode 1.17.9 (the
+        # stream starts and then no chunks ever arrive — see opencode issues
+        # #34126 / #34698 for the pending parser fix, and #31133 / #34672 for the
+        # z.ai-specific transient network/retry bugs). The maintained
+        # models.dev `zai-coding-plan` provider uses @ai-sdk/openai-compatible
+        # against `api.z.ai/api/coding/paas/v4` and tracks the GLM streaming
+        # quirks, so we lean on it instead of overriding npm/baseURL/models.
+        # Only the API key needs supplying; pick another GLM with /models.
+        provider."zai-coding-plan".options.apiKey =
+          "{file:${config.sops.secrets.zai-api-key.path}}";
         lsp = true;
       };
       sops.secrets = {

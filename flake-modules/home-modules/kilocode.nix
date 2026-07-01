@@ -18,18 +18,19 @@ let
 
   kiloConfig = jsonFormat.generate "kilo.json" {
     "$schema" = "https://app.kilo.ai/config.json";
-    model = "openrouter/anthropic/claude-sonnet-4-20250514";
+    model = "zai-coding-plan/glm-5.2";
     provider.openrouter.options.apiKey =
       "{file:${config.sops.secrets.openrouter-api-key.path}}";
     # Floor pricing for every OpenRouter model: route to the cheapest provider.
     # extraBody is merged into each request, so it applies globally.
     provider.openrouter.options.extraBody.provider.sort = "price";
-    # z.ai GLM coding plan — OpenAI-compatible coding endpoint. Models come from
-    # the built-in models.dev "zai" registry; pick one with /models at runtime.
-    provider.zai.options = {
-      baseURL = "https://api.z.ai/api/coding/paas/v4";
-      apiKey = "{file:${config.sops.secrets.zai-api-key.path}}";
-    };
+    # z.ai GLM Coding Plan via the built-in `zai-coding-plan` provider (from
+    # models.dev), which uses @ai-sdk/openai-compatible against
+    # `api.z.ai/api/coding/paas/v4`. Only the key needs supplying; pick a GLM
+    # at runtime. See opencode.nix for the rationale (hand-rolling this path or
+    # the Anthropic endpoint both hang in opencode's runtime).
+    provider."zai-coding-plan".options.apiKey =
+      "{file:${config.sops.secrets.zai-api-key.path}}";
   };
 
   configDir = "${config.home.homeDirectory}/.config/kilo";

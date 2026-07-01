@@ -25,6 +25,13 @@ let
     };
   };
 
+  # settings.json: default to z.ai's GLM-5.2. Written as a real 0600 file so
+  # pi can still mutate it (it manages settings.json in this dir at runtime).
+  settingsConfig = (pkgs.formats.json { }).generate "pi-settings.json" {
+    defaultProvider = "zai";
+    defaultModel = "glm-5.2";
+  };
+
   configDir = "${config.home.homeDirectory}/.pi/agent";
 in
 
@@ -58,6 +65,7 @@ in
       home.activation.piAgentAuth = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         mkdir -p ${configDir}
         install -m 0600 ${authConfig} ${configDir}/auth.json
+        install -m 0600 ${settingsConfig} ${configDir}/settings.json
       '';
     })
   ]);
