@@ -56,6 +56,28 @@
         provider."zai-coding-plan".options.apiKey =
           "{file:${config.sops.secrets.zai-api-key.path}}";
         lsp = true;
+        # /usage — show the z.ai (GLM coding plan) API usage limits. The key is
+        # read at runtime from the sops path so nothing secret lands in the
+        # (world-readable) nix store; the command body just hands the agent a
+        # curl|jq pipeline to run and print verbatim.
+        command.usage = {
+          description = "Show z.ai API usage limits and quota.";
+          template = ''
+            Run this bash command and print its stdout verbatim, with no commentary:
+
+            ```bash
+            KEY="$(cat ${config.sops.secrets.zai-api-key.path})"
+            curl -sS 'https://api.z.ai/api/monitor/usage/quota/limit' \
+              -H "Authorization: Bearer $KEY" | jq -r '
+            "z.ai usage quota — plan level: \(.data.level)","",
+            (.data.limits[] |
+              "• \(.type): \(.percentage)% used",
+              (if .remaining != null then "    remaining: \(.remaining) / \(.usage)" else empty end),
+              "    resets: \(.nextResetTime/1000|strftime("%Y-%m-%d %H:%M UTC"))",
+              "")'
+            ```
+          '';
+        };
       };
       sops.secrets = {
         openrouter-api-key = {

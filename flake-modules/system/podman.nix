@@ -4,7 +4,11 @@
 { config, lib, pkgs, ... }:
 
 {
-  # Enable Podman auto-update for rootless containers across all users
+  # Podman auto-update only makes sense where Podman is actually enabled.
+  # Gating it keeps `pkgs.podman` (and crun → libkrun → libkrunfw) out of the
+  # closure of hosts that don't use containers — e.g. the embedded kr260, where
+  # libkrunfw's bundled-kernel build is also broken under aarch64 cross.
+  config = lib.mkIf config.virtualisation.podman.enable {
   systemd.timers.podman-auto-update = {
     description = "Daily container image updates using podman auto-update";
     wantedBy = [ "timers.target" ];
@@ -38,6 +42,7 @@
         fi
       done
     '';
+  };
   };
 }
 ;

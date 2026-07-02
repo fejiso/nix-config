@@ -8,8 +8,9 @@
 
 buildLinux (args // {
   version = "6.6.80";
-  # xilinx_zynqmp_defconfig sets CONFIG_LOCALVERSION="-xilinx".
-  modDirVersion = "6.6.80-xilinx";
+  # xilinx_zynqmp_defconfig leaves CONFIG_LOCALVERSION empty (unlike the
+  # Zynq-7000 defconfig, which sets "-xilinx"), so kernelrelease == 6.6.80.
+  modDirVersion = "6.6.80";
 
   src = fetchFromGitHub {
     owner = "Xilinx";
@@ -22,6 +23,15 @@ buildLinux (args // {
   };
 
   defconfig = "xilinx_zynqmp_defconfig";
+
+  # The xilinx_zynqmp_defconfig is an embedded/PS-only config: it leaves ACPI,
+  # the security LSM stack (apparmor/landlock/lockdown/yama), RPi/BCM2835,
+  # Tegra/Allwinner, Xen, PCIEAER, SCHED_CORE, etc. disabled. nixpkgs' common
+  # kernel-config (merged into every buildLinux) requests those symbols, and
+  # since their Kconfig dependencies aren't met here `make olddefconfig` drops
+  # them — generate-config.pl then errors with "unused option: ...". Downgrade
+  # those to warnings (same as nixpkgs' own embedded/vendor kernels, e.g. RPi).
+  ignoreConfigErrors = true;
 
   # xilinx_zynqmp_defconfig is geared at Xilinx's own rootfs; NixOS needs a few
   # extra options (added here as builds/boots reveal them). The Zynq-7000 kernel
