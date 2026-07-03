@@ -35,8 +35,9 @@ buildLinux (args // {
 
   # xilinx_zynqmp_defconfig is geared at Xilinx's own rootfs; NixOS needs a few
   # extra options (added here as builds/boots reveal them). The Zynq-7000 kernel
-  # additionally had to disable Micrel-PHY/gcc-15-media build breakages that are
-  # armv7l/Zynq-7000 specific; ZynqMP is unaffected, so they stay out.
+  # also builds in its board's Micrel PHY; the KR260's PHY differs, so that
+  # stays out. The linux-xlnx vendor modpost-breakers below are NOT arch-specific
+  # (they bite ZynqMP just as they do Zynq-7000) — see pkgs/zynq/kernel.nix.
   structuredExtraConfig = with lib.kernel; {
     # systemd / NixOS stage-2 essentials commonly missing from vendor defconfigs:
     AUTOFS_FS = yes;
@@ -54,6 +55,16 @@ buildLinux (args // {
     EXT4_FS = yes;
     EXT4_USE_FOR_EXT2 = yes;
     BTRFS_FS = yes;
+
+    # linux-xlnx vendor modules that fail `make modules` modpost (broken
+    # namespace imports / undefined symbols) and aren't on this board: a TI
+    # PMBUS regulator, the Xilinx staging MPEG2-TS muxer, and the Versal (not
+    # ZynqMP) sysmon. Identical to the Zynq-7000 workarounds.
+    SENSORS_TPS544 = no;
+    XLNX_TSMUX = no;
+    VERSAL_SYSMON = no;
+    VERSAL_SYSMON_CORE = no;
+    VERSAL_SYSMON_I2C = no;
   };
 
   extraMeta = {
