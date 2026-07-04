@@ -23,6 +23,15 @@
   # Host-specific networking
   networking.hostName = "hispanas";
 
+  # Ralink RT5390R (rt2800pci) firmware is notoriously slow (<1Mbps) under
+  # default settings. Two well-known fixes:
+  #   1. Disable Wi-Fi power management (NetworkManager defaults it on).
+  #   2. Disable hardware crypto offload (driver bug; CPU handles it faster).
+  networking.networkmanager.wifi.powersave = false;
+  boot.extraModprobeConfig = ''
+    options rt2800pci nohwcrypt=1
+  '';
+
   # Emilia user account
   users.users.emilia = {
     isNormalUser = true;
