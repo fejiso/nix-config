@@ -6,7 +6,7 @@
   ];
 
   # Image configuration
-  image.fileName = "nixos-pine64-${config.system.nixos.label}-${pkgs.stdenv.hostPlatform.system}.img.zst";
+  image.baseName = "nixos-pine64-${config.system.nixos.label}-${pkgs.stdenv.hostPlatform.system}";
 
   # SD image configuration
   sdImage = {

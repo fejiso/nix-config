@@ -10,7 +10,7 @@
   hardware.graphics.enable32Bit = lib.mkForce false;
 
   # Image configuration
-  image.fileName = "nixos-rpi3-${config.system.nixos.label}-${pkgs.stdenv.hostPlatform.system}.img.zst";
+  image.baseName = "nixos-rpi3-${config.system.nixos.label}-${pkgs.stdenv.hostPlatform.system}";
 
   # SD image configuration
   sdImage = {

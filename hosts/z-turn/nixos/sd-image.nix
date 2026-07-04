@@ -23,7 +23,7 @@ in
   hardware.graphics.enable = lib.mkForce false;
   hardware.graphics.enable32Bit = lib.mkForce false;
 
-  image.fileName = "nixos-z-turn-${config.system.nixos.label}-${pkgs.stdenv.hostPlatform.system}.img.zst";
+  image.baseName = "nixos-z-turn-${config.system.nixos.label}-${pkgs.stdenv.hostPlatform.system}";
 
   sdImage = {
     firmwareSize = 256;   # holds BOOT.BIN + u-boot.img + extlinux + kernel/initrd

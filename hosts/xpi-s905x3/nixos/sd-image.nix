@@ -10,7 +10,7 @@
   hardware.graphics.enable32Bit = lib.mkForce false;
 
   # Image configuration
-  image.fileName = "nixos-xpi-s905x3-${config.system.nixos.label}-${pkgs.stdenv.hostPlatform.system}.img.zst";
+  image.baseName = "nixos-xpi-s905x3-${config.system.nixos.label}-${pkgs.stdenv.hostPlatform.system}";
 
   # SD image configuration
   sdImage = {
