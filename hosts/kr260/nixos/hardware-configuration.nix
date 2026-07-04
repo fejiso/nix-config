@@ -26,8 +26,25 @@
   # revA, carrier revB. (Verified present in the built kernel's dtbs/.)
   hardware.deviceTree.name = "xilinx/zynqmp-smk-k26-revA-sck-kr-g-revB.dtb";
 
-  # Root filesystem (btrfs, grow-on-boot) and the FAT boot partition come from
-  # the shared sd-image-btrfs module (wired in by mk-host for sdImage hosts).
+  # USB stability fix (root cause of the btrfs read-error storm). The card boots
+  # through the on-board Microchip USB2744 hub → USB card reader (root shows up
+  # as /dev/sda2, NOT mmcblk). The `onboard-usb-dev` driver (CONFIG_USB_ONBOARD_DEV)
+  # binds to those hub nodes, can't find their regulators ("supply vdd not found,
+  # using dummy regulator"), and immediately power-cycles the hubs — which
+  # disconnects the card reader mid-transfer. The dmesg timestamping is exact:
+  # `onboard-usb-dev` registers → `usb 1-1: USB disconnect` → `BTRFS error sda2
+  # errs: rd 1, 2, 3…`. Two known-good cards fail identically because the fault
+  # is the hub reset, not the media. The hubs are self-powered standard USB
+  # hubs and need no onboard-usb-dev power sequencing, so just suppress that
+  # driver. It's =m (module loaded by udev), so blacklistedKernelModules is the
+  # real fix; initcall_blacklist is belt-and-suspenders in case it's ever built
+  # in. (Card via native sdhci1 / 1.8V SDR104 is a different board's issue — the
+  # KR260's card is behind USB here.)
+  boot.blacklistedKernelModules = [ "onboard_usb_dev" "onboard-usb-dev" ];
+  boot.kernelParams = [ "initcall_blacklist=onboard_dev_init" ];
+
+  # Root filesystem (btrfs) and the FAT boot partition come from the shared
+  # sd-image-btrfs module (wired in by mk-host for sdImage hosts).
 
   swapDevices = [ ];
   networking.useDHCP = lib.mkDefault true;
