@@ -39,6 +39,32 @@ in {
     # Cross-compile when the consuming config is aarch64 built on x86 (kr260).
     # Reuses the same linux-xlnx tree/rev as the Zynq-7000 kernel (one FOD).
     linuxZynqmpXlnx = final.callPackage ../pkgs/zynq/kernel-zynqmp.nix { };
+
+    # load-fpga: program a Zynq/ZynqMP PL over the network from any local path,
+    # via the Linux fpga-manager — no JTAG, no /nix/store writes. Points the
+    # firmware loader at /tmp (writable, unlike the store) through the
+    # firmware_class.path param, copies the bitstream there, then triggers the
+    # manager. The image must already be fpga-manager format (.bit.bin), as
+    # produced by: bootgen -image bitswap.bif -arch {zynq|zynqmp} -process_bitstream bin
+    load-fpga = final.writeShellScriptBin "load-fpga" ''
+      set -euo pipefail
+      if [ "$#" -ne 1 ]; then
+        echo "usage: load-fpga <bitstream.bit.bin>" >&2
+        exit 2
+      fi
+      src="$1"
+      name="$(basename "$src")"
+      fw_param="/sys/module/firmware_class/parameters/path"
+      mgr="/sys/class/fpga_manager/fpga0"
+      [ -e "$fw_param" ] || { echo "load-fpga: $fw_param missing (firmware_class not loaded?)" >&2; exit 1; }
+      [ -d "$mgr" ]      || { echo "load-fpga: $mgr missing (fpga-manager driver not probed?)" >&2; exit 1; }
+      # Redirect the firmware loader at a writable dir; store search path is RO.
+      echo -n "/tmp" | sudo tee "$fw_param" >/dev/null
+      cp "$src" "/tmp/$name"
+      echo "$name" | sudo tee "$mgr/firmware" >/dev/null
+      state="$(cat "$mgr/state")"
+      echo "load-fpga: $name -> fpga0 state=$state"
+    '';
   };
 
   # This one contains whatever you want to overlay

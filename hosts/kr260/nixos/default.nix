@@ -29,5 +29,8 @@
   users.users.root.initialPassword = lib.mkForce "kr260";
   users.users.z-247.initialPassword = lib.mkForce "kr260";
 
+  # PL bitstream loader: `load-fpga design.bit.bin` over SSH/netbird. No JTAG.
+  environment.systemPackages = [ pkgs.load-fpga ];
+
   system.stateVersion = "25.05";
 }
