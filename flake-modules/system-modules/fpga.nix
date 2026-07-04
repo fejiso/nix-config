@@ -110,10 +110,10 @@ let
   # add the same libs under `multiPkgs` (buildFHSEnv) for the i686 set.
   tdTargetPkgs = p: with p; [
     stdenv.cc.cc.lib zlib glib glibc
-    xorg.libX11 xorg.libXext xorg.libXrender xorg.libXi xorg.libXrandr
-    xorg.libXfixes xorg.libXcursor xorg.libXScrnSaver xorg.libXtst
-    xorg.libXcomposite xorg.libXdamage xorg.libXt xorg.libSM xorg.libICE
-    xorg.libxcb xorg.libXau xorg.libXdmcp xorg.libXmu xorg.libXpm
+    libx11 libxext libxrender libxi libxrandr
+    libxfixes libxcursor libxscrnsaver libxtst
+    libxcomposite libxdamage libxt libsm libice
+    libxcb libxau libxdmcp libxmu libxpm
     libGL libGLU freetype fontconfig libpng12 expat dbus.lib
     nss nspr cups.lib ncurses5 libusb1 e2fsprogs
   ];
