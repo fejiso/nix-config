@@ -14,6 +14,16 @@ let
   retentionPolicy = "--keep-daily 7 --keep-weekly 4 --keep-monthly 12 --keep-annual 10";
   # Ignore-pattern flags built from services.backup.ignore (empty when unset).
   ignoreArgs = concatMapStringsSep " " (p: "--add-ignore " + escapeShellArg p) cfg.ignore;
+  # Deterministic backup time from hostname hash — spreads hosts across
+  # the day so they don't all hammer the server at midnight.
+  hexMap = { "0"=0; "1"=1; "2"=2; "3"=3; "4"=4; "5"=5; "6"=6; "7"=7;
+             "8"=8; "9"=9; "a"=10; "b"=11; "c"=12; "d"=13; "e"=14; "f"=15; };
+  hexToInt = h: builtins.foldl' (acc: c: acc * 16 + hexMap.${c}) 0
+    (lib.stringToCharacters h);
+  hashMinutes = lib.mod (hexToInt (builtins.substring 0 8
+    (builtins.hashString "sha256" hostname))) 1440;
+  backupHour   = lib.fixedWidthString 2 "0" (toString (hashMinutes / 60));
+  backupMinute = lib.fixedWidthString 2 "0" (toString (lib.mod hashMinutes 60));
 in {
   options.services.backup = {
     enable = mkEnableOption "Kopia backup service";
@@ -87,9 +97,9 @@ in {
         description = "Run Kopia backup daily";
         wantedBy = [ "timers.target" ];
         timerConfig = {
-          OnCalendar = "daily";
+          OnCalendar = "*-*-* ${backupHour}:${backupMinute}:00";
           Persistent = true;
-          RandomizedDelaySec = "1h";
+          RandomizedDelaySec = "5m";
         };
       };
     })
