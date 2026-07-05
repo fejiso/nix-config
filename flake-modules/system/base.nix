@@ -20,6 +20,11 @@
       "**/Syncthing"
       "**/.local/share/containers"
       "**/.venv"
+      "**/.cache"
+      "**/.wine*"
+      "**/.mozilla"
+      "**/.vscode"
+      "**/.platformio"
     ];
 
     nixpkgs = {

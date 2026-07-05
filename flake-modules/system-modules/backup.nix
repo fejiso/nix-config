@@ -100,6 +100,18 @@ in {
         "d ${cfg.repoPath} 0755 root root -"
       ];
 
+      # kopia-admin: run kopia against the server's DIRECT filesystem repo
+      # (as root@<host> — the repo + maintenance owner), so admin operations
+      # the backup-user-via-server context denies (maintenance, repository
+      # change-password, repair, maintenance info) just work. Forwards args.
+      environment.systemPackages = [
+        (pkgs.writeShellScriptBin "kopia-admin" ''
+          set -euo pipefail
+          export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_repo_password.path})"
+          exec ${kopia}/bin/kopia --config-file /var/lib/kopia/.config/kopia/repository.config "$@"
+        '')
+      ];
+
       systemd.services.kopia-server = {
         description = "Kopia Repository Server";
         wantedBy = [ "multi-user.target" ];
@@ -143,10 +155,18 @@ in {
           chmod 0644 ${cfg.repoPath}/server-fingerprint
           echo "Server fingerprint published: $FINGERPRINT"
 
+          # Set repo-wide global policy (retention + ignores) via the direct
+          # repo connection. All clients inherit these automatically — they
+          # can't set global policies themselves via the server connection.
+          # Two steps: clear first, then add — avoids any flag-order ambiguity.
+          ${kopia}/bin/kopia policy set --global --clear-ignore
+          ${kopia}/bin/kopia policy set --global ${retentionPolicy} ${ignoreArgs}
+
+          export KOPIA_SERVER_USERNAME="admin"
+          export KOPIA_SERVER_PASSWORD="$(cat ${config.sops.secrets.kopia_server_password.path})"
+
           exec ${kopia}/bin/kopia server start --address 0.0.0.0:51515 \
-            --tls-cert-file "$CERT_FILE" --tls-key-file "$KEY_FILE" \
-            --server-username "admin" \
-            --server-password-file ${config.sops.secrets.kopia_server_password.path}
+            --tls-cert-file "$CERT_FILE" --tls-key-file "$KEY_FILE"
         '';
       };
 
@@ -197,7 +217,9 @@ in {
         wants = [ "kopia-server.service" ];
         environment = {
           HOME = "/root";
+          KOPIA_LOG_DIR = "/var/log/kopia";
         };
+        serviceConfig.LogsDirectory = [ "kopia" ];
         path = [ kopia ];
         script = ''
           export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_server_password.path})"
@@ -234,9 +256,28 @@ in {
             fi
           fi
 
-          echo "Starting snapshot..."
-          ${kopia}/bin/kopia snapshot create ${snapshotPaths}
-          ${kopia}/bin/kopia policy set --global ${retentionPolicy} ${ignoreArgs}
+          echo "Starting kopia snapshot: ${snapshotPaths}"
+
+          START_TIME=$(date +%s)
+          ( while true; do
+              sleep 600
+              echo "[heartbeat] still snapshotting - $(( ($(date +%s) - START_TIME) / 60 ))min elapsed"
+            done ) &
+          HEARTBEAT_PID=$!
+          trap 'kill "$HEARTBEAT_PID" 2>/dev/null || true' EXIT
+
+          ${kopia}/bin/kopia --log-level=warning snapshot create ${snapshotPaths}
+          SNAPSHOT_EXIT=$?
+
+          kill "$HEARTBEAT_PID" 2>/dev/null || true
+          trap - EXIT
+
+          if [ $SNAPSHOT_EXIT -ne 0 ]; then
+            echo "Snapshot FAILED (exit $SNAPSHOT_EXIT)"
+            exit $SNAPSHOT_EXIT
+          fi
+
+          echo "Snapshot complete"
         '';
       };
     })
@@ -249,7 +290,9 @@ in {
         after = [ "sops-nix.service" ];
         environment = {
           HOME = "/root";
+          KOPIA_LOG_DIR = "/var/log/kopia";
         };
+        serviceConfig.LogsDirectory = [ "kopia" ];
         path = [ kopia ];
         script = ''
           export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_server_password.path})"
@@ -279,9 +322,28 @@ in {
             fi
           fi
 
-          echo "Starting snapshot..."
-          ${kopia}/bin/kopia snapshot create ${snapshotPaths}
-          ${kopia}/bin/kopia policy set --global ${retentionPolicy} ${ignoreArgs}
+          echo "Starting kopia snapshot: ${snapshotPaths}"
+
+          START_TIME=$(date +%s)
+          ( while true; do
+              sleep 600
+              echo "[heartbeat] still snapshotting - $(( ($(date +%s) - START_TIME) / 60 ))min elapsed"
+            done ) &
+          HEARTBEAT_PID=$!
+          trap 'kill "$HEARTBEAT_PID" 2>/dev/null || true' EXIT
+
+          ${kopia}/bin/kopia --log-level=warning snapshot create ${snapshotPaths}
+          SNAPSHOT_EXIT=$?
+
+          kill "$HEARTBEAT_PID" 2>/dev/null || true
+          trap - EXIT
+
+          if [ $SNAPSHOT_EXIT -ne 0 ]; then
+            echo "Snapshot FAILED (exit $SNAPSHOT_EXIT)"
+            exit $SNAPSHOT_EXIT
+          fi
+
+          echo "Snapshot complete"
         '';
       };
     })
