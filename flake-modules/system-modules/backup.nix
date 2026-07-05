@@ -8,6 +8,12 @@ let
   cfg = config.services.backup;
   kopia = pkgs.kopia;
   openssl = "${pkgs.openssl}/bin/openssl";
+  # Snapshot these trees on every host.
+  snapshotPaths = "/home /var/lib";
+  # Global retention applied by each client to its own snapshots.
+  retentionPolicy = "--keep-daily 7 --keep-weekly 4 --keep-monthly 12 --keep-annual 10";
+  # Ignore-pattern flags built from services.backup.ignore (empty when unset).
+  ignoreArgs = concatMapStringsSep " " (p: "--add-ignore " + escapeShellArg p) cfg.ignore;
 in {
   options.services.backup = {
     enable = mkEnableOption "Kopia backup service";
@@ -23,23 +29,47 @@ in {
     serverAddress = mkOption {
       type = types.str;
       default = "https://butthead.netbird.cloud:51515";
-      description = "Address of the Kopia server";
+      description = "Address of the Kopia server (used by remote clients over netbird)";
     };
 
-    sharedPath = mkOption {
+    serverFingerprint = mkOption {
       type = types.str;
-      default = "/mnt/Backups/Kopia";
+      default = "";
       description = ''
-        NFS-mounted path to the Kopia shared directory.
-        Clients read the server fingerprint and write their hostname for
-        auto-registration here. Defaults to the NFS mount of the server's
-        repoPath parent directory.
+        SHA256 fingerprint of the Kopia server's TLS certificate (hex, no
+        colons), as printed on server startup and written to
+        <repoPath>/server-fingerprint. Required by remote clients to pin the
+        server cert (kopia pins the fingerprint, so no hostname validation).
+        Set once globally (system/base.nix) after the server's cert stabilises;
+        it is a public value (embedded in the TLS cert).
+      '';
+    };
+
+    clients = mkOption {
+      type = types.listOf types.str;
+      default = [ ];
+      description = ''
+        Hostnames of every NixOS host that backs up to this server (each is
+        registered as backup-user@<hostname>). Server-only. Replaces the old
+        NFS-shared known-clients/ auto-registration, which only worked for the
+        handful of hosts that mounted the share.
+      '';
+    };
+
+    ignore = mkOption {
+      type = types.listOf types.str;
+      default = [ ];
+      description = ''
+        Glob patterns to exclude from snapshots, applied to each client's global
+        kopia policy (so they apply to every snapshot source). Patterns are
+        matched relative to a source root — use a `**/` prefix to match at any
+        depth, e.g. `"**/.cache"` or `"**/node_modules"`. Override per host.
       '';
     };
   };
 
   config = mkMerge [
-    # Common Configuration
+    # Common — runs on every enabled host (server and remote clients).
     (mkIf cfg.enable {
       environment.systemPackages = [ kopia ];
 
@@ -51,13 +81,23 @@ in {
         sopsFile = "${inputs.self}/secrets/kopia.yaml";
         key = "server_password";
       };
+
+      # Daily snapshot timer — applies to server-host and remote clients alike.
+      systemd.timers.kopia-backup = {
+        description = "Run Kopia backup daily";
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnCalendar = "daily";
+          Persistent = true;
+          RandomizedDelaySec = "1h";
+        };
+      };
     })
 
-    # Server Configuration
+    # Server role: run the kopia repository TCP server + register clients.
     (mkIf (cfg.enable && cfg.server) {
       systemd.tmpfiles.rules = [
         "d ${cfg.repoPath} 0755 root root -"
-        "d ${cfg.repoPath}/known-clients 0777 root root -"
       ];
 
       systemd.services.kopia-server = {
@@ -119,16 +159,16 @@ in {
           HOME = "/var/lib/kopia";
         };
         path = [ kopia ];
-        script = ''
+        script = let
+          ensureClient = h: ''
+            echo "Ensuring client registered: ${h}"
+            ${kopia}/bin/kopia server user add backup-user@${h} \
+              --user-password="$SERVER_PASS" 2>/dev/null || true
+          '';
+        in ''
           export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_repo_password.path})"
           SERVER_PASS="$(cat ${config.sops.secrets.kopia_server_password.path})"
-          for client_file in ${cfg.repoPath}/known-clients/*; do
-            [ -f "$client_file" ] || continue
-            client_hostname=$(basename "$client_file")
-            echo "Ensuring client registered: $client_hostname"
-            ${kopia}/bin/kopia server user add backup-user@"$client_hostname" \
-              --user-password="$SERVER_PASS" 2>/dev/null || true
-          done
+          ${concatMapStringsSep "\n" ensureClient cfg.clients}
         '';
       };
 
@@ -145,12 +185,14 @@ in {
       networking.firewall.allowedTCPPorts = [ 51515 ];
     })
 
-    # Client Configuration
-    (mkIf cfg.enable {
+    # Server-host client: back this box up via localhost, bypassing netbird/NFS.
+    # Reads the fingerprint from the local repo file (written by kopia-server),
+    # so it tracks the cert automatically — no baked fingerprint needed here.
+    (mkIf (cfg.enable && cfg.server) {
       systemd.services.kopia-backup = {
-        description = "Kopia Backup Snapshot";
-        after = [ "sops-nix.service" ] ++ lib.optionals (cfg.server) [ "kopia-server.service" ];
-        wants = lib.optionals (cfg.server) [ "kopia-server.service" ];
+        description = "Kopia Backup Snapshot (server host)";
+        after = [ "sops-nix.service" "kopia-server.service" ];
+        wants = [ "kopia-server.service" ];
         environment = {
           HOME = "/root";
         };
@@ -158,61 +200,87 @@ in {
         script = ''
           export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_server_password.path})"
 
-          mkdir -p ${cfg.sharedPath}/known-clients 2>/dev/null || true
-          touch ${cfg.sharedPath}/known-clients/$(hostname) 2>/dev/null || true
+          FINGERPRINT_FILE="${cfg.repoPath}/server-fingerprint"
+          for i in $(seq 1 60); do
+            [ -f "$FINGERPRINT_FILE" ] && break
+            echo "Waiting for server fingerprint... (attempt $i/60)"
+            sleep 5
+          done
+          if [ ! -f "$FINGERPRINT_FILE" ]; then
+            echo "Server fingerprint not found at $FINGERPRINT_FILE. Is the kopia server running?"
+            exit 1
+          fi
+          FINGERPRINT=$(cat "$FINGERPRINT_FILE")
 
           if ! ${kopia}/bin/kopia repository status >/dev/null 2>&1; then
-             echo "Kopia not connected. Attempting to connect..."
-
-             FINGERPRINT_FILE="${cfg.sharedPath}/server-fingerprint"
-
-             for i in $(seq 1 60); do
-               [ -f "$FINGERPRINT_FILE" ] && break
-               echo "Waiting for server fingerprint... (attempt $i/60)"
-               sleep 5
-             done
-
-             if [ ! -f "$FINGERPRINT_FILE" ]; then
-               echo "Server fingerprint not found at $FINGERPRINT_FILE. Is the kopia server running?"
-               exit 1
-             fi
-
-             FINGERPRINT=$(cat "$FINGERPRINT_FILE")
-
-             for i in $(seq 1 12); do
-               echo "Connecting to ${cfg.serverAddress} with fingerprint $FINGERPRINT (attempt $i/12)"
-               if ${kopia}/bin/kopia repository connect server \
-                 --url ${cfg.serverAddress} \
-                 --server-cert-fingerprint "$FINGERPRINT" \
-                 --override-hostname "$(hostname)" \
-                 --override-username "backup-user"; then
-                 break
-               fi
-               echo "Connection failed — waiting for server to register our user..."
-               sleep 30
-             done
-
-             if ! ${kopia}/bin/kopia repository status >/dev/null 2>&1; then
-               echo "Failed to connect after retries."
-               exit 1
-             fi
+            echo "Kopia not connected. Attempting to connect to localhost..."
+            for i in $(seq 1 12); do
+              echo "Connecting to https://localhost:51515 (attempt $i/12)"
+              if ${kopia}/bin/kopia repository connect server \
+                --url https://localhost:51515 \
+                --server-cert-fingerprint "$FINGERPRINT" \
+                --override-hostname "$(hostname)" \
+                --override-username "backup-user"; then
+                break
+              fi
+              echo "Connection failed — waiting for user registration..."
+              sleep 30
+            done
+            if ! ${kopia}/bin/kopia repository status >/dev/null 2>&1; then
+              echo "Failed to connect after retries."
+              exit 1
+            fi
           fi
 
           echo "Starting snapshot..."
-          ${kopia}/bin/kopia snapshot create /home /var/lib
-
-          ${kopia}/bin/kopia policy set --global --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --keep-annual 1
+          ${kopia}/bin/kopia snapshot create ${snapshotPaths}
+          ${kopia}/bin/kopia policy set --global ${retentionPolicy} ${ignoreArgs}
         '';
       };
+    })
 
-      systemd.timers.kopia-backup = {
-        description = "Run Kopia backup daily";
-        wantedBy = [ "timers.target" ];
-        timerConfig = {
-          OnCalendar = "daily";
-          Persistent = true;
-          RandomizedDelaySec = "1h";
+    # Remote clients: back up via the kopia server over netbird, pinning the
+    # server cert by the fingerprint from config (services.backup.serverFingerprint).
+    (mkIf (cfg.enable && !cfg.server) {
+      systemd.services.kopia-backup = {
+        description = "Kopia Backup Snapshot";
+        after = [ "sops-nix.service" ];
+        environment = {
+          HOME = "/root";
         };
+        path = [ kopia ];
+        script = ''
+          export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_server_password.path})"
+
+          if [ -z "${cfg.serverFingerprint}" ]; then
+            echo "services.backup.serverFingerprint is empty — set it (in system/base.nix) to the kopia server's TLS fingerprint." >&2
+            exit 1
+          fi
+
+          if ! ${kopia}/bin/kopia repository status >/dev/null 2>&1; then
+            echo "Kopia not connected. Attempting to connect to ${cfg.serverAddress}..."
+            for i in $(seq 1 12); do
+              echo "Connecting (attempt $i/12)"
+              if ${kopia}/bin/kopia repository connect server \
+                --url ${cfg.serverAddress} \
+                --server-cert-fingerprint "${cfg.serverFingerprint}" \
+                --override-hostname "$(hostname)" \
+                --override-username "backup-user"; then
+                break
+              fi
+              echo "Connection failed — waiting for server to register our user..."
+              sleep 30
+            done
+            if ! ${kopia}/bin/kopia repository status >/dev/null 2>&1; then
+              echo "Failed to connect after retries."
+              exit 1
+            fi
+          fi
+
+          echo "Starting snapshot..."
+          ${kopia}/bin/kopia snapshot create ${snapshotPaths}
+          ${kopia}/bin/kopia policy set --global ${retentionPolicy} ${ignoreArgs}
+        '';
       };
     })
   ];

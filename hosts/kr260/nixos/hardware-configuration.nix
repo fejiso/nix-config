@@ -18,13 +18,38 @@
   # are builtin, so no initrd device modules are needed.
   boot.initrd.availableKernelModules = lib.mkForce [ ];
 
-  hardware.deviceTree.enable = true;
-  # KR260 revB (board silkscreen "REV B01"; u-boot reports "Model: ZynqMP KR260
-  # revB", FRU SOM "SMK-K26-XCL2G rev1" + carrier "SCK-KR-G rev1"). linux-xlnx's
-  # DT naming predates the "rev1" FRU labels: it has only `smk-k26-revA` SOMs
-  # (no revB SOM in this tree) with carrier `sck-kr-g-revA`/`-revB`. So: SOM
-  # revA, carrier revB. (Verified present in the built kernel's dtbs/.)
-  hardware.deviceTree.name = "xilinx/zynqmp-smk-k26-revA-sck-kr-g-revB.dtb";
+  hardware.deviceTree = {
+    enable = true;
+    # KR260 revB (board silkscreen "REV B01"; u-boot reports "Model: ZynqMP KR260
+    # revB", FRU SOM "SMK-K26-XCL2G rev1" + carrier "SCK-KR-G rev1"). linux-xlnx's
+    # DT naming predates the "rev1" FRU labels: it has only `smk-k26-revA` SOMs
+    # (no revB SOM in this tree) with carrier `sck-kr-g-revA`/`-revB`. So: SOM
+    # revA, carrier revB. (Verified present in the built kernel's dtbs/.)
+    name = "xilinx/zynqmp-smk-k26-revA-sck-kr-g-revB.dtb";
+    # The K26 SOM DTS (zynqmp-sm-k26-revA.dts:107) ships a `pwm-fan` node on
+    # ttc0 ch2, but never pins the TTC's PWM wave output to a physical pad — so
+    # the PWM is internal-only and the KR260 blower is hardwired to full speed.
+    # Verified: writing pwm1 / toggling pwm1_enable has no effect (debugfs duty
+    # tracks 157->39999 ns, fan unchanged); the SCK-KR-G carrier DTS has no fan
+    # path either (no GPIO/I2C controller). Disable the inert node so it stops
+    # exposing a dead `pwmfan` hwmon and inviting more unworkable fan-control
+    # code. Real fan control would need a carrier-schematic-informed hardware
+    # path (TTC pinctrl + carrier wiring, or a PL PWM bitstream).
+    overlays = [ {
+      name = "disable-pwm-fan";
+      dtsText = ''
+        /dts-v1/;
+        /plugin/;
+        / {
+          compatible = "xlnx,zynqmp-sk-kr260";
+          fragment@0 {
+            target-path = "/pwm-fan";
+            __overlay__ { status = "disabled"; };
+          };
+        };
+      '';
+    } ];
+  };
 
   # USB stability fix (root cause of the btrfs read-error storm). The card boots
   # through the on-board Microchip USB2744 hub → USB card reader (root shows up

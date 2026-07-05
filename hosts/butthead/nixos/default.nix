@@ -20,6 +20,13 @@
   services.backup = {
     server = true;
     repoPath = "/mnt/user/Backups/Kopia";
+    # Every NixOS host backs up /home + /var/lib here. Each is registered as
+    # backup-user@<hostname> by kopia-register-clients. butthead itself snapshots
+    # via localhost (see backup.nix), so it must be registered here too.
+    clients = [
+      "elitedex" "lenovix" "hispanas" "a8" "blacktop" "hierro" "butthead" "snuffles"
+      "rpi3" "pine64" "xpi-s905x3" "z-turn" "kr260"
+    ];
   };
 
   # Enable development tools

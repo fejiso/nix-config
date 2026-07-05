@@ -2,6 +2,25 @@
   flake.modules.nixos.cli = { inputs, outputs, lib, config, pkgs, hostname, ... }: {
     # Enable backups on all nodes
     services.backup.enable = lib.mkDefault true;
+    # Public TLS fingerprint of butthead's kopia server (SHA256, hex, no colons).
+    # Pinned by every remote client; refresh from `cat <repoPath>/server-fingerprint`
+    # on butthead if the server cert is ever regenerated.
+    services.backup.serverFingerprint = lib.mkDefault "D50A92ACEBF880EC64252ACCC43E6B26AB57A9ACC84C6E452C7C0265ACB87BD9";
+
+    # Global snapshot exclusions — applied to every host's global kopia policy.
+    # Patterns are globs relative to each snapshot source; `**/` matches at any
+    # depth. Extend or override per-host via services.backup.ignore (mkDefault
+    # here means a per-host assignment replaces, not appends).
+    services.backup.ignore = lib.mkDefault [
+      "**/.stversions"
+      "**/logs"
+      "**/target"
+      "**/debug"
+      "**/*.h5"
+      "**/Syncthing"
+      "**/.local/share/containers"
+      "**/.venv"
+    ];
 
     nixpkgs = {
       overlays = [
