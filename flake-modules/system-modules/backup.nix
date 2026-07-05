@@ -144,7 +144,9 @@ in {
           echo "Server fingerprint published: $FINGERPRINT"
 
           exec ${kopia}/bin/kopia server start --address 0.0.0.0:51515 \
-            --tls-cert-file "$CERT_FILE" --tls-key-file "$KEY_FILE"
+            --tls-cert-file "$CERT_FILE" --tls-key-file "$KEY_FILE" \
+            --server-username "admin" \
+            --server-password-file ${config.sops.secrets.kopia_server_password.path}
         '';
       };
 
@@ -161,9 +163,9 @@ in {
         path = [ kopia ];
         script = let
           ensureClient = h: ''
-            echo "Ensuring client registered: ${h}"
-            ${kopia}/bin/kopia server user add backup-user@${h} \
-              --user-password="$SERVER_PASS" 2>/dev/null || true
+            echo "Syncing client user: ${h}"
+            ${kopia}/bin/kopia server user set backup-user@${h} \
+              --user-password="$SERVER_PASS"
           '';
         in ''
           export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_repo_password.path})"
