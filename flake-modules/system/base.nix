@@ -25,6 +25,7 @@
       "**/.mozilla"
       "**/.vscode"
       "**/.platformio"
+      "**/poly_frame"
     ];
 
     nixpkgs = {
