@@ -19,8 +19,10 @@
         START_SSH_SERVER = true;
         SSH_DOMAIN = "forgejo.fer.xyz";
         SSH_LISTEN_HOST = "0.0.0.0";
-        SSH_LISTEN_PORT = 222;
-        SSH_PORT = 222;
+        # Unprivileged port: the hardened forgejo unit (PrivateUsers, no
+        # capabilities) cannot bind ports < 1024.
+        SSH_LISTEN_PORT = 2222;
+        SSH_PORT = 2222;
         LANDING_PAGE = "explore";
       };
       service = {
@@ -39,5 +41,5 @@
   };
 
   # Expose only on the netbird mesh.
-  networking.firewall.interfaces.wt0.allowedTCPPorts = [ 3000 222 ];
+  networking.firewall.interfaces.wt0.allowedTCPPorts = [ 3000 2222 ];
 }
