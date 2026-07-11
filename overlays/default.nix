@@ -30,6 +30,14 @@ let
 in {
   # This one brings our custom packages from the 'pkgs' directory
   additions = final: prev: {
+    # LazyPi — opinionated one-shot installer that sets up the Pi coding agent
+    # with a curated catalog of extensions, skills, prompt templates, and themes
+    # (sub-agents, MCP, web access, memory, plan, diff review, powerbar, usage
+    # dashboard, themes, …). Installed alongside pi-coding-agent so the
+    # home-manager pi-agent module can deploy that catalog declaratively AND
+    # offer the `lazypi` CLI (status/doctor/update/remove). See pkgs/lazypi/.
+    lazypi = final.callPackage ../pkgs/lazypi { };
+
     # Xilinx forks for the MYIR Z-turn (Zynq-7020). Cross-compile when the
     # consuming config is armv7l (z-turn). See pkgs/zynq/.
     ubootZturn = final.callPackage ../pkgs/zynq/uboot.nix { };
