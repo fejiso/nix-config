@@ -160,6 +160,21 @@ in {
     judy = prev.judy.overrideAttrs (old: {
       hardeningDisable = (old.hardeningDisable or [ ]) ++ [ "fortify" "fortify3" ];
     });
+
+    # whipper 0.10.0 imports pkg_resources in 4 modules, but setuptools 81+
+    # (nixpkgs-unstable ships 82) removed pkg_resources entirely. Patch the
+    # imports to use stdlib importlib.metadata and packaging instead, add
+    # packaging as a runtime dep, and skip the test suite (which also fails on
+    # the missing import). Drop when fixed upstream in nixpkgs.
+    whipper = prev.whipper.overridePythonAttrs (old: {
+      propagatedBuildInputs = (old.propagatedBuildInputs or [ ]) ++ [
+        prev.python3Packages.packaging
+      ];
+      patches = (old.patches or [ ]) ++ [
+        ./patches/whipper-pkg-resources.patch
+      ];
+      doInstallCheck = false;
+    });
   };
 
   # Force every buildGo*Module vendor fetch through GOPROXY=direct / GOSUMDB=off.

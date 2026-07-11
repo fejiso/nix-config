@@ -1,0 +1,80 @@
+--- a/whipper/__init__.py
++++ b/whipper/__init__.py
+@@ -2,11 +2,10 @@
+ import os
+ import sys
+ 
+-from pkg_resources import (get_distribution,
+-                           DistributionNotFound, RequirementParseError)
++from importlib.metadata import version as _get_version, PackageNotFoundError
+ try:
+-    __version__ = get_distribution(__name__).version
+-except (DistributionNotFound, RequirementParseError):
++    __version__ = _get_version(__name__)
++except PackageNotFoundError:
+     # not installed as package or is being run from source/git checkout
+     from setuptools_scm import get_version
+     __version__ = get_version()
+--- a/whipper/command/main.py
++++ b/whipper/command/main.py
+@@ -3,7 +3,10 @@
+ 
+ import os
+ import sys
+-import pkg_resources
++try:
++    import pkg_resources
++except ImportError:
++    pkg_resources = None
+ import musicbrainzngs
+ import site
+ import whipper
+@@ -46,11 +49,12 @@
+     else:
+         plugins_p += [x + '/whipper/plugins' for x in site.getsitepackages()]
+ 
+-    # register plugins with pkg_resources
+-    distributions, _ = pkg_resources.working_set.find_plugins(
+-        pkg_resources.Environment(plugins_p)
+-    )
+-    list(map(pkg_resources.working_set.add, distributions))
++    # register plugins with pkg_resources (optional; setuptools 81+ removed it)
++    if pkg_resources is not None:
++        distributions, _ = pkg_resources.working_set.find_plugins(
++            pkg_resources.Environment(plugins_p)
++        )
++        list(map(pkg_resources.working_set.add, distributions))
+     try:
+         cmd = Whipper(sys.argv[1:], os.path.basename(sys.argv[0]), None)
+         ret = cmd.do()
+--- a/whipper/common/program.py
++++ b/whipper/common/program.py
+@@ -98,7 +98,7 @@
+ 
+         Also warn about buggy cdrdao versions.
+         """
+-        from pkg_resources import parse_version as V
++        from packaging.version import parse as V
+         version = cdrdao.version()
+         if V(version) < V('1.2.3rc2'):
+             logger.warning('cdrdao older than 1.2.3 has a pre-gap length bug.'
+--- a/whipper/result/result.py
++++ b/whipper/result/result.py
+@@ -18,7 +18,7 @@
+ # You should have received a copy of the GNU General Public License
+ # along with whipper.  If not, see <http://www.gnu.org/licenses/>.
+ 
+-import pkg_resources
++import importlib.metadata
+ import time
+ 
+ 
+@@ -157,7 +157,7 @@
+     """
+     d = {}
+ 
+-    pluggables = list(pkg_resources.iter_entry_points("whipper.logger"))
++    pluggables = list(importlib.metadata.entry_points(group="whipper.logger"))
+     for entrypoint in [EntryPoint(), ] + pluggables:
+         plugin_class = entrypoint.load()
+         d[entrypoint.name] = plugin_class
