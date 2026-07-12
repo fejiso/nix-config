@@ -259,8 +259,7 @@ with lib;
           Mod+Ctrl+J { move-column-to-workspace-down; }
           Mod+Ctrl+K { move-column-to-workspace-up; }
           Mod+Ctrl+U { move-column-to-workspace-down; }
-          Mod+Ctrl+I { move-column-to-workspace-up; }
-          Mod+Ctrl+Next { move-column-to-workspace-down; }
+          Mod+Ctrl+I { move-column-to-workspace-up; } Mod+Ctrl+Next { move-column-to-workspace-down; }
           Mod+Ctrl+Prior { move-column-to-workspace-up; }
 
           // Focus monitor (horizontal only)
@@ -345,6 +344,7 @@ with lib;
 
           Ctrl+Alt+Delete { spawn-sh "noctalia msg session lock"; }
           Mod+Shift+Q { spawn-sh "noctalia msg session lock"; }
+          Mod+Ctrl+Q { spawn-sh "noctalia msg session lock"; }
 
           Mod+Shift+P { power-off-monitors; }
 

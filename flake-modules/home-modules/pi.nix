@@ -119,6 +119,94 @@ let
   settingsConfig = (pkgs.formats.json { }).generate "pi-settings.json" settings;
 
   configDir = "${config.home.homeDirectory}/.pi/agent";
+
+  # /zaiusage — a deterministic (no-model) slash command that fetches and
+  # renders z.ai API usage/quota limits. The script reads the API key the same
+  # way pi's `zai` auth entry does: $Z_AI_API_KEY first, then the sops-deployed
+  # key file (path baked in at build time, so nothing secret lands in the nix
+  # store). pi runs the script via a `script:` deterministic step with
+  # `handoff: never`, so it shows a result card and makes no LLM call (zero
+  # token cost). Replaces the opencode /usage command (opencode.nix), which
+  # routed through the model and didn't reliably print verbatim.
+  zaiKeyPath = config.sops.secrets.zai-api-key.path;
+
+  zaiUsageScript = pkgs.writeTextFile {
+    name = "zaiusage.sh";
+    executable = true;
+    text = ''
+      #!/usr/bin/env bash
+      set -uo pipefail
+
+      KEY_FILE="''${Z_AI_KEY_FILE:-${zaiKeyPath}}"
+      KEY="''${Z_AI_API_KEY:-}"
+      if [ -z "$KEY" ] && [ -r "$KEY_FILE" ]; then
+        KEY="$(cat "$KEY_FILE")"
+      fi
+
+      if [ -z "$KEY" ]; then
+        echo "z.ai usage: no API key found." >&2
+        echo "  Set \$Z_AI_API_KEY or make \$KEY_FILE readable." >&2
+        exit 1
+      fi
+
+      if ! command -v jq >/dev/null 2>&1; then
+        echo "z.ai usage: jq is required but not installed." >&2
+        exit 1
+      fi
+
+      RESPONSE="$(curl -sS --max-time 12 'https://api.z.ai/api/monitor/usage/quota/limit' \
+        -H "Authorization: Bearer $KEY" -H 'Accept: application/json' 2>/dev/null)"
+      CURL_EXIT=$?
+
+      if [ $CURL_EXIT -ne 0 ]; then
+        echo "z.ai usage: request failed (curl exit $CURL_EXIT)." >&2
+        exit 1
+      fi
+
+      if ! echo "$RESPONSE" | jq -e '.success == true' >/dev/null 2>&1; then
+        echo "$RESPONSE" | jq -r '"z.ai usage: API reported failure — code \(.code // \"?\"), msg: \(.msg // \"unknown\")"' 2>/dev/null \
+          || echo "z.ai usage: invalid JSON response."
+        echo "--- raw response ---" >&2
+        echo "$RESPONSE" >&2
+        exit 1
+      fi
+
+      echo "$RESPONSE" | jq -r '
+      def bar:
+        ([.percentage/5|floor,0]|max) as $f | (20-$f) as $e |
+        "\("█"*$f)\("░"*$e)  \(.percentage)%";
+      def ulabel: {"3":"h","5":"mo","6":"d"}[.unit|tostring] // "u";
+      "z.ai usage quota — plan: \(.data.level // "unknown")",
+      "",
+      (.data.limits[]? |
+        if .type == "TOKENS_LIMIT" then
+          "Tokens (\(.number // "?")\(ulabel)) window",
+          "  \(bar)   resets \(.nextResetTime/1000|strftime("%Y-%m-%d %H:%M UTC"))",
+          ""
+        elif .type == "TIME_LIMIT" then
+          "Monthly time quota",
+          "  \(bar)   \(.remaining // 0)/\(.usage // 0) remaining   resets \(.nextResetTime/1000|strftime("%Y-%m-%d %H:%M UTC"))",
+          "  per-model: \(.usageDetails | map("\(.modelCode) \(.usage)") | join(" · "))",
+          ""
+        else
+          "\(.type)",
+          "  \(bar)   resets \(.nextResetTime/1000|strftime("%Y-%m-%d %H:%M UTC"))",
+          ""
+        end)'
+    '';
+  };
+
+  zaiUsagePrompt = pkgs.writeTextFile {
+    name = "zaiusage.md";
+    text = ''
+      ---
+      description: Show current z.ai API usage and quota limits
+      script: ${zaiUsageScript}
+      handoff: never
+      timeout: 20000
+      ---
+    '';
+  };
 in
 
 {
@@ -179,6 +267,9 @@ in
     # sops secret isn't declared there, via opencode.nix). auth.json is written
     # as a real 0600 file (pi manages settings.json in the same dir).
     (lib.mkIf cfg.personalProviders {
+      home.file = {
+        ".pi/agent/prompts/zaiusage.md".source = zaiUsagePrompt;
+      };
       home.activation.piAgentAuth = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         mkdir -p ${configDir}
         install -m 0600 ${authConfig} ${configDir}/auth.json
