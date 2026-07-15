@@ -52,7 +52,15 @@ creation_rules:
       - *kr260_age
 
   # Home-manager secrets - use user SSH key
-  - path_regex: 'secrets/(git-credentials-age|beets|music|atuin|agents)\.yaml$'
+  - path_regex: 'secrets/(git-credentials-age|beets|music|atuin)\.yaml$'
+    age:
+      - *user_ssh
+      - *user_age
+
+  # Agent "sauce" — a plain markdown file, sops-encrypted as binary so `sops
+  # secrets/agents.md` edits real markdown (not a YAML string). User-only: it's
+  # pure home-manager personal instructions, no system service reads it.
+  - path_regex: 'secrets/agents\.md$'
     age:
       - *user_ssh
       - *user_age

@@ -54,7 +54,7 @@ let
 in {
   # Shared "agent sauce" — global instructions fanned out to every coding
   # agent's memory file (pi/opencode/kilo/claude/gemini). See
-  # home-modules/agent-sauce.nix; edit the payload via `sops secrets/agents.yaml`.
+  # home-modules/agent-sauce.nix; edit the payload via `sops secrets/agents.md`.
   imports = [ homeModules.agent-sauce ];
 
   # Fish shell configuration
