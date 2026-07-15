@@ -1,4 +1,6 @@
-{ ... }: {
+{ config, ... }: let
+  homeModules = config.flake.modules.homeManager;
+in {
   flake.modules.homeManager.default =
 # Shell configuration
 {
@@ -50,7 +52,10 @@ let
     in
       builtins.elemAt colors hashNum;
 in {
-  
+  # Shared "agent sauce" — global instructions fanned out to every coding
+  # agent's memory file (pi/opencode/kilo/claude/gemini). See
+  # home-modules/agent-sauce.nix; edit the payload via `sops secrets/agents.yaml`.
+  imports = [ homeModules.agent-sauce ];
 
   # Fish shell configuration
   programs.fish = {
