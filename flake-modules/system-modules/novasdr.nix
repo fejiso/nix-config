@@ -50,7 +50,7 @@ in {
       after = [ "network-online.target" ];
       wants = [ "network-online.target" ];
       wantedBy = [ "multi-user.target" ];
-      path = [ pkgs.podman pkgs.git pkgs.gnutar pkgs.gzip ];
+      path = [ pkgs.podman pkgs.git pkgs.gnutar pkgs.gzip pkgs.gnused pkgs.gnugrep ];
       serviceConfig = {
         Type = "oneshot";
         RemainAfterExit = true;
@@ -61,12 +61,23 @@ in {
           git clone --recursive ${cfg.repoUrl} source
         else
           cd source
+          # Discard the local opus patch below so `git pull` doesn't conflict.
+          git checkout -- Dockerfile
           git pull
           git submodule update --init --recursive
           cd ..
         fi
-        
+
         cd source
+        # Upstream Dockerfile is missing opus: crates/interop/build.rs
+        # hard-requires opus via pkg-config ("Couldn't find opus"), but the
+        # image never installs it. Add libopus-dev (builder stage) and
+        # libopus0 (runtime stage). Drop once fixed upstream.
+        grep -q 'libopus-dev' Dockerfile || \
+          sed -i 's/^\( *\)libusb-1\.0-0-dev/\1libopus-dev \\\n\1libusb-1.0-0-dev/' Dockerfile
+        grep -q '^ *libopus0' Dockerfile || \
+          sed -i 's/^\( *\)libusb-1\.0-0 /\1libopus0 \\\n\1libusb-1.0-0 /' Dockerfile
+
         ${pkgs.podman}/bin/podman build -t localhost/novasdr:latest .
       '';
     };

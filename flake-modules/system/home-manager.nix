@@ -34,7 +34,16 @@
               outputs.overlays.additions
               outputs.overlays.modifications
               outputs.overlays.unstable-packages
-            ];
+            ] ++ lib.optional (pkgs.stdenv.buildPlatform != pkgs.stdenv.hostPlatform)
+              # systemd's bpf-framework (withLibBPF defaults to on for aarch)
+              # fails to cross-compile: the `clang -target bpf` skeleton build
+              # isn't given kernel/libc headers ('linux/types.h' not found).
+              # HM only needs systemd for `systemctl --user`, so drop BPF in
+              # the cross set (kr260 aarch64 / z-turn armv7l). The system's
+              # own systemd (26.05) is untouched.
+              (_final: prev: {
+                systemd = prev.systemd.override { withLibBPF = false; };
+              });
           }
           // (
             if pkgs.stdenv.buildPlatform == pkgs.stdenv.hostPlatform
