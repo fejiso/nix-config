@@ -38,6 +38,13 @@ in {
     # offer the `lazypi` CLI (status/doctor/update/remove). See pkgs/lazypi/.
     lazypi = final.callPackage ../pkgs/lazypi { };
 
+    # kimi-cli — Moonshot AI's Kimi Code CLI (PyPI: kimi-cli), command `kimi`.
+    # A standalone terminal coding agent, AND the credential source the
+    # pi-kimi-coder extension auto-imports (reads ~/.kimi/credentials/). Bundles
+    # four deps nixpkgs lacks (kosong/pykaos/streamingjson/ripgrepy). See
+    # pkgs/kimi-cli/.
+    kimi-cli = final.callPackage ../pkgs/kimi-cli { };
+
     # Xilinx forks for the MYIR Z-turn (Zynq-7020). Cross-compile when the
     # consuming config is armv7l (z-turn). See pkgs/zynq/.
     ubootZturn = final.callPackage ../pkgs/zynq/uboot.nix { };

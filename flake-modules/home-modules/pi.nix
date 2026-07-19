@@ -53,6 +53,16 @@ let
     { id = "add-dir"; source = "npm:pi-add-dir"; }
     { id = "prompt-templates"; source = "npm:pi-prompt-template-model"; }
     { id = "claude-cli"; source = "npm:pi-claude-cli"; }
+    # Kimi Code provider (Leechael's pi-provider-kimi-code). Preferred over
+    # picassio's pi-kimi-coder: explicit Kimi K3 support (model id `k3`), live
+    # model metadata from /v1/models, plan-aware K3 context window (Moderato
+    # 256K, Allegretto+ up to 1M), plus K2.7 and HighSpeed. Reuses kimi-cli
+    # credentials from ~/.kimi/ (read-only legacy path), so the two ship
+    # together (see lazypi.kimiPackage below). Not in upstream LazyPi v0.6.3 —
+    # added locally; kept in sync with the matching PACKAGES entry patched into
+    # pkgs/lazypi. Provider registers as `kimi-coding`, so models are
+    # addressable as /model kimi-coding/k3 etc.
+    { id = "kimi-coding"; source = "npm:pi-provider-kimi-code"; }
     # ui
     { id = "plannotator"; source = "npm:@plannotator/pi-extension"; }
     { id = "slopchop"; source = "npm:pi-slopchop"; }
@@ -253,14 +263,32 @@ in
           Note: "compound" is always excluded (needs bun at install time).
         '';
       };
+      # kimi-cli is the Moonshot AI Kimi Code CLI agent (command `kimi`) AND
+      # a credential source the pi-provider-kimi-code extension (catalog id
+      # "kimi-coding") reads: `kimi login` writes ~/.kimi/credentials/
+      # kimi-code.json, which the provider imports (legacy read-only path) for
+      # zero-config auth. Installed whenever the catalog's kimi-coding entry is
+      # selected (i.e. not in except) and lazypi is enabled. Set to null to
+      # skip the package.
+      kimiPackage = lib.mkOption {
+        type = lib.types.nullOr lib.types.package;
+        default = pkgs.kimi-cli;
+        defaultText = "pkgs.kimi-cli";
+        description = "The kimi-cli package to install alongside the Kimi Code provider, or null for none.";
+      };
     };
   };
 
   config = lib.mkIf cfg.enable (lib.mkMerge [
     {
+      # Install pi, the lazypi CLI, and — when the Kimi Code provider is in
+      # the selected catalog — kimi-cli, whose credentials that provider reads.
       home.packages =
         lib.optional (cfg.package != null) cfg.package
-        ++ lib.optional (lazypiCfg.enable && lazypiCfg.package != null) lazypiCfg.package;
+        ++ lib.optional (lazypiCfg.enable && lazypiCfg.package != null) lazypiCfg.package
+        ++ lib.optional (lazypiCfg.enable
+          && lazypiCfg.kimiPackage != null
+          && !(builtins.elem "kimi-coding" lazypiCfg.except)) lazypiCfg.kimiPackage;
     }
 
     # Personal OpenRouter auth — skipped on machines that opt out (the openrouter
