@@ -45,6 +45,15 @@ let
     lib.any (option: option == "x-systemd.automount")
       (lib.attrByPath [ path "options" ] [ ] config.fileSystems);
   automountUnits = map (p: builtins.replaceStrings ["/"] ["-"] (lib.strings.removePrefix "/" p) + ".automount") (lib.filter hasAutomount mountPoints);
+
+  # Paths whose backing mount is NOT automount-managed. These keep a hard
+  # RequiresMountsFor below. Automount-backed paths are depended on via their
+  # .automount unit instead: requiring the .mount unit is brittle because an
+  # automount's .mount unit is frequently left "failed" (e.g. after a transient
+  # NFS hiccup) even while the .automount unit is active and the path is fully
+  # accessible — which makes RequiresMountsFor fail the service with
+  # "Dependency failed". depending on the .automount unit avoids that.
+  nonAutomountPaths = lib.filter (p: !(hasAutomount (getMountPoint p))) rwPaths;
 in
 {
   imports = [
@@ -171,9 +180,9 @@ in
         tdarr-server = {
           path = cfg.extraPackages;
           unitConfig = {
-            RequiresMountsFor = rwPaths;
+            RequiresMountsFor = nonAutomountPaths;
+            Requires = automountUnits;
             After = automountUnits;
-            Wants = automountUnits;
           };
           serviceConfig = {
             ReadWritePaths = mkAfter rwPaths;
@@ -185,9 +194,9 @@ in
         ${nodeUnit} = {
           path = cfg.extraPackages;
           unitConfig = {
-            RequiresMountsFor = rwPaths;
+            RequiresMountsFor = nonAutomountPaths;
+            Requires = automountUnits;
             After = automountUnits;
-            Wants = automountUnits;
           };
           serviceConfig = {
             ReadWritePaths = mkAfter rwPaths;
