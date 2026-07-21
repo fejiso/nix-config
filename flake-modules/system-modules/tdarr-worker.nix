@@ -29,6 +29,18 @@ let
       mountPath;
   
   mountPoints = lib.unique (map getMountPoint rwPaths);
+
+  # DRX-Lab hdr10plus_tool-av1 (vendored next to this file): inject/extract
+  # HDR10+ dynamic metadata in AV1 (IVF) files. Used by Tdarr flows to keep
+  # native HDR10+ when re-encoding to AV1.
+  hdr10plusToolAv1 = pkgs.runCommand "hdr10plus_tool_av1"
+    { nativeBuildInputs = [ pkgs.python3 ]; }
+    ''
+      mkdir -p $out/bin
+      cp ${./hdr10plus_tool_av1.py} $out/bin/hdr10plus_tool_av1
+      chmod +x $out/bin/hdr10plus_tool_av1
+      patchShebangs $out/bin/hdr10plus_tool_av1
+    '';
   hasAutomount = path:
     lib.any (option: option == "x-systemd.automount")
       (lib.attrByPath [ path "options" ] [ ] config.fileSystems);
@@ -94,14 +106,15 @@ in
 
     extraPackages = mkOption {
       type = types.listOf types.package;
-      default = with pkgs; [ dovi-tool hdr10plus_tool mkvtoolnix-cli ];
-      defaultText = literalExpression "with pkgs; [ dovi-tool hdr10plus_tool mkvtoolnix-cli ]";
+      default = (with pkgs; [ dovi-tool hdr10plus_tool mkvtoolnix-cli ]) ++ [ hdr10plusToolAv1 ];
+      defaultText = literalExpression "(with pkgs; [ dovi-tool hdr10plus_tool mkvtoolnix-cli ]) ++ [ hdr10plusToolAv1 ]";
       description = ''
         Extra packages placed on the Tdarr server/node PATH, for plugins and
         flows that shell out to external tools — e.g. Dolby Vision / HDR10+
-        handling (dovi_tool, hdr10plus_tool) and remuxing (mkvextract/mkvmerge).
-        The bundled container images shipped these; native installs do not, so
-        provide them here. ffmpeg is bundled with Tdarr itself.
+        handling (dovi_tool, hdr10plus_tool, hdr10plus_tool_av1) and remuxing
+        (mkvextract/mkvmerge). The bundled container images shipped these;
+        native installs do not, so provide them here. ffmpeg is bundled with
+        Tdarr itself.
       '';
     };
 
