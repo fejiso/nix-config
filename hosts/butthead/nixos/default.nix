@@ -163,8 +163,34 @@
     GPU_MAX_HW_QUEUES = "1";
   };
 
+  # Tdarr requires identical /mnt/* paths on the server and every node.
+  # butthead owns the NFS exports, so expose the local mergerfs directories via
+  # bind mounts instead of NFS-mounting butthead's own Netbird address.
+  fileSystems = {
+    "/mnt/Series" = lib.mkForce {
+      device = "/mnt/user/Series";
+      fsType = "none";
+      options = [ "bind" "rw" ];
+      depends = [ "/mnt/user" ];
+    };
+
+    "/mnt/Movies" = lib.mkForce {
+      device = "/mnt/user/Movies";
+      fsType = "none";
+      options = [ "bind" "rw" ];
+      depends = [ "/mnt/user" ];
+    };
+
+    "/mnt/downloadtemp" = lib.mkForce {
+      device = "/mnt/user/downloadtemp";
+      fsType = "none";
+      options = [ "bind" "rw" ];
+      depends = [ "/mnt/user" ];
+    };
+  };
+
   # Tdarr transcoding server and worker (native NixOS services).
-  # Uses the unified /mnt/* paths shared (identically) across all nodes via NFS.
+  # Uses the unified /mnt/* paths shared (identically) across all nodes.
   services.tdarr-worker = {
     enable = true;
     serverEnabled = true;

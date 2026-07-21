@@ -29,7 +29,10 @@ let
       mountPath;
   
   mountPoints = lib.unique (map getMountPoint rwPaths);
-  automountUnits = map (p: builtins.replaceStrings ["/"] ["-"] (lib.strings.removePrefix "/" p) + ".automount") mountPoints;
+  hasAutomount = path:
+    lib.any (option: option == "x-systemd.automount")
+      (lib.attrByPath [ path "options" ] [ ] config.fileSystems);
+  automountUnits = map (p: builtins.replaceStrings ["/"] ["-"] (lib.strings.removePrefix "/" p) + ".automount") (lib.filter hasAutomount mountPoints);
 in
 {
   imports = [
