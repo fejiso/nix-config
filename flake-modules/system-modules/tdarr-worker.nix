@@ -201,6 +201,13 @@ in
           serviceConfig = {
             ReadWritePaths = mkAfter rwPaths;
             SupplementaryGroups = [ "render" "video" ];
+            # Run transcoding at the lowest possible CPU and IO priority so it
+            # never starves interactive/other services on the host.
+            Nice = 19;
+            CPUSchedulingPolicy = "idle";
+            CPUWeight = 1;
+            IOSchedulingClass = "idle";
+            IOWeight = 1;
           };
         };
       }
