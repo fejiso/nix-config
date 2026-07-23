@@ -213,6 +213,13 @@
     services.dbus.enable = true;
     services.openssh.enable = true;
 
+    # Daily TRIM on all mounted filesystems that support it. Complements the
+    # LUKS allowDiscards default (flake.modules.nixos.luks-discards).
+    services.fstrim = {
+      enable = lib.mkDefault true;
+      interval = lib.mkDefault "daily";
+    };
+
     fonts.packages = with pkgs; [
       noto-fonts
       noto-fonts-cjk-sans
