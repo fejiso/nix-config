@@ -63,17 +63,17 @@
   fileSystems."/home/z-247/ROMs/ROMS" = {
     device = "10.2.3.200:/mnt/user/ROMs/Clean";
     fsType = "nfs";
-    options = [ "nfsvers=4" "noatime" "x-systemd.automount" "nofail" "fsc" "_netdev" "rw" ];
+    options = [ "noatime" "x-systemd.automount" "nofail" "fsc" "_netdev" "rw" ];
   };
   fileSystems."/home/z-247/ROMs/SAVES" = {
     device = "10.2.3.200:/mnt/user/ROMs/Saves";
     fsType = "nfs";
-    options = [ "nfsvers=4" "noatime" "x-systemd.automount" "nofail" "fsc" "_netdev" "rw" ];
+    options = [ "noatime" "x-systemd.automount" "nofail" "fsc" "_netdev" "rw" ];
   };
   fileSystems."/home/z-247/ROMs/BIOS" = {
     device = "10.2.3.200:/mnt/user/ROMs/BIOS";
     fsType = "nfs";
-    options = [ "nfsvers=4" "noatime" "x-systemd.automount" "nofail" "fsc" "_netdev" "rw" ];
+    options = [ "noatime" "x-systemd.automount" "nofail" "fsc" "_netdev" "rw" ];
   };
 
   # Pipewire configuration

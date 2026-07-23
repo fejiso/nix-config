@@ -38,7 +38,6 @@ with lib;
           "rw"
           "intr"
           "hard"
-          "vers=4"
           "noauto"
         ];
       };
@@ -53,7 +52,6 @@ with lib;
           "rw"
           "intr"
           "hard"
-          "vers=4"
           "noauto"
         ];
       };
@@ -121,7 +119,6 @@ with lib;
           "rw"
           "intr"
           "hard"
-          "vers=4"
           "noauto"
         ];
       };
