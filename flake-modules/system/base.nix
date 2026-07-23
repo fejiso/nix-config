@@ -227,4 +227,16 @@
     # Fallback only — every host should pin its own install-time stateVersion.
     system.stateVersion = lib.mkDefault "25.05";
   };
+
+  # Allow discards (TRIM) on every LUKS device without per-host hardcoding:
+  # extend the option's submodule type so allowDiscards defaults to true.
+  # A host can still opt out with `allowDiscards = false;` (plain assignment
+  # beats this mkDefault).
+  flake.modules.nixos.luks-discards = { lib, ... }: {
+    options.boot.initrd.luks.devices = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.submodule {
+        config.allowDiscards = lib.mkDefault true;
+      });
+    };
+  };
 }

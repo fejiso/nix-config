@@ -27,7 +27,7 @@ let
     hostname = name;
   };
   baseModules =
-    [ config.flake.modules.nixos.cli ]
+    [ config.flake.modules.nixos.cli config.flake.modules.nixos.luks-discards ]
     ++ modules
     # SD hosts get the generic btrfs root (fs + grow); see
     # flake-modules/system-modules/sd-image-btrfs.nix.

@@ -30,7 +30,6 @@
   boot.initrd.compressor = "xz";
   boot.initrd.luks.devices."cryptroot" = {
     device = "/dev/disk/by-uuid/7f1bd4db-58b3-40aa-be5c-d38ba434cfcb";
-    allowDiscards = true;
   };
   boot.loader.systemd-boot.configurationLimit = 1;
   boot.resumeDevice = "/dev/disk/by-uuid/54cc1038-6f3b-49c0-925b-81ad8127d045";
