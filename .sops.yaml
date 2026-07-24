@@ -12,7 +12,7 @@ keys:
   - &butthead_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDa46hBmT7aRcNtTSKRmzTG8VBBrf9dU+GsUMgMzS7ld
   - &hispanas_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICzC0DNxw+lrSBF/lgGMKY2eZJWm1KD1FP47sdakZP9Z
   - &snuffles_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOt+r0UbKvmpLwz13qBbxlHyuL0BZ9sg2/L83Q4FA75S
-  - &z_turn_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAIlRbbVnOt/ttkcUWhtP6dfD0HUzGbkBwZk0FOWOWfR
+  - &z_turn_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN1eFJxVzMN3FeBbTas0G1lQgEnxk4oU9PJ5JM8xr5qu
   - &kr260_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKPS9fMrBgKRc/ZsS0LjgjVs1UY7/OQ+1G/L5cEEytFq
 
   # Age keys (derived from SSH host keys for sops-nix)
@@ -23,7 +23,7 @@ keys:
   - &lenovix_age age18hutz4xq0lk2y0vy0flk5w0qx5as8xlr9k0wd5qshjvglldceq6spxmp02
   - &hispanas_age age1za9qg39ygxc4xlda6elmmk3fq2845j3r2dv6qw3fvkjdtcklhvqsqfvvxv
   - &snuffles_age age1t60rm2grrq3zrhpgpgxz4uc3un7wuy93j3nvp6j7uujkn5l52qasclxhdl
-  - &z_turn_age age15ap0xlg54h6q4k2cvl6pvfst3xag4yp9w0eqwfl5xtlxhsv44esqqhazu5
+  - &z_turn_age age1v4sun8t2ggdyv97kvgcep3mh2fjja95509x7sufkx487jp5egvks7sy8k4
   - &kr260_age age1vsjplswaaj0dja82u939ng9h9wftm6rdjqlzgjsjykg55j7q83csx72nq6
 
 creation_rules:

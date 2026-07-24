@@ -17,10 +17,22 @@
     # (filesystem-agnostic, unlike the sd-image module's ext4-only expandOnBoot).
     boot.growPartition = true;
 
+    # SD-card longevity mount options: zstd compresses data before it hits the
+    # flash (fewer bytes written = less write amplification), commit=120 batches
+    # metadata updates every 120s instead of the 30s default, and discard=async
+    # feeds the card's FTL free-block info for its internal GC. (space_cache=v2
+    # is omitted: free-space-tree is the default on modern kernels.)
     fileSystems."/" = {
       device = "/dev/disk/by-label/NIXOS_SD";
       fsType = "btrfs";
-      options = [ "compress=lzo" "noatime" "x-systemd.growfs" ];
+      options = [
+        "noatime"
+        "nodiratime"
+        "commit=120"
+        "compress=zstd"
+        "discard=async"
+        "x-systemd.growfs"
+      ];
     };
     fileSystems."/boot" = {
       device = "/dev/disk/by-label/FIRMWARE";
@@ -126,7 +138,15 @@
         "/" = {
           device = "/dev/disk/by-label/NIXOS_SD";
           fsType = "btrfs";
-          options = [ "compress=lzo" "noatime" "x-systemd.growfs" ];
+          # MUST mirror the runtime module's root options above.
+          options = [
+            "noatime"
+            "nodiratime"
+            "commit=120"
+            "compress=zstd"
+            "discard=async"
+            "x-systemd.growfs"
+          ];
         };
         "/boot" = {
           device = "/dev/disk/by-label/FIRMWARE";

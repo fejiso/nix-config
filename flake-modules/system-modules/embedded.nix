@@ -76,7 +76,10 @@
       documentation.man.cache.enable = lib.mkForce false;
       documentation.man.cache.generateAtRuntime = lib.mkForce false;
 
-      # Journald volatile (SD longevity)
+      # Keep volatile state in RAM, off the SD card: /tmp on tmpfs (capped at
+      # 25% of RAM) and journald fully volatile (capped at 30M of runtime RAM).
+      boot.tmp.useTmpfs = true;
+      boot.tmp.tmpfsSize = "25%";
       services.journald.extraConfig = ''
         Storage=volatile
         RuntimeMaxUse=30M
