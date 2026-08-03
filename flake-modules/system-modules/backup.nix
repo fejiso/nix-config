@@ -12,6 +12,10 @@ let
   snapshotPaths = "/home /var/lib";
   # Global retention applied by each client to its own snapshots.
   retentionPolicy = "--keep-daily 7 --keep-weekly 4 --keep-monthly 12 --keep-annual 10";
+  # Short retention for /var/lib on every host — machine/service state churns
+  # fast and isn't worth long-term history. Every keep-* knob must be zeroed
+  # explicitly, otherwise unset fields inherit the long-term global policy.
+  varLibRetention = "--keep-latest 0 --keep-hourly 0 --keep-daily 7 --keep-weekly 0 --keep-monthly 0 --keep-annual 0";
   # Ignore-pattern flags built from services.backup.ignore (empty when unset).
   ignoreArgs = concatMapStringsSep " " (p: "--add-ignore " + escapeShellArg p) cfg.ignore;
   # Deterministic backup time from hostname hash — spreads hosts across
@@ -171,6 +175,13 @@ in {
           # Two steps: clear first, then add — avoids any flag-order ambiguity.
           ${kopia}/bin/kopia policy set --global --clear-ignore
           ${kopia}/bin/kopia policy set --global ${retentionPolicy} ${ignoreArgs}
+
+          # Per-source override: /var/lib on every client gets 1-week retention
+          # (kept in sync with the clients list; each snapshot of /var/lib
+          # prunes its own old snapshots against this policy).
+          ${concatMapStringsSep "\n" (h: ''
+            ${kopia}/bin/kopia policy set "backup-user@${h}:/var/lib" ${varLibRetention}
+          '') cfg.clients}
 
           export KOPIA_SERVER_USERNAME="admin"
           export KOPIA_SERVER_PASSWORD="$(cat ${config.sops.secrets.kopia_server_password.path})"
