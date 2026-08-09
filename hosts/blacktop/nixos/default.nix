@@ -23,6 +23,20 @@
   # Enable emulation
   emulation.enable = true;
 
+  # Zenbook power/fan management: use power-profiles-daemon instead of TLP/asusd
+  services.power-profiles-daemon.enable = lib.mkForce true;
+  services.tlp.enable = lib.mkForce false;
+  systemd.services.power-saver-default = {
+    description = "Set default power profile to power-saver";
+    after = [ "power-profiles-daemon.service" ];
+    requires = [ "power-profiles-daemon.service" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.power-profiles-daemon}/bin/powerprofilesctl set power-saver";
+    };
+  };
+
   # Boot configuration
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
