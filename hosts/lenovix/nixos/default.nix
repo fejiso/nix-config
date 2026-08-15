@@ -17,6 +17,11 @@
   # Host-specific networking
   networking.hostName = "lenovix";
 
+  # Tdarr worker node (native NixOS service)
+  services.tdarr-worker = {
+    enable = true;
+  };
+
   # System state version
   system.stateVersion = "25.05";
 }

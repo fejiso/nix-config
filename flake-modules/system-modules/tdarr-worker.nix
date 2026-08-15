@@ -158,6 +158,14 @@ in
       nodes.${cfg.nodeId} = {
         name = cfg.nodeId;
         type = "mapped";
+        # Exactly one encoding slot per node (1 CPU transcode worker, no GPU
+        # workers). Note: worker counts are only applied on first registration;
+        # afterwards the server's stored node config wins and must be changed
+        # in the web UI.
+        workers = {
+          transcodeCPU = 1;
+          transcodeGPU = 0;
+        };
         serverURL =
           if cfg.serverEnabled
           then "http://127.0.0.1:${toString cfg.serverPort}"
@@ -201,6 +209,10 @@ in
           serviceConfig = {
             ReadWritePaths = mkAfter rwPaths;
             SupplementaryGroups = [ "render" "video" ];
+            # The node exits with status 0 when the server tells it to shut
+            # down/restart (e.g. from the web UI), and the upstream unit's
+            # Restart=on-failure then leaves it dead forever. Always restart.
+            Restart = mkForce "always";
             # Run transcoding at the lowest possible CPU and IO priority so it
             # never starves interactive/other services on the host.
             Nice = 19;
