@@ -66,7 +66,8 @@ LOCK_FILE="/var/snapraid/snapraid-sync.lock"
 
 # Exit-code policy:
 # 0 = continue on failures (but warn and block downstream risky steps)
-# 1 = fail fast (exit on first non-zero exit code from snapraid, except diff rc=2)
+# 1 = fail fast (exit on first non-zero exit code from snapraid, except diff rc=2
+#     and sync soft errors -- files changed/removed mid-sync -- which only warn)
 FAIL_FAST=1
 
 # Summarize the verbose `snapraid diff` file list in the emailed report.
@@ -345,6 +346,49 @@ run_cmd() {
   mark_end "$name" "$rc"
 
   if (( rc != 0 )); then
+    HAD_FAILURE=1
+    log "**WARNING** ${name} returned non-zero exit code: ${rc}"
+    if (( FAIL_FAST == 1 )); then
+      die "${name} failed with rc=${rc} (FAIL_FAST=1)"
+    fi
+  fi
+
+  return "$rc"
+}
+
+# Like run_cmd, but for `snapraid sync`: soft errors (files changed or removed
+# while syncing) are demoted to warnings -- the sync completed and saved state,
+# and the next run picks up the stragglers. Only hard errors (io/data errors),
+# or a summary that can't be parsed, are treated as failures.
+run_sync_cmd() {
+  local name="$1"; shift
+
+  mark_begin "$name"
+  {
+    echo "###${name} [$(date)]"
+    "$@"
+  } 2>&1 | tee -a "$TMP_OUTPUT"
+
+  local rc=${PIPESTATUS[0]}
+  mark_end "$name" "$rc"
+
+  if (( rc != 0 )); then
+    # Extract this job's block and check snapraid's error counters
+    local block soft_err io_err data_err
+    block="$(awk -v n="$name" '
+      $0 ~ "__SNAPRAID_" n "_BEGIN__" { in_block=1; next }
+      $0 ~ "__SNAPRAID_" n "_END__"   { in_block=0 }
+      in_block { print }
+    ' "$TMP_OUTPUT")"
+    soft_err="$(awk '/^[[:space:]]*[0-9]+[[:space:]]+soft errors$/ {print $1; exit}' <<<"$block")"
+    io_err="$(awk '/^[[:space:]]*[0-9]+[[:space:]]+io errors$/   {print $1; exit}' <<<"$block")"
+    data_err="$(awk '/^[[:space:]]*[0-9]+[[:space:]]+data errors$/ {print $1; exit}' <<<"$block")"
+
+    if [[ -n "$soft_err" && "${io_err:-1}" -eq 0 && "${data_err:-1}" -eq 0 ]]; then
+      log "**WARNING** ${name} hit ${soft_err} soft error(s) (files changed/removed during sync). Not fatal; continuing."
+      return 0
+    fi
+
     HAD_FAILURE=1
     log "**WARNING** ${name} returned non-zero exit code: ${rc}"
     if (( FAIL_FAST == 1 )); then
@@ -1487,7 +1531,7 @@ main() {
   # SYNC - Update parity if authorized
   #
   if (( DO_SYNC == 1 )); then
-    run_cmd "SYNC" "$SNAPRAID_BIN" sync -q
+    run_sync_cmd "SYNC" "$SNAPRAID_BIN" sync -q
     SYNC_RC=$?
     JOBS_DONE="${JOBS_DONE} + SYNC"
     
