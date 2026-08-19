@@ -110,13 +110,13 @@
           behavior = {
             lock = {
               timeout = 900;
-              command = "noctalia:session lock";
+              action = "lock";
               enabled = true;
             };
             screen-off = {
               timeout = 1800;
-              command = "noctalia:dpms-off";
-              resume_command = "noctalia:dpms-on";
+              # native action powers monitors back on automatically on resume
+              action = "screen_off";
               enabled = true;
             };
           };
