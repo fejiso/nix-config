@@ -168,6 +168,18 @@ in {
       hardeningDisable = (old.hardeningDisable or [ ]) ++ [ "fortify" "fortify3" ];
     });
 
+    # ccextractor 0.94-unstable-2025-05-20 doesn't build against gpac 26.07:
+    # gpac's setup.h now poisons strcpy/strcat/strncpy/strncat with #error
+    # unless GPAC_ALLOW_UNSAFE_STRFUNC is defined before including its headers
+    # ("stray '#' in program" in lib_ccx/mp4.c). Define it — ccextractor only
+    # uses these on its own buffers, not gpac's. Drop when nixpkgs' ccextractor
+    # bump fixes gpac 26.07 compat upstream.
+    ccextractor = prev.ccextractor.overrideAttrs (old: {
+      env = (old.env or { }) // {
+        NIX_CFLAGS_COMPILE = (old.env.NIX_CFLAGS_COMPILE or "") + " -DGPAC_ALLOW_UNSAFE_STRFUNC";
+      };
+    });
+
     # whipper 0.10.0 imports pkg_resources in 4 modules, but setuptools 81+
     # (nixpkgs-unstable ships 82) removed pkg_resources entirely. Patch the
     # imports to use stdlib importlib.metadata and packaging instead, add
