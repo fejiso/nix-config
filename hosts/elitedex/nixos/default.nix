@@ -118,4 +118,8 @@
 
   # Install-time NixOS release; do not bump on upgrades.
   system.stateVersion = "25.05";
+
+  # llama.cpp RPC worker for hierro's distributed inference master (CPU only;
+  # set gpuBackend = "rocm"/"vulkan" once GPU support is confirmed)
+  services.llama-rpc.worker.enable = true;
 }

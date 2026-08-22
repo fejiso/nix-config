@@ -67,4 +67,7 @@
 
   # System state version
   system.stateVersion = "25.05";
+
+  # llama.cpp RPC worker for hierro's distributed inference master (CPU only)
+  services.llama-rpc.worker.enable = true;
 }

@@ -6,6 +6,7 @@ import ../../lib/mk-host.nix {
     config.flake.modules.nixos.novasdr
     config.flake.modules.nixos.mesh
     config.flake.modules.nixos.desktop-services
+    config.flake.modules.nixos.bcachefs
   ];
   homeModules = [
     config.flake.modules.homeManager.linux-default

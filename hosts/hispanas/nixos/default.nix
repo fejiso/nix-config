@@ -23,6 +23,9 @@
   # Host-specific networking
   networking.hostName = "hispanas";
 
+  # bcachefs support (kernel module + bcachefs-tools)
+  hardware.bcachefs-support.enable = true;
+
   # Ralink RT5390R (rt2800pci) firmware is notoriously slow (<1Mbps) under
   # default settings. Two well-known fixes:
   #   1. Disable Wi-Fi power management (NetworkManager defaults it on).

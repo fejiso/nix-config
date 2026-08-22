@@ -43,6 +43,12 @@
         mode = "0444";
       };
 
+      kimi-api-key = {
+        sopsFile = "${inputs.self}/secrets/kimi.yml";
+        key = "kimi_api";
+        mode = "0444";
+      };
+
       kuma-disk-maintenance-push-url = {
         sopsFile = "${inputs.self}/secrets/kuma.yaml";
         key = "disk_maintenance_push_url";

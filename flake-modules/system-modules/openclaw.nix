@@ -9,6 +9,7 @@ let
   cfg = config.services.openclaw;
   tokenFile = config.sops.secrets.openclaw-gateway-token.path;
   openrouterKeyFile = config.sops.secrets.openrouter-api-key.path;
+  kimiKeyFile = config.sops.secrets.kimi-api-key.path;
 in {
   options.services.openclaw = {
     enable = mkEnableOption "OpenClaw AI assistant";
@@ -86,9 +87,12 @@ in {
         mkdir -p /run/openclaw
         GATEWAY_TOKEN=$(cat ${tokenFile})
         OPENROUTER_KEY=$(cat ${openrouterKeyFile})
+        KIMI_KEY=$(cat ${kimiKeyFile})
         cat > /run/openclaw/env << EOF
         OPENCLAW_GATEWAY_TOKEN=$GATEWAY_TOKEN
         OPENROUTER_API_KEY=$OPENROUTER_KEY
+        KIMI_API_KEY=$KIMI_KEY
+        MOONSHOT_API_KEY=$KIMI_KEY
         EOF
         chown openclaw:openclaw /run/openclaw/env
         chmod 600 /run/openclaw/env

@@ -44,6 +44,16 @@
   # Home Assistant OS VM
   services.haos-vm.enable = true;
 
+  # bcachefs support (kernel module + bcachefs-tools)
+  hardware.bcachefs-support.enable = true;
+
+  # llama.cpp RPC worker for hierro's distributed inference master
+  # (CUDA build compiles from source on first deploy)
+  services.llama-rpc.worker = {
+    enable = true;
+    gpuBackend = "cuda";
+  };
+
   # SANE scanner support
   hardware.sane = {
     enable = true;
