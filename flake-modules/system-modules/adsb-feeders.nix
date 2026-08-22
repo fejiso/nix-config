@@ -139,11 +139,41 @@ with lib;
         default = false;
         description = "Expose SBS (30003) port to host";
       };
+
+      address = mkOption {
+        type = types.str;
+        default = "10.89.0.10";
+        description = "Static IP of the adsbfi container on the shared podman network";
+      };
+    };
+
+    networkName = mkOption {
+      type = types.str;
+      default = "adsb";
+      description = "Podman network shared by the ADS-B decoder and feeder containers";
+    };
+
+    networkSubnet = mkOption {
+      type = types.str;
+      default = "10.89.0.0/24";
+      description = "Subnet of the shared podman network (adsbfi.address must lie within it)";
     };
 
     beastHost = mkOption {
       type = types.str;
-      default = "host.containers.internal";
+      # When the adsbfi ultrafeeder does the SDR decoding, feeders reach it
+      # directly container-to-container over the shared podman network instead
+      # of via host-published ports (which broke repeatedly when the decoder
+      # container was recreated during nixos switches).
+      default =
+        if config.services.adsb-feeders.adsbfi.enable
+           && config.services.adsb-feeders.adsbfi.deviceType != "none"
+        then config.services.adsb-feeders.adsbfi.address
+        else "host.containers.internal";
+      defaultText = literalExpression ''
+        if adsbfi handles SDR decoding: services.adsb-feeders.adsbfi.address
+        otherwise: "host.containers.internal"
+      '';
       description = "Beast protocol host for feeders";
     };
 
@@ -154,7 +184,16 @@ with lib;
     };
   };
 
-  config = mkMerge [
+  config =
+    let
+      feedersCfg = config.services.adsb-feeders;
+      # Create the shared podman network (idempotent) before any container starts
+      ensureNetwork = pkgs.writeShellScript "ensure-adsb-network" ''
+        ${pkgs.podman}/bin/podman network exists ${feedersCfg.networkName} || \
+          ${pkgs.podman}/bin/podman network create --subnet ${feedersCfg.networkSubnet} ${feedersCfg.networkName}
+      '';
+    in
+    mkMerge [
     # Enable podman if any feeder is enabled
     (mkIf (config.services.adsb-feeders.piaware.enable || config.services.adsb-feeders.fr24feed.enable || config.services.adsb-feeders.adsbfi.enable) {
       virtualisation.podman = {
@@ -179,7 +218,10 @@ with lib;
           Type = "simple";
           Restart = "always";
           RestartSec = "30";
-          ExecStartPre = "-${pkgs.podman}/bin/podman rm -f piaware";
+          ExecStartPre = [
+            "-${pkgs.podman}/bin/podman rm -f piaware"
+            ensureNetwork
+          ];
           ExecStart =
             let
               cfg = config.services.adsb-feeders;
@@ -188,6 +230,7 @@ with lib;
               ${if cfg.piaware.feederIdSecretFile != null then ''
                 FEEDER_ID=$(cat ${cfg.piaware.feederIdSecretFile})
                 ${pkgs.podman}/bin/podman run --rm --name piaware \
+                  --network ${cfg.networkName} \
                   --label io.containers.autoupdate=registry \
                   ${optionalString (cfg.piaware.webPort != null) "-p ${toString cfg.piaware.webPort}:8080"} \
                   -e BEASTHOST=${cfg.beastHost} \
@@ -198,6 +241,7 @@ with lib;
                   ghcr.io/sdr-enthusiasts/docker-piaware:latest
               '' else ''
                 ${pkgs.podman}/bin/podman run --rm --name piaware \
+                  --network ${cfg.networkName} \
                   --label io.containers.autoupdate=registry \
                   ${optionalString (cfg.piaware.webPort != null) "-p ${toString cfg.piaware.webPort}:8080"} \
                   -e BEASTHOST=${cfg.beastHost} \
@@ -228,7 +272,10 @@ with lib;
           Type = "simple";
           Restart = "always";
           RestartSec = "30";
-          ExecStartPre = "-${pkgs.podman}/bin/podman rm -f fr24feed";
+          ExecStartPre = [
+            "-${pkgs.podman}/bin/podman rm -f fr24feed"
+            ensureNetwork
+          ];
           ExecStart =
             let
               cfg = config.services.adsb-feeders.fr24feed;
@@ -236,6 +283,7 @@ with lib;
             pkgs.writeShellScript "start-fr24feed" ''
               FR24KEY=$(cat ${cfg.sharingKeySecretFile})
               ${pkgs.podman}/bin/podman run --rm --name fr24feed \
+                --network ${config.services.adsb-feeders.networkName} \
                 --label io.containers.autoupdate=registry \
                 ${optionalString (cfg.webPort != null) "-p ${toString cfg.webPort}:8754"} \
                 -e BEASTHOST=${config.services.adsb-feeders.beastHost} \
@@ -271,7 +319,10 @@ with lib;
           Type = "simple";
           Restart = "always";
           RestartSec = "30";
-          ExecStartPre = "-${pkgs.podman}/bin/podman rm -f adsbfi";
+          ExecStartPre = [
+            "-${pkgs.podman}/bin/podman rm -f adsbfi"
+            ensureNetwork
+          ];
           ExecStart =
             let
               cfg = config.services.adsb-feeders.adsbfi;
@@ -283,6 +334,8 @@ with lib;
               
               ${pkgs.podman}/bin/podman run --rm --name adsbfi \
                 --privileged \
+                --network ${config.services.adsb-feeders.networkName} \
+                --ip ${cfg.address} \
                 --label io.containers.autoupdate=registry \
                 ${optionalString (cfg.webPort != null) "-p ${toString cfg.webPort}:80"} \
                 ${optionalString cfg.exposeBeastPort "-p 30005:30005"} \
