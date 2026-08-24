@@ -218,6 +218,7 @@ with lib;
           Type = "simple";
           Restart = "always";
           RestartSec = "30";
+          LimitNOFILE = 1048576; # see fr24feed note
           ExecStartPre = [
             "-${pkgs.podman}/bin/podman rm -f piaware"
             ensureNetwork
@@ -231,6 +232,7 @@ with lib;
                 FEEDER_ID=$(cat ${cfg.piaware.feederIdSecretFile})
                 ${pkgs.podman}/bin/podman run --rm --name piaware \
                   --network ${cfg.networkName} \
+                  --ulimit nofile=1048576:1048576 \
                   --label io.containers.autoupdate=registry \
                   ${optionalString (cfg.piaware.webPort != null) "-p ${toString cfg.piaware.webPort}:8080"} \
                   -e BEASTHOST=${cfg.beastHost} \
@@ -242,6 +244,7 @@ with lib;
               '' else ''
                 ${pkgs.podman}/bin/podman run --rm --name piaware \
                   --network ${cfg.networkName} \
+                  --ulimit nofile=1048576:1048576 \
                   --label io.containers.autoupdate=registry \
                   ${optionalString (cfg.piaware.webPort != null) "-p ${toString cfg.piaware.webPort}:8080"} \
                   -e BEASTHOST=${cfg.beastHost} \
@@ -272,6 +275,15 @@ with lib;
           Type = "simple";
           Restart = "always";
           RestartSec = "30";
+          # NOTE: fr24feed leaks one fd per failed reconnect to the Beast
+          # source. The image's s6 run script forces `ulimit -n 256`
+          # (deliberate upstream workaround: fr24feed fcntls every fd up to
+          # the limit), so neither LimitNOFILE nor --ulimit can save it:
+          # once it has leaked 256 fds it is permanently wedged with
+          # "Too many open files" and never recovers on its own. The
+          # healthcheck + fr24feed-healthcheck timer below restart the
+          # container when it reaches that state.
+          LimitNOFILE = 1048576;
           ExecStartPre = [
             "-${pkgs.podman}/bin/podman rm -f fr24feed"
             ensureNetwork
@@ -279,12 +291,21 @@ with lib;
           ExecStart =
             let
               cfg = config.services.adsb-feeders.fr24feed;
+              # Fail once fr24feed is close to its hardcoded 256 fd limit
+              # (i.e. the reconnect-loop leak has wedged it).
+              healthCmd = "/bin/bash -c 'test $(ls /proc/$(pgrep -x fr24feed | head -n1)/fd | wc -l) -lt 200'";
             in
             pkgs.writeShellScript "start-fr24feed" ''
               FR24KEY=$(cat ${cfg.sharingKeySecretFile})
               ${pkgs.podman}/bin/podman run --rm --name fr24feed \
                 --network ${config.services.adsb-feeders.networkName} \
+                --ulimit nofile=1048576:1048576 \
                 --label io.containers.autoupdate=registry \
+                --health-cmd ${escapeShellArg healthCmd} \
+                --health-interval 60s \
+                --health-timeout 10s \
+                --health-retries 3 \
+                --health-start-period 120s \
                 ${optionalString (cfg.webPort != null) "-p ${toString cfg.webPort}:8754"} \
                 -e BEASTHOST=${config.services.adsb-feeders.beastHost} \
                 -e BEASTPORT=${config.services.adsb-feeders.beastPort} \
@@ -298,6 +319,26 @@ with lib;
                 ghcr.io/sdr-enthusiasts/docker-flightradar24:latest
             '';
           ExecStop = "${pkgs.podman}/bin/podman stop -t 10 fr24feed";
+        };
+      };
+
+      # podman 5 removed `autoheal`, so do it by hand: restart the fr24feed
+      # container when its healthcheck reports unhealthy (fd-leak wedge).
+      systemd.services.fr24feed-healthcheck = {
+        description = "Restart fr24feed container if unhealthy";
+        serviceConfig.Type = "oneshot";
+        script = ''
+          if systemctl is-active --quiet fr24feed.service; then
+            ${pkgs.podman}/bin/podman healthcheck run fr24feed || systemctl restart fr24feed.service
+          fi
+        '';
+      };
+      systemd.timers.fr24feed-healthcheck = {
+        description = "Check fr24feed container health";
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnBootSec = "2min";
+          OnUnitActiveSec = "1min";
         };
       };
     })
@@ -319,6 +360,7 @@ with lib;
           Type = "simple";
           Restart = "always";
           RestartSec = "30";
+          LimitNOFILE = 1048576; # see fr24feed note
           ExecStartPre = [
             "-${pkgs.podman}/bin/podman rm -f adsbfi"
             ensureNetwork
@@ -335,6 +377,7 @@ with lib;
               ${pkgs.podman}/bin/podman run --rm --name adsbfi \
                 --privileged \
                 --network ${config.services.adsb-feeders.networkName} \
+                --ulimit nofile=1048576:1048576 \
                 --ip ${cfg.address} \
                 --label io.containers.autoupdate=registry \
                 ${optionalString (cfg.webPort != null) "-p ${toString cfg.webPort}:80"} \
