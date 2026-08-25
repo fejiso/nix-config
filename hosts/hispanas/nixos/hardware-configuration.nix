@@ -27,9 +27,9 @@
 
   fileSystems."/mnt/user" =
   {
-    device = "/dev/disk/by-uuid/9f722a2b-1ef7-46d5-8b70-78832e9fe3a7";
-    fsType = "btrfs";
-    options = [ "nofail" "x-systemd.automount" "x-systemd.idle-timeout=600" "compress=zstd" ];
+    device = "/dev/disk/by-uuid/80309343-96df-4957-af44-31dba7b0ebc0";
+    fsType = "bcachefs";
+    options = [ "nofail" "x-systemd.automount" "x-systemd.idle-timeout=600" "compression=lz4" "background_compression=zstd" ];
   };
 
   swapDevices =
