@@ -52,6 +52,12 @@
       options = [ "fmask=0022" "dmask=0022" ];
     };
 
+  fileSystems."/mnt/bcachefs" =
+    { device = "/dev/disk/by-uuid/de105d4d-df96-444c-8fdb-b616c589a422";
+      fsType = "bcachefs";
+      options = [ "compression=lz4" "background_compression=zstd" "noatime" "discard" "nofail" ];
+    };
+
   # swapDevices configured in default.nix for hibernation support
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";

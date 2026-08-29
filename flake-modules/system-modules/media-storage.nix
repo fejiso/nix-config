@@ -3,7 +3,7 @@
 # Tiered media storage: SSD write cache (data01) in front of an HDD mergerfs
 # pool, with SnapRAID parity, staggered btrfs scrubs, SSD->HDD migration and
 # aggressive HDD spindown. Extracted from hosts/butthead/nixos; the disk
-# layout (labels data01..data07, parity1/parity2, SSD on sdc) is butthead's.
+# layout (labels data01..data07, parity1, SSD on sdc) is butthead's.
 {
   config,
   lib,
@@ -157,12 +157,6 @@ in
       options = [ "defaults" "noatime" "nofail" "compress=zstd" ];
     };
 
-    # Parity2
-    fileSystems."/mnt/parity2" = {
-      device = "/dev/disk/by-label/parity2"; # sdd1 - 7.3T
-      fsType = "btrfs";
-      options = [ "defaults" "noatime" "nofail" "compress=zstd" ];
-    };
 
     # MergerFS pool combining all data disks (SSD writes first)
     fileSystems."/mnt/user" = {
@@ -220,7 +214,6 @@ in
       };
       parityFiles = [
         "/mnt/parity1/snapraid.parity"
-        "/mnt/parity2/snapraid.2-parity"  # Add when sdd1 is formatted
       ];
       contentFiles = [
         "/var/snapraid/snapraid.content"
@@ -275,7 +268,6 @@ in
     systemd.timers."btrfs-scrub-mnt-data06".timerConfig.OnCalendar = lib.mkForce "*-*-21 07:00:00";
     systemd.timers."btrfs-scrub-mnt-data07".timerConfig.OnCalendar = lib.mkForce "*-*-23 07:00:00";
     systemd.timers."btrfs-scrub-mnt-parity1".timerConfig.OnCalendar = lib.mkForce "*-*-25 07:00:00";
-    systemd.timers."btrfs-scrub-mnt-parity2".timerConfig.OnCalendar = lib.mkForce "*-*-28 07:00:00";
 
     # Wrap scrub services with flock to guarantee no two scrubs run simultaneously
     systemd.services."btrfs-scrub-mnt-data01".serviceConfig.ExecStart = lib.mkForce
@@ -294,8 +286,6 @@ in
       "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/data07";
     systemd.services."btrfs-scrub-mnt-parity1".serviceConfig.ExecStart = lib.mkForce
       "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/parity1";
-    systemd.services."btrfs-scrub-mnt-parity2".serviceConfig.ExecStart = lib.mkForce
-      "${pkgs.util-linux}/bin/flock /var/lock/disk-maintenance.lock ${pkgs.btrfs-progs}/bin/btrfs scrub start -B /mnt/parity2";
 
     # SSD cache migration services
     #   ssd-migrate:         daily, always runs, migrates files older than 24h (triggered by snapraid)
