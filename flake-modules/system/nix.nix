@@ -37,13 +37,20 @@
   systemd.services.nix-garbage-collect = {
     description = "Nix Garbage Collection (system + user)";
     serviceConfig.Type = "oneshot";
+    # Let angrr prune generations by policy first; it protects the booted
+    # generation (keep-booted-system), which age-based deletion would kill.
+    after = lib.optional config.services.angrr.enable "angrr.service";
     path = [ config.nix.package pkgs.coreutils ];
     script = ''
       echo "=== Nix GC start ==="
       echo "Store size before: $(du -sh /nix/store | cut -f1)"
 
-      # Delete old generations from all system profiles
-      nix-collect-garbage --delete-older-than 7d
+      # Delete old generations from all system profiles.
+      # When angrr is enabled it already pruned the system profile by policy
+      # (and kept the booted/current generations), so only collect.
+      ${if config.services.angrr.enable
+        then "nix-collect-garbage"
+        else "nix-collect-garbage --delete-older-than 7d"}
 
       # Delete old per-user profile generations (home-manager, nix-env)
       for dir in /nix/var/nix/profiles/per-user/*/; do
