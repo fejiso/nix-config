@@ -160,7 +160,8 @@ in
 
     # MergerFS pool combining all data disks (SSD writes first)
     fileSystems."/mnt/user" = {
-      device = "/mnt/data01:/mnt/data02:/mnt/data03:/mnt/data04:/mnt/data05:/mnt/data06:/mnt/data07";
+      # bcachefs appended temporarily during mergerfs/snapraid -> bcachefs migration
+      device = "/mnt/data01:/mnt/data02:/mnt/data03:/mnt/data04:/mnt/data05:/mnt/data06:/mnt/data07:/mnt/bcachefs";
       fsType = "fuse.mergerfs";
       options = [
         "defaults"

@@ -76,7 +76,7 @@
 
   # Hibernation configuration
   boot.resumeDevice = "/dev/disk/by-uuid/2ae17721-d56e-4707-90af-9d17b37a14c7";
-  boot.kernelParams = [ "resume_offset=3987983" ];
+  boot.kernelParams = [ "resume_offset=3987983" "nvme_core.default_ps_max_latency_us=0" ];
 
   # Host-specific networking
   networking.hostName = "butthead";
