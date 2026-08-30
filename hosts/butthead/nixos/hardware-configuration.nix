@@ -55,7 +55,7 @@
   fileSystems."/mnt/bcachefs" =
     { device = "/dev/disk/by-uuid/de105d4d-df96-444c-8fdb-b616c589a422";
       fsType = "bcachefs";
-      options = [ "compression=lz4" "background_compression=zstd" "noatime" "discard" "nofail" ];
+      options = [ "compression=lz4" "background_compression=zstd" "relatime" "discard" "nofail" ];
     };
 
   # swapDevices configured in default.nix for hibernation support
