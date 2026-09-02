@@ -15,7 +15,7 @@
   fileSystems."/" =
     { device = "/dev/mapper/crypted";
       fsType = "btrfs";
-      options = [ "subvol=@" "degraded" "compress=zstd" "noatime" ];
+      options = [ "subvol=@" "degraded" "compress=zstd" "relatime" ];
     };
 
   boot.initrd.luks.devices."crypted" = {
@@ -25,19 +25,19 @@
 
   # Copy the keyfile from /boot into the initrd
   boot.initrd.secrets = {
-    "/luks-key" = "/boot/luks-key";
+  "/luks-key" = "/boot/luks-key";
   };
 
   fileSystems."/home" =
     { device = "/dev/mapper/crypted";
       fsType = "btrfs";
-      options = [ "subvol=@home" "degraded" "compress=zstd" "noatime" ];
+      options = [ "subvol=@home" "degraded" "compress=zstd" "relatime" ];
     };
 
   fileSystems."/nix" =
     { device = "/dev/mapper/crypted";
       fsType = "btrfs";
-      options = [ "subvol=@nix" "degraded" "compress=zstd" "noatime" ];
+      options = [ "subvol=@nix" "degraded" "compress=zstd" "relatime" ];
     };
 
   fileSystems."/var/log" =

@@ -169,7 +169,7 @@ in
         "use_ino"
         "cache.files=partial"
         "dropcacheonclose=true"
-        "category.create=ff"
+        "category.create=mfs"
         # Metadata caching (3h) to prevent drive spinup
         "cache.symlinks=true"
         "cache.readdir=true"
