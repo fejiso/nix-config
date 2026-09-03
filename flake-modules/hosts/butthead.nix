@@ -21,6 +21,7 @@ import ../../lib/mk-host.nix {
     config.flake.modules.nixos.haos-vm
     config.flake.modules.nixos.bcachefs
     config.flake.modules.nixos.llama-rpc
+    config.flake.modules.nixos.polystack
   ];
   homeModules = [
     config.flake.modules.homeManager.linux-default

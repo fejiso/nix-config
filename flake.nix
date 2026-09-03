@@ -29,6 +29,13 @@
     # Colmena for deployment (NixOS hosts)
     colmena.url = "github:zhaofengli/colmena";
 
+    # polystack trading bot (dendritic fleet: hierro root/trade host +
+    # zenoh router, butthead observe/soak leaf; see polystack docs/deploy.md).
+    # Branch soaks: add a second input pinned at the branch and point the soak
+    # instance's `package` at it, e.g.
+    #   polystack-soak.url = "git+ssh://forgejo@hierro.netbird.cloud:2222/fer/polystack.git?ref=<branch>";
+    polystack.url = "git+ssh://forgejo@hierro.netbird.cloud:2222/fer/polystack.git";
+
     # deploy-rs for deployment (home-manager on foreign distros, etc.)
     deploy-rs.url = "github:serokell/deploy-rs";
     deploy-rs.inputs.nixpkgs.follows = "nixpkgs";

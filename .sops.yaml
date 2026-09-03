@@ -27,6 +27,14 @@ keys:
   - &kr260_age age1vsjplswaaj0dja82u939ng9h9wftm6rdjqlzgjsjykg55j7q83csx72nq6
 
 creation_rules:
+  # polystack trading key — trade hosts only (hierro) + the admin user.
+  - path_regex: 'secrets/polystack\.yaml$'
+    age:
+      - *user_ssh
+      - *user_age
+      - *hierro_ssh
+      - *hierro_age
+
   # Shared secrets - used by both home-manager (user key) and system services (host keys)
   - path_regex: 'secrets/(openrouter|opencodego|zai)\.yaml$'
     age:

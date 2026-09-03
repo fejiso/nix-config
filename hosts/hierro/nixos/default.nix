@@ -12,6 +12,7 @@
     ./forgejo.nix
     ./nats.nix
     ./metrics.nix
+    ./polystack.nix
   ];
 
   # Boot configuration

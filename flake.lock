@@ -41,6 +41,21 @@
         "type": "github"
       }
     },
+    "crane": {
+      "locked": {
+        "lastModified": 1785782307,
+        "narHash": "sha256-MPaRdVkf6zZP5fCPxYCi8Dr4pZzgmXzg8T9nVEbp3Mw=",
+        "owner": "ipetkov",
+        "repo": "crane",
+        "rev": "2c71e194474d13de031d729b729c968ddbe3507f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "ipetkov",
+        "repo": "crane",
+        "type": "github"
+      }
+    },
     "deploy-rs": {
       "inputs": {
         "flake-compat": "flake-compat_2",
@@ -400,6 +415,22 @@
         "type": "github"
       }
     },
+    "nixpkgs_8": {
+      "locked": {
+        "lastModified": 1785692966,
+        "narHash": "sha256-vUfIeBEfpbAfZ5zjgIkYk7eHBeVfCYVjLbWnMkseYnk=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "643809054d65fdd466a63e3155b8c498cb483c04",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "ref": "nixos-unstable",
+        "repo": "nixpkgs",
+        "type": "github"
+      }
+    },
     "noctalia": {
       "inputs": {
         "nixpkgs": [
@@ -418,6 +449,42 @@
         "owner": "noctalia-dev",
         "repo": "noctalia",
         "type": "github"
+      }
+    },
+    "polyboh": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1788465099,
+        "narHash": "sha256-15LILpZEQq15hvitG/gXvPeVCKZUrfwxFWmK0+ydsrI=",
+        "ref": "refs/heads/main",
+        "rev": "38b5a2e799645ba75f83f1feeb7a29d3c90b255e",
+        "revCount": 11,
+        "type": "git",
+        "url": "ssh://forgejo@hierro.netbird.cloud:2222/fer/polyboh.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://forgejo@hierro.netbird.cloud:2222/fer/polyboh.git"
+      }
+    },
+    "polystack": {
+      "inputs": {
+        "crane": "crane",
+        "nixpkgs": "nixpkgs_8",
+        "polyboh": "polyboh"
+      },
+      "locked": {
+        "lastModified": 1788471673,
+        "narHash": "sha256-z+ngORmx+did0VJyAdT+URMyYq+JIQj4roosM3/fnpI=",
+        "ref": "refs/heads/main",
+        "rev": "d9952f03a5d0ef440af4bb82b897594690287bec",
+        "revCount": 71,
+        "type": "git",
+        "url": "ssh://forgejo@hierro.netbird.cloud:2222/fer/polystack.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://forgejo@hierro.netbird.cloud:2222/fer/polystack.git"
       }
     },
     "quadlet-nix": {
@@ -450,6 +517,7 @@
         "nixpkgs": "nixpkgs_7",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "noctalia": "noctalia",
+        "polystack": "polystack",
         "quadlet-nix": "quadlet-nix",
         "sops-nix": "sops-nix"
       }

@@ -9,6 +9,8 @@ import ../../lib/mk-host.nix {
     config.flake.modules.nixos.tdarr-worker
     config.flake.modules.nixos.openclaw
     config.flake.modules.nixos.llama-rpc
+    config.flake.modules.nixos.polystack
+    config.flake.modules.nixos.polystack-zenohd
   ];
   homeModules = [
     config.flake.modules.homeManager.default

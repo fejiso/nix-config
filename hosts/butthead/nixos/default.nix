@@ -10,6 +10,7 @@
 {
   imports = [
     ./hardware-configuration.nix
+    ./polystack.nix
   ];
 
   # Enable quadlet-based containers
