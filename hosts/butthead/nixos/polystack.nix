@@ -21,6 +21,7 @@
   systemd.tmpfiles.rules = [ "d /mnt/storage/polystack 0755 root root -" ];
   fileSystems."/var/lib/polystack-main" = {
     device = "/mnt/storage/polystack";
+    fsType = "none";
     options = [ "bind" ];
   };
 }
