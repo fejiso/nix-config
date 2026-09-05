@@ -201,16 +201,35 @@ in {
         environment = {
           HOME = "/var/lib/kopia";
         };
-        path = [ kopia ];
+        path = [ kopia pkgs.python3 ];
         script = let
           ensureClient = h: ''
             echo "Syncing client user: ${h}"
             ${kopia}/bin/kopia server user set backup-user@${h} \
-              --user-password="$SERVER_PASS"
+              --user-password-hash="$USER_HASH"
           '';
         in ''
           export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_repo_password.path})"
-          SERVER_PASS="$(cat ${config.sops.secrets.kopia_server_password.path})"
+
+          # Never put the plaintext client password on the kopia command line —
+          # /proc/<pid>/cmdline is world-readable, so --user-password would leak
+          # it to every local user (and this unit re-runs every 60s). Instead,
+          # compute kopia's salted scrypt user-hash in-memory (python reads the
+          # password from its environment, which only root can inspect) and pass
+          # --user-password-hash. Format (kopia internal/user/hash_password.go):
+          # base64(json{passwordHashVersion:1,
+          #   passwordHash: base64(salt[32] || scrypt-65536-8-1(pw, salt, 32))})
+          USER_HASH=$(SERVER_PASS="$(cat ${config.sops.secrets.kopia_server_password.path})" \
+            python3 -c '
+          import base64, hashlib, json, os
+          salt = os.urandom(32)
+          key = hashlib.scrypt(os.environ["SERVER_PASS"].encode(), salt=salt,
+                               n=65536, r=8, p=1, dklen=32, maxmem=2**28)
+          print(base64.b64encode(json.dumps({
+              "passwordHashVersion": 1,
+              "passwordHash": base64.b64encode(salt + key).decode(),
+          }).encode()).decode())
+          ')
           ${concatMapStringsSep "\n" ensureClient cfg.clients}
         '';
       };
