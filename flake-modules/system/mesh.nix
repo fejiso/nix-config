@@ -52,14 +52,22 @@
     };
   };
 
-  # Reticulum Network Stack daemon (shared for all users)
+  # Reticulum Network Stack daemon (shared for all users).
+  # Runs unprivileged (dynamic user); all ports are >1024 and clients reach the
+  # shared instance via the 0777 /var/run/reticulum socket dir, so root was
+  # never needed. Writable state lives in /var/lib/reticulum (StateDirectory);
+  # the declarative config from /etc is linked in before start because RNS
+  # expects the config file inside its config dir.
   systemd.services.rnsd = {
     description = "Reticulum Network Stack Daemon";
     after = [ "network.target" ];
     wantedBy = [ "multi-user.target" ];
     serviceConfig = {
       Type = "simple";
-      ExecStart = "${pkgs.python3Packages.rns}/bin/rnsd --service --config /etc/reticulum";
+      DynamicUser = true;
+      StateDirectory = "reticulum";
+      ExecStartPre = "+${pkgs.coreutils}/bin/ln -sf /etc/reticulum/config /var/lib/reticulum/config";
+      ExecStart = "${pkgs.python3Packages.rns}/bin/rnsd --service --config /var/lib/reticulum";
       Restart = "always";
     };
   };
@@ -334,7 +342,8 @@
   # Environment variable so all apps use the shared Reticulum instance
   environment.variables.RNS_SHARED_INSTANCE = "Yes";
 
-  # LXMF daemon for message  and node announcement
+  # LXMF daemon for message and node announcement. Also unprivileged; state in
+  # /var/lib/lxmf with the /etc config linked in, same as rnsd above.
   systemd.services.lxmd = {
     description = "LXMF Propagation Daemon";
     after = [ "network.target" "rnsd.service" ];
@@ -345,7 +354,10 @@
     };
     serviceConfig = {
       Type = "simple";
-      ExecStart = "${pkgs.python3Packages.lxmf}/bin/lxmd -p -s --config /etc/lxmf";
+      DynamicUser = true;
+      StateDirectory = "lxmf";
+      ExecStartPre = "+${pkgs.coreutils}/bin/ln -sf /etc/lxmf/config /var/lib/lxmf/config";
+      ExecStart = "${pkgs.python3Packages.lxmf}/bin/lxmd -p -s --config /var/lib/lxmf";
       Restart = "always";
       RestartSec = "5";
     };

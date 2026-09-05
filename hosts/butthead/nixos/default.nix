@@ -64,6 +64,12 @@
   # Enable TooGoodToGo watcher
   services.tgtg-watcher.enable = true;
 
+  # Set I/O scheduler to "none" for all block devices (NVMe/SATA/virtio/mmc).
+  # Devices without a "none" option silently ignore the write.
+  services.udev.extraRules = ''
+    ACTION=="add|change", KERNEL=="sd[a-z]*|nvme[0-9]*|mmcblk[0-9]*|vd[a-z]*", ATTR{queue/scheduler}="none"
+  '';
+
   # Boot configuration
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;

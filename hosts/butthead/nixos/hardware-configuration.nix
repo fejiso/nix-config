@@ -58,6 +58,14 @@
       options = [ "compression=lz4" "background_compression=zstd" "relatime" "discard" "nofail" ];
     };
 
+  # Bind-mount the bcachefs pool at /mnt/user (media layout)
+  fileSystems."/mnt/user" =
+    { device = "/mnt/bcachefs";
+      fsType = "none";
+      options = [ "bind" ];
+      depends = [ "/mnt/bcachefs" ];
+    };
+
   # swapDevices configured in default.nix for hibernation support
 
   nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
