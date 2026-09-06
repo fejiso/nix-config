@@ -8,9 +8,11 @@
 {
   services.polystack-zenohd.enable = true; # wt0:7447, mesh-only
 
-  # The trading key (secrets/polystack.yaml, sops; deploy.md §2).
+  # The trading key lives in the POLYSTACK repo (its own .sops.yaml pins the
+  # recipients: admin user + trade hosts) — the encrypted file rides the
+  # flake input; this host only declares which key to decrypt.
   sops.secrets.polymarket_private_key = {
-    sopsFile = "${inputs.self}/secrets/polystack.yaml";
+    sopsFile = "${inputs.polystack}/config/secrets/polystack.yaml";
     key = "polymarket_private_key";
   };
 
