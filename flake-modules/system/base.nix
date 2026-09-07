@@ -127,6 +127,10 @@
       git-crypt
       htop
       btop
+      nmon
+      lshw
+      pciutils # lspci
+      usbutils # lsusb
       tree
       unzip
       zip

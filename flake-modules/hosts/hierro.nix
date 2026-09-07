@@ -15,5 +15,6 @@ import ../../lib/mk-host.nix {
   homeModules = [
     config.flake.modules.homeManager.default
     config.flake.modules.homeManager.development
+    config.flake.modules.homeManager.silverbullet
   ];
 }

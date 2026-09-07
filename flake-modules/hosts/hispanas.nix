@@ -3,7 +3,6 @@ import ../../lib/mk-host.nix {
   inherit inputs config;
   name = "hispanas";
   modules = [
-    config.flake.modules.nixos.novasdr
     config.flake.modules.nixos.mesh
     config.flake.modules.nixos.desktop-services
     config.flake.modules.nixos.bcachefs

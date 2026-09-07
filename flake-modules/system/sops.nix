@@ -43,6 +43,12 @@
         mode = "0444";
       };
 
+      opencodego-api-key = {
+        sopsFile = "${inputs.self}/secrets/opencodego.yaml";
+        key = "opencodego_api_key";
+        mode = "0444";
+      };
+
       kimi-api-key = {
         sopsFile = "${inputs.self}/secrets/kimi.yml";
         key = "kimi_api";

@@ -2,7 +2,9 @@
   flake.modules.homeManager.linux-default = { pkgs, ... }: {
     home.packages = with pkgs; [
       lshw
-      pciutils
+      pciutils # lspci
+      usbutils # lsusb
+      nmon
       e2fsprogs # badblocks
     ];
   };

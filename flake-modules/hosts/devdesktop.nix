@@ -28,6 +28,7 @@
         config.flake.modules.homeManager.default
         config.flake.modules.homeManager.development
         config.flake.modules.homeManager.opencode-work
+        config.flake.modules.homeManager.silverbullet
         "${inputs.self}/hosts/devdesktop/home"
       ];
     };
