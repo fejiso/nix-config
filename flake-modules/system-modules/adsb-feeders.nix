@@ -408,7 +408,16 @@ with lib;
 
       networking.firewall.interfaces.wt0.allowedTCPPorts = 
         (optional config.services.adsb-feeders.adsbfi.exposeBeastPort 30005) ++
-        (optional config.services.adsb-feeders.adsbfi.exposeSbsPort 30003);
+        (optional config.services.adsb-feeders.adsbfi.exposeSbsPort 30003) ++
+        # Web UIs, reachable on the mesh (linked from butthead's Homepage)
+        (optional (config.services.adsb-feeders.piaware.enable
+                   && config.services.adsb-feeders.piaware.webPort != null)
+                  config.services.adsb-feeders.piaware.webPort) ++
+        (optional (config.services.adsb-feeders.fr24feed.enable
+                   && config.services.adsb-feeders.fr24feed.webPort != null)
+                  config.services.adsb-feeders.fr24feed.webPort) ++
+        (optional (config.services.adsb-feeders.adsbfi.webPort != null)
+                  config.services.adsb-feeders.adsbfi.webPort);
     })
   ];
 }

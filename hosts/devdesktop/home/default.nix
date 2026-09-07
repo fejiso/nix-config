@@ -67,6 +67,12 @@
     openRegistration = true;  # Set to false after initial registration
   };
 
+  # Silverbullet notes (user service, localhost-only on this work machine).
+  services.silverbullet = {
+    enable = true;
+    spaceDir = "/home/superfer/workspace/silverbullet";
+  };
+
   # Configure atuin client to use local server
   programs.atuin.settings.sync_address = "http://localhost:8888";
 

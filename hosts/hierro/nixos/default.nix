@@ -58,14 +58,36 @@
     enable = true;
   };
 
-  # OpenClaw AI assistant (Kimi K3 via Moonshot provider; key from
-  # secrets/kimi.yml, injected as KIMI_API_KEY/MOONSHOT_API_KEY by the module)
+  # OpenClaw AI assistant. Baseline = OpenCode Zen free models (key from
+  # secrets/opencodego.yaml), OpenRouter deepseek-v4-flash as fallback; talk to
+  # it via Telegram (bot token in secrets/openclaw.yaml).
   services.openclaw = {
     enable = true;
     port = 3080;
     dataDir = "/var/lib/openclaw";
-    model = "moonshot/kimi-k3";
+    model = "opencode/big-pickle";
+    modelFallbacks = [
+      "opencode/nemotron-3-ultra-free"
+      "openrouter/deepseek/deepseek-v4-flash"
+    ];
+    telegram.enable = true;
+    # TODO: numeric Telegram user ID allowed to DM the bot (from @userinfobot)
+    telegram.allowFrom = [ 000000000 ];
   };
+
+  # Silverbullet runs as z-247's systemd USER service (see hosts/hierro/home);
+  # keep the user manager alive on this headless host and open the port on the
+  # netbird mesh only.
+  systemd.services.enable-linger-z-247 = {
+    description = "Enable lingering for z-247";
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${pkgs.systemd}/bin/loginctl enable-linger z-247";
+    };
+  };
+  networking.firewall.interfaces.wt0.allowedTCPPorts = [ 3004 ]; # silverbullet (user service)
 
   # Hourly flake builder — builds all host closures so nix-serve can distribute them
   systemd.services.nix-builder = {

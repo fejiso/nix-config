@@ -14,12 +14,6 @@
     # inputs.nixos-hardware.nixosModules.lenovo-thinkpad-x1-carbon-gen11
   ];
 
-  # NovaSDR Configuration
-  services.novasdr = {
-    enable = true;
-    port = 9002;
-  };
-
   # Host-specific networking
   networking.hostName = "hispanas";
 
@@ -88,8 +82,8 @@
     X-Cinnamon-Autostart-enabled=true
   '';
 
-  # Open firewall for webcam stream and novasdr
-  networking.firewall.allowedTCPPorts = [ 8080 9002 ];
+  # Open firewall for webcam stream
+  networking.firewall.allowedTCPPorts = [ 8080 ];
 
   # System state version
   system.stateVersion = "25.05";
