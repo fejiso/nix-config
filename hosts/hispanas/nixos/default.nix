@@ -20,6 +20,22 @@
   # bcachefs support (kernel module + bcachefs-tools)
   hardware.bcachefs-support.enable = true;
 
+  # TESTBED for the stale needs_reconcile fix (see bcachefs-patch.md):
+  # bch2_stripe_repair() early-returns on non-degraded stripes without
+  # clearing needs_reconcile, so stripes flagged during a transient device
+  # state spin in reconcile_hipri forever (ret==0, no IO, no state change).
+  # Applied ONLY on hispanas; butthead keeps vanilla 1.39.5 until proven.
+  # Drop when fixed upstream.
+  nixpkgs.overlays = [
+    (_final: prev: {
+      bcachefs-tools = prev.bcachefs-tools.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [
+          ../../../overlays/patches/bcachefs-stripe-repair-clear-stale-needs-reconcile.patch
+        ];
+      });
+    })
+  ];
+
   # Ralink RT5390R (rt2800pci) firmware is notoriously slow (<1Mbps) under
   # default settings. Two well-known fixes:
   #   1. Disable Wi-Fi power management (NetworkManager defaults it on).
