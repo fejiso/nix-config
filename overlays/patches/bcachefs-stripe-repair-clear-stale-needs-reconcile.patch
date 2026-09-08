@@ -1,0 +1,49 @@
+ec: clear stale needs_reconcile on non-degraded stripes in stripe_repair
+
+bch2_stripe_repair() early-returns success for stripes that are not
+degraded, leaving needs_reconcile set. But needs_reconcile on a stripe can
+only ever transition back to 0 by rewriting the stripe - which only happens
+on this same repair path, behind the stripe_degraded() check:
+
+- bch2_bkey_needs_reconcile() (fs/data/reconcile/trigger.c) returns true for
+  a stripe only when (need_rb & data_replicas) && !needs_reconcile, so for a
+  flagged-but-healthy stripe it returns 0 and bch2_bkey_set_needs_reconcile()
+  bails before set_needs_reconcile_stripe() could clear the flag.
+- fsck's check_reconcile_work only validates the opposite direction
+  (stripe_needs_reconcile_not_set).
+
+So a stripe flagged during a transient device state (bad/evacuating device
+later returning, durability churn) is reprocessed by every reconcile pass
+forever: ret == 0, no IO, no state change, and the reconcile_hipri entry and
+its accounting ("stripes pending" in reconcile status / fs usage) never go
+away. Observed on a 10-device pool: ~445k flagged stripes, reconcile_stripe
+counter in the petabytes, zero bytes moved, all other reconcile work starved.
+
+Fix: when the stripe turns out not to be degraded, write it back with
+needs_reconcile cleared. The stripe trigger then drops the reconcile_hipri
+work entry and the pending-stripe accounting.
+
+--- a/fs/data/ec/create.c
++++ b/fs/data/ec/create.c
+@@ -2320,6 +2320,21 @@
+ 	if (!stripe_degraded(c, old_s)) {
+ 		event_inc_trace(c, stripe_repair_race, buf,
+ 				bch2_bkey_val_to_text(&buf, c, s.s_c));
++		/*
++		 * needs_reconcile is sticky: the only thing that ever cleared
++		 * it was rewriting the stripe, which we only do past the
++		 * stripe_degraded() check. A stripe flagged during a transient
++		 * device state would otherwise be reprocessed by every
++		 * reconcile pass forever, changing nothing each time.
++		 *
++		 * Clear it; the stripe trigger then drops the reconcile_hipri
++		 * work entry and the pending-stripe accounting.
++		 */
++		if (old_s->needs_reconcile) {
++			struct bkey_i_stripe *u =
++				errptr_try(bch2_bkey_make_mut_typed(trans, iter, &s.s_c, 0, stripe));
++			u->v.needs_reconcile = 0;
++		}
+ 		return 0;
+ 	}
+ 
