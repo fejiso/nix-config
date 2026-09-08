@@ -180,6 +180,36 @@ in {
       };
     });
 
+    # Pin bcachefs to 1.39.5: fixes EC stripe allocation non-convergence
+    # (stripe reuse now engages instead of allocating at BCH_WATERMARK_stripe
+    # against copygc, deadlocking stripe creation on a partly-full array) and
+    # the ec_stripe_new leak on failed allocations. On 1.39.2, butthead's pool
+    # had 9.19T of stripe rework + 280G of data permanently parked in
+    # reconcile's pending queue ("watermark: stripe" allocation failures).
+    # The out-of-tree kernel module (linuxPackages.*.bcachefs) builds from
+    # bcachefs-tools.dkms, so it follows this pin automatically.
+    # Drop once nixpkgs ships >= 1.39.5.
+    bcachefs-tools = prev.bcachefs-tools.overrideAttrs (old: rec {
+      version = "1.39.5";
+      src = final.fetchFromGitHub {
+        owner = "koverstreet";
+        repo = "bcachefs-tools";
+        tag = "v${version}";
+        hash = "sha256-k9JW6GMXFwphkYGcYMwA59uafNj0EV96wTnbzeuVM1w=";
+      };
+      cargoDeps = final.rustPlatform.fetchCargoVendor {
+        inherit src;
+        hash = "sha256-hbh4+vpZtVpda2yVZK+fkdPXWd5+GYLbWYPfJsYtPfM=";
+      };
+      # 1.39.3+ installs a systemd mount generator; without an override its
+      # Makefile resolves systemdsystemgeneratordir via pkg-config into the
+      # (read-only) systemd store path and the install fails. Same fix as
+      # nixpkgs' existing PKGCONFIG_SERVICEDIR/PKGCONFIG_UDEVDIR entries.
+      makeFlags = (old.makeFlags or [ ]) ++ [
+        "PKGCONFIG_GENERATORDIR=$(out)/lib/systemd/system-generators"
+      ];
+    });
+
     # whipper 0.10.0 imports pkg_resources in 4 modules, but setuptools 81+
     # (nixpkgs-unstable ships 82) removed pkg_resources entirely. Patch the
     # imports to use stdlib importlib.metadata and packaging instead, add
