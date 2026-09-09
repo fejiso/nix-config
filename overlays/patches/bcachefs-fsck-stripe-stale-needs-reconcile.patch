@@ -1,0 +1,135 @@
+fsck: check for stale stripe needs_reconcile flags
+
+needs_reconcile on a stripe means a block sits on a bad/evacuating device
+and the stripe needs repair. But the flag is only ever cleared by
+rewriting the stripe, which bch2_stripe_repair() only does for stripes
+that are still degraded: a stripe flagged during a transient device state
+(device marked evacuating, then returned to rw) keeps the flag forever.
+
+At runtime this makes every reconcile pass reprocess the stripe - ret == 0,
+no IO, no state change - spinning reconcile_hipri indefinitely while real
+work (data pending, EC conversion) starves behind it. Observed on a
+10-device pool: ~445k flagged stripes, reconcile_stripe counter in the
+petabytes, zero bytes moved.
+
+check_reconcile_work already validates the other direction
+(stripe_needs_reconcile_not_set); make it bidirectional: a flagged stripe
+whose blocks are all on healthy devices has the flag cleared. Runs in the
+existing stripes walk, alongside check_stripe_can_widen_one(). New error
+stripe_needs_reconcile_stale, marked FSCK_AUTOFIX.
+
+Exports bch2_stripe_degraded() (was static stripe_degraded() in
+fs/data/ec/create.c) for the check.
+
+diff --git a/fs/data/ec/create.c b/fs/data/ec/create.c
+index fd0105c89..de98a8f88 100644
+--- a/fs/data/ec/create.c
++++ b/fs/data/ec/create.c
+@@ -2293,7 +2293,7 @@ err:
+ 
+ /* reconcile/resilver: */
+ 
+-static bool stripe_degraded(struct bch_fs *c, const struct bch_stripe *s)
++bool bch2_stripe_degraded(struct bch_fs *c, const struct bch_stripe *s)
+ {
+ 	for (unsigned i = 0; i < s->nr_blocks; i++)
+ 		if (bch2_dev_bad_or_evacuating(c, s->ptrs[i].dev))
+@@ -2317,7 +2317,7 @@ int bch2_stripe_repair(struct moving_context *ctxt,
+ 	BUG_ON(!btree_node_intent_locked(btree_iter_path(trans, iter), 0));
+ 
+ 	const struct bch_stripe *old_s = s.v;
+-	if (!stripe_degraded(c, old_s)) {
++	if (!bch2_stripe_degraded(c, old_s)) {
+ 		event_inc_trace(c, stripe_repair_race, buf,
+ 				bch2_bkey_val_to_text(&buf, c, s.s_c));
+ 		return 0;
+diff --git a/fs/data/ec/create.h b/fs/data/ec/create.h
+index 158c890a6..439b3cd0e 100644
+--- a/fs/data/ec/create.h
++++ b/fs/data/ec/create.h
+@@ -249,6 +249,7 @@ void bch2_new_stripes_to_text(struct printbuf *, struct bch_fs *);
+ 
+ struct moving_context;
+ int bch2_stripe_repair(struct moving_context *, struct btree_iter *, struct bkey_s_c_stripe);
++bool bch2_stripe_degraded(struct bch_fs *, const struct bch_stripe *);
+ 
+ struct wb_maybe_flush;
+ int bch2_ec_record_lost_block(struct btree_trans *, struct bkey_s_c_stripe, unsigned,
+diff --git a/fs/data/reconcile/check.c b/fs/data/reconcile/check.c
+index 6d6fd83e0..7753d221f 100644
+--- a/fs/data/reconcile/check.c
++++ b/fs/data/reconcile/check.c
+@@ -454,6 +454,42 @@ fsck_err:
+ 	return ret;
+ }
+ 
++/*
++ * needs_reconcile on a stripe means a block sits on a bad/evacuating device
++ * and the stripe needs repair. If no block does, the flag is stale - it was
++ * set during a transient device state, and since nothing at runtime clears
++ * it for a non-degraded stripe (stripe repair only rewrites degraded
++ * stripes), reconcile would reprocess the stripe on every pass forever
++ * without changing anything.
++ */
++static int check_stripe_stale_needs_reconcile(struct btree_trans *trans,
++					      struct btree_iter *iter,
++					      struct bkey_s_c k)
++{
++	struct bch_fs *c = trans->c;
++	int ret = 0;
++
++	if (k.k->type != KEY_TYPE_stripe)
++		return 0;
++
++	const struct bch_stripe *s = bkey_s_c_to_stripe(k).v;
++
++	if (!s->needs_reconcile || bch2_stripe_degraded(c, s))
++		return 0;
++
++	CLASS(printbuf, buf)();
++	prt_str(&buf, "stripe marked needs_reconcile, but is not degraded\n");
++	bch2_bkey_val_to_text(&buf, c, k);
++
++	if (fsck_err(trans, stripe_needs_reconcile_stale, "%s", buf.buf)) {
++		struct bkey_i_stripe *update =
++			errptr_try(bch2_bkey_make_mut_typed(trans, iter, &k, 0, stripe));
++		update->v.needs_reconcile = 0;
++	}
++fsck_err:
++	return ret;
++}
++
+ noinline_for_stack
+ static int check_stripe_can_widen(struct btree_trans *trans)
+ {
+@@ -473,7 +509,8 @@ static int check_stripe_can_widen(struct btree_trans *trans)
+ 			POS_MIN, BTREE_ITER_prefetch, k,
+ 			NULL, NULL, BCH_TRANS_COMMIT_no_enospc, ({
+ 		bch2_progress_update_iter(trans, &c->recovery.progress, &iter) ?:
+-		check_stripe_can_widen_one(trans, &iter, k, &cache, scan_pending);
++		check_stripe_can_widen_one(trans, &iter, k, &cache, scan_pending) ?:
++		check_stripe_stale_needs_reconcile(trans, &iter, k);
+ 	}));
+ }
+ 
+diff --git a/fs/sb/errors_format.h b/fs/sb/errors_format.h
+index 473b46cba..d1eaf09cf 100644
+--- a/fs/sb/errors_format.h
++++ b/fs/sb/errors_format.h
+@@ -381,6 +381,7 @@ enum bch_fsck_flags {
+ 	x(extent_io_opts_not_set,				330,	FSCK_AUTOFIX)	\
+ 	x(stripe_needs_reconcile_not_set,			352,	FSCK_AUTOFIX)	\
+ 	x(stripe_can_widen_wrong,				361,	FSCK_AUTOFIX)	\
++	x(stripe_needs_reconcile_stale,			433,	FSCK_AUTOFIX)	\
+ 	x(extent_io_opts_unneeded,				331,	FSCK_AUTOFIX)	\
+ 	x(reconcile_bp_to_missing_btree_ptr,			310,	FSCK_AUTOFIX)	\
+ 	x(reconcile_bp_to_leaf_node_key,			334,	FSCK_AUTOFIX)	\
+@@ -444,7 +445,7 @@ enum bch_fsck_flags {
+ 	x(stripe_reconstruct_failed,				430,	0)		\
+ 	x(data_lost_btree_node_read_error,			431,	0)		\
+ 	x(data_lost_double_allocation,				432,	0)		\
+-	x(MAX,							433,	0)
++	x(MAX,							434,	0)
+ 
+ enum bch_sb_error_id {
+ #define x(t, n, ...) BCH_FSCK_ERR_##t = n,
