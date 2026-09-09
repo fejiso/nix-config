@@ -474,11 +474,11 @@
         "polyboh": "polyboh"
       },
       "locked": {
-        "lastModified": 1788685648,
-        "narHash": "sha256-zUXr2lxKxUaQNlQtUWUebHT4eSj32GD8j/vonujyyIs=",
+        "lastModified": 1788982990,
+        "narHash": "sha256-gSqEHSKbluZbSUqQUgkxzHauLEafikh1HEejVrjFGI8=",
         "ref": "refs/heads/main",
-        "rev": "634bf49b8a1b614a40fecbabe3598ed68b166461",
-        "revCount": 78,
+        "rev": "ab236e751c3d84ea7407d595dab4c344b8330251",
+        "revCount": 79,
         "type": "git",
         "url": "ssh://forgejo@hierro.netbird.cloud:2222/fer/polystack.git"
       },
