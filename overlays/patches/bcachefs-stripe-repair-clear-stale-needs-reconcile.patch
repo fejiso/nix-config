@@ -23,9 +23,11 @@ Fix: when the stripe turns out not to be degraded, write it back with
 needs_reconcile cleared. The stripe trigger then drops the reconcile_hipri
 work entry and the pending-stripe accounting.
 
+diff --git a/fs/data/ec/create.c b/fs/data/ec/create.c
+index fd0105c89..bd468e6eb 100644
 --- a/fs/data/ec/create.c
 +++ b/fs/data/ec/create.c
-@@ -2320,6 +2320,21 @@
+@@ -2320,6 +2320,23 @@ int bch2_stripe_repair(struct moving_context *ctxt,
  	if (!stripe_degraded(c, old_s)) {
  		event_inc_trace(c, stripe_repair_race, buf,
  				bch2_bkey_val_to_text(&buf, c, s.s_c));
@@ -43,6 +45,8 @@ work entry and the pending-stripe accounting.
 +			struct bkey_i_stripe *u =
 +				errptr_try(bch2_bkey_make_mut_typed(trans, iter, &s.s_c, 0, stripe));
 +			u->v.needs_reconcile = 0;
++			try(bch2_trans_commit(trans, NULL, NULL,
++					      BCH_TRANS_COMMIT_no_enospc));
 +		}
  		return 0;
  	}
