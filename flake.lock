@@ -454,11 +454,11 @@
     "polyboh": {
       "flake": false,
       "locked": {
-        "lastModified": 1789217945,
-        "narHash": "sha256-Ug/sQnrCDSRPcvHw4huMQRiEKUOTMvMQNCXh9zyt8rY=",
+        "lastModified": 1789218353,
+        "narHash": "sha256-Q1w/QbXqYOxuE8js6s7QiKZb6Wr/cHLOusTPtDYZyfI=",
         "ref": "refs/heads/main",
-        "rev": "680b44699334fe117d0b6237645d3c397322e45e",
-        "revCount": 19,
+        "rev": "664cc6c3937d63c2982f71c2cb87b21785d34a6c",
+        "revCount": 20,
         "type": "git",
         "url": "ssh://forgejo@hierro.netbird.cloud:2222/fer/polyboh.git"
       },
@@ -474,11 +474,11 @@
         "polyboh": "polyboh"
       },
       "locked": {
-        "lastModified": 1789217956,
-        "narHash": "sha256-254w+ZjdgtYVGlKopeu4zgdrAqGK7A4jdoW5IZhNK/Y=",
+        "lastModified": 1789218364,
+        "narHash": "sha256-MlB6guq9y1oszWZpydPJHkvigkKWtbgSyS2JHZxHLrc=",
         "ref": "refs/heads/main",
-        "rev": "5211434f81fe0edbe010ead0e3875a9faac19b4e",
-        "revCount": 85,
+        "rev": "f8e938afc59f0893c7ea0f997d52d38f75f09e73",
+        "revCount": 86,
         "type": "git",
         "url": "ssh://forgejo@hierro.netbird.cloud:2222/fer/polystack.git"
       },
