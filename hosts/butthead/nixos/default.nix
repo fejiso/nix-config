@@ -26,7 +26,7 @@
     # backup-user@<hostname> by kopia-register-clients. butthead itself snapshots
     # via localhost (see backup.nix), so it must be registered here too.
     clients = [
-      "elitedex" "lenovix" "hispanas" "a8" "blacktop" "hierro" "butthead" "snuffles"
+      "elitedex" "lenovix" "hispanas" "a8" "blacktop" "tungsten" "hierro" "butthead" "snuffles"
       "rpi3" "pine64" "xpi-s905x3" "z-turn" "kr260"
     ];
   };

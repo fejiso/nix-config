@@ -18,7 +18,10 @@
       hostPublicKey = "AAAAC3NzaC1lZDI1NTE5AAAAIBgTN8rJvs9tZlSA0t3lNQX4MY15aJWUjxASTz32NdHt";
       nixPublicKey = "hierro.netbird.cloud:avFnbUhkKpj22+Xso2AWrjEZNu7m8VeeNLBvuDiv1xk=";
     };
-    blacktop = {
+    # Machine formerly known as blacktop: same disk, same SSH host key. The
+    # nix-serve key on disk was generated before the rename, so its embedded
+    # name still says "blacktop.netbird.cloud" (keygen only runs if missing).
+    tungsten = {
       hostPublicKey = "AAAAC3NzaC1lZDI1NTE5AAAAINQePaMUwEu3oPfVMg/Yk9BiX6QbDmxRBC3Icnd1GkGQ";
       nixPublicKey = "blacktop.netbird.cloud:B5ESfgNFS512fO1c6AlX3kW7L0gp77vC6FdU/KhrEEI=";
     };

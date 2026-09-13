@@ -15,7 +15,7 @@ See the "Host roles at a glance" table in README.md for the full list. In
 short:
 
 ### NixOS systems (full system + home-manager) — user: z-247
-`a8`, `blacktop`, `butthead`, `elitedex`, `hierro`, `hispanas`, `lenovix`,
+`a8`, `blacktop`, `tungsten`, `butthead`, `elitedex`, `hierro`, `hispanas`, `lenovix`,
 `snuffles`, plus ARM/SD-image hosts `pine64`, `rpi3`, `xpi-s905x3`.
 
 ### Non-NixOS systems (home-manager only) — user: superfer/ubuntu
