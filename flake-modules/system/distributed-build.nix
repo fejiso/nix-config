@@ -24,6 +24,13 @@ let
       supportedFeatures = [ "kvm" "big-parallel" ];
       alwaysOn = true;  # Always available for cache
     };
+    tungsten = {
+      system = "x86_64-linux";
+      maxJobs = 4;
+      speedFactor = 1;  # Laptop
+      supportedFeatures = [ "kvm" ];
+      alwaysOn = false;  # Laptop, not always on
+    };
     blacktop = {
       system = "x86_64-linux";
       maxJobs = 4;

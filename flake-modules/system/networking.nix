@@ -9,6 +9,8 @@
 }: {
   # Enable networking
   networking.networkmanager.enable = true;
+  # Use iwd as the wifi backend instead of wpa_supplicant
+  networking.networkmanager.wifi.backend = "iwd";
 
   # DNS configuration - DNS-over-TLS via systemd-resolved.
   # Mullvad belongs only in fallbackDns below: its public DNS refuses plain

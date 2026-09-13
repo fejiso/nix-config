@@ -121,7 +121,7 @@
   # API only on the netbird mesh: http://hierro.netbird.cloud:8079
   services.llama-rpc.master = {
     enable = true;
-    workers = [ "butthead" "elitedex" "blacktop" ];
+    workers = [ "butthead" "elitedex" "blacktop" "tungsten" ];
     # Public GGUF; change to whatever model you want (downloaded once to
     # /var/lib/llama-models by llama-rpc-model-fetch).
     modelUrl = "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf";

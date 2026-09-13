@@ -20,7 +20,7 @@ them. See [Repository Structure](#repository-structure) below.
 This flake-based configuration supports:
 
 - **x86_64 NixOS systems**: `elitedex`, `lenovix`, `hispanas`, `a8`, `blacktop`,
-  `hierro`, `butthead`, `snuffles`
+  `tungsten`, `hierro`, `butthead`, `snuffles`
 - **ARM NixOS systems**: `rpi3` (Raspberry Pi 3), `pine64` (Pine64 SBC),
   `xpi-s905x3` (Amlogic S905X3 TV box) — all aarch64 — plus `z-turn`
   (MYIR Z-turn, Xilinx Zynq-7020 FPGA SoC, **armv7l**, cross-compiled with the
@@ -128,6 +128,7 @@ automatically. ARM hosts pass `sdImage = true` to also get `images.<name>`.
 | `elitedex`   | x86_64-linux    | NixOS           | Desktop + emulation |
 | `lenovix`    | x86_64-linux    | NixOS           | Minimal laptop |
 | `blacktop`   | x86_64-linux    | NixOS           | Desktop/laptop, development, tdarr worker, ADS-B |
+| `tungsten`   | x86_64-linux    | NixOS           | ThinkPad P16 Gen 2 (iGPU + RTX 3500 Ada), development, tdarr worker, ADS-B |
 | `butthead`   | x86_64-linux    | NixOS           | Media/download/container hub (quadlet, nspawn, tdarr) |
 | `hierro`     | x86_64-linux    | NixOS           | Build host, development, OpenClaw |
 | `hispanas`   | x86_64-linux    | NixOS           | SDR (NovaSDR), desktop, development |
