@@ -129,6 +129,7 @@
       btop
       nmon
       lshw
+      sysstat
       pciutils # lspci
       usbutils # lsusb
       tree

@@ -29,7 +29,7 @@
   {
     device = "/dev/disk/by-uuid/80309343-96df-4957-af44-31dba7b0ebc0";
     fsType = "bcachefs";
-    options = [ "nofail" "x-systemd.automount" "x-systemd.idle-timeout=600" "compression=lz4" "background_compression=zstd" ];
+    options = [ "nofail" "x-systemd.automount" "x-systemd.idle-timeout=600" ];
   };
 
   swapDevices =
