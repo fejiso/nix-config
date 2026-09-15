@@ -58,7 +58,9 @@ in
 
       serviceConfig = {
         Restart = "always";
-        RestartSec = "15min";
+        # 15min turns any transient start failure (e.g. a failed ExecStartPre
+        # pull) into a long outage.
+        RestartSec = "30s";
         Type = "simple";
         User = "nginx-proxy-manager";
         Group = "nginx-proxy-manager";
@@ -78,6 +80,36 @@ in
         ExecStart = "${pkgs.bash}/bin/bash -c 'set -x; ${pkgs.podman}/bin/podman run --rm --name nginx-proxy-manager --label io.containers.autoupdate=registry --log-driver=journald --memory=1G --network=slirp4netns:allow_host_loopback=true -p 8102:81 -p 8002:80 -p 44302:443 -v /var/lib/npm-storage/data:/data:rw -v /var/lib/npm-storage/letsencrypt:/etc/letsencrypt:rw -e DB_SQLITE_FILE=/data/database.sqlite docker.io/jc21/nginx-proxy-manager:latest'";
 
         ExecStop = "${pkgs.podman}/bin/podman stop -t 10 nginx-proxy-manager";
+      };
+    };
+
+    # Watchdog: the rootless forwarding path (slirp4netns + rootlessport) can
+    # wedge while the container itself stays "healthy", making proxied services
+    # unreachable. Curl the forwarded admin port and restart the unit (fresh
+    # netns + forwarders) when it stops answering.
+    systemd.services.nginx-proxy-manager-watchdog = {
+      description = "Restart nginx-proxy-manager if its forwarded port stops responding";
+      serviceConfig = {
+        Type = "oneshot";
+        ExecStart = pkgs.writeShellScript "nginx-proxy-manager-watchdog" ''
+          set -eu
+          # Skip while the unit is (re)starting/inactive — the daily
+          # podman-auto-update restart is expected downtime.
+          ${pkgs.systemd}/bin/systemctl is-active --quiet nginx-proxy-manager.service || exit 0
+          if ! ${pkgs.curl}/bin/curl -fsS -m 10 -o /dev/null http://localhost:8102/; then
+            echo "nginx-proxy-manager not responding on :8102 — restarting"
+            ${pkgs.systemd}/bin/systemctl restart nginx-proxy-manager.service
+          fi
+        '';
+      };
+    };
+
+    systemd.timers.nginx-proxy-manager-watchdog = {
+      description = "Periodic nginx-proxy-manager liveness check";
+      wantedBy = [ "timers.target" ];
+      timerConfig = {
+        OnBootSec = "2min";
+        OnUnitActiveSec = "1min";
       };
     };
 

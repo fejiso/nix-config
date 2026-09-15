@@ -135,8 +135,15 @@ in {
     settings = {
       auto_sync = true;
       sync_frequency = "5m";
+      # Self-hosted atuin server (devdesktop). mkDefault so devdesktop and
+      # work-laptop's host-level sync_address overrides still win.
+      sync_address = lib.mkDefault "http://superfer.aka.corp.amazon.com:8888";
       key_path = config.sops.secrets.atuin-key.path;
       filter_mode_shell_up_key_binding = "session";
+      # Sync server can be slow to reach (netbird mesh); default 5s connect
+      # timeout is too short.
+      network_timeout = 30;
+      network_connect_timeout = 30;
     };
   };
 
