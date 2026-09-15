@@ -56,7 +56,7 @@ in {
     nix-direnv.enable = true;
   };
   
-  programs.kilocode.enable = lib.mkDefault true;
+  programs.kilocode.enable = lib.mkDefault false;
   programs.pi-agent.enable = lib.mkDefault true;
 
   # Neovim configuration with LazyVim
