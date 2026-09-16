@@ -12,12 +12,6 @@
 
     home.stateVersion = "25.05";
 
-    # Intentional split: 26.05 system + unstable home pkgs (the global
-    # _module.args.pkgs override). HM-as-a-nixos-module always evaluates against
-    # the system's 26.05 nixpkgs, so the version-mismatch warning is inherent and
-    # cosmetic — silence it, same as the `default` home does in home/base.nix.
-    home.enableNixpkgsReleaseCheck = false;
-
     # The generated HM manual is useless on a headless board; skip it.
     manual.manpages.enable = false;
     manual.html.enable = false;
@@ -60,6 +54,7 @@
     };
     programs.atuin = {
       enable = true;
+      package = lib.mkDefault pkgs.unstable.atuin;
       enableFishIntegration = false;
       settings.auto_sync = false;
     };

@@ -22,7 +22,10 @@ let
       maxJobs = 2;
       speedFactor = 3;  # Server with good CPU
       supportedFeatures = [ "kvm" "big-parallel" ];
-      alwaysOn = true;  # Always available for cache
+      alwaysOn = true;
+      # nix-serve currently accepts connections but stalls responses. Keep
+      # hierro as a builder, but stop peers from querying it as a substituter.
+      serveCache = false;
     };
     tungsten = {
       system = "x86_64-linux";

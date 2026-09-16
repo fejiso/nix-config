@@ -12,6 +12,8 @@
   system.primaryUser = "superfer";
 
   nixpkgs.config.allowUnfree = true;
+  # Stable base with pkgs.unstable available for explicit package exceptions.
+  nixpkgs.overlays = [ outputs.overlays.unstable-packages ];
 
   # Nix configuration
   nix = {

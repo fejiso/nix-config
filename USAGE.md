@@ -4,9 +4,9 @@ This configuration supports multiple systems with shared common configuration
 (dendritic flake-parts layout — see README.md for the full architecture).
 
 **System Versions:**
-- **NixOS**: 26.05 (stable, `nixos-26.05`); `nixpkgs-unstable` and
-  `nixpkgs-master` are available as extra inputs for selective pinning
-- **Home Manager**: `release-26.05`
+- **NixOS**: 26.05 (stable, `nixos-26.05`); `nixpkgs-unstable` is
+  reserved for explicit per-package exceptions
+- **Home Manager**: `release-26.05`, using the same stable nixpkgs by default
 - **Darwin**: nix-darwin against the same nixpkgs
 
 ## Systems

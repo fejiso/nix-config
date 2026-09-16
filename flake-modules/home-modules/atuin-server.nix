@@ -31,7 +31,9 @@ in {
   };
 
   config = mkIf cfg.enable {
-    home.packages = [ pkgs.atuin ];
+    # Follow unstable like the atuin client (client/server versions should
+    # track each other).
+    home.packages = [ pkgs.unstable.atuin ];
 
     xdg.configFile."atuin/server.toml".text = ''
       host = "${cfg.host}"
@@ -46,7 +48,7 @@ in {
         After = [ "network.target" ];
       };
       Service = {
-        ExecStart = "${pkgs.atuin}/bin/atuin server start";
+        ExecStart = "${pkgs.unstable.atuin}/bin/atuin server start";
         Restart = "on-failure";
         RestartSec = 5;
       };

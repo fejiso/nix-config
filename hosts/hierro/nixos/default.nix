@@ -87,7 +87,19 @@
       ExecStart = "${pkgs.systemd}/bin/loginctl enable-linger z-247";
     };
   };
-  networking.firewall.interfaces.wt0.allowedTCPPorts = [ 3004 ]; # silverbullet (user service)
+  networking.firewall.interfaces.wt0.allowedTCPPorts = [ 3004 8888 ]; # silverbullet (user service), atuin
+
+  # Atuin sync server for the personal fleet. Clients get the address from the
+  # global default in flake-modules/home/shell.nix; only reachable on the
+  # netbird mesh (firewall opens 8888 on wt0 only).
+  services.atuin = {
+    enable = true;
+    host = "0.0.0.0";
+    port = 8888;
+    # Personal single-user server; needed so each host can register its account.
+    openRegistration = true;
+    # Default: local postgres (database.createLocally = true).
+  };
 
   # Hourly flake builder — builds all host closures so nix-serve can distribute them
   systemd.services.nix-builder = {

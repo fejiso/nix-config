@@ -6,21 +6,21 @@
     flake-parts.url = "github:hercules-ci/flake-parts";
     import-tree.url = "github:vic/import-tree";
 
-    # Nixpkgs
+    # Nixpkgs: stable by default; unstable only for explicit per-package picks.
     nixpkgs.url = "github:nixos/nixpkgs/nixos-26.05";
     nixpkgs-unstable.url = "github:nixos/nixpkgs/nixos-unstable";
 
-    # Home manager — track master (unstable) so the HM modules match the
-    # unstable home `pkgs` (see system/home-manager.nix). The system stays on
-    # nixpkgs 26.05; only the home realm rides unstable.
-    home-manager.url = "github:nix-community/home-manager";
-    home-manager.inputs.nixpkgs.follows = "nixpkgs-unstable";
+    # Home Manager tracks the same stable nixpkgs as the system by default.
+    # Use `pkgs.unstable` selectively for packages that need to move faster.
+    home-manager.url = "github:nix-community/home-manager/release-26.05";
+    home-manager.inputs.nixpkgs.follows = "nixpkgs";
 
     # Hardware configurations for NixOS
     nixos-hardware.url = "github:NixOS/nixos-hardware/master";
 
-    # Darwin support for macOS
-    nix-darwin.url = "github:LnL7/nix-darwin";
+    # Darwin support for macOS, also on stable nixpkgs by default
+    nix-darwin.url = "github:nix-darwin/nix-darwin/nix-darwin-26.05";
+    nix-darwin.inputs.nixpkgs.follows = "nixpkgs";
 
     # Secrets management
     sops-nix.url = "github:Mic92/sops-nix";
@@ -46,7 +46,7 @@
     # Airspy ADS-B source
     airspy-adsb-bin.url = "github:fejiso/airspy_adsb/master";
 
-    # Noctalia desktop shell
+    # Noctalia desktop shell (fast-moving; intentional unstable exception)
     noctalia = {
       url = "github:noctalia-dev/noctalia";
       inputs.nixpkgs.follows = "nixpkgs-unstable";
