@@ -124,20 +124,25 @@ in {
     nix-direnv.enable = true;
   };
 
-  home.packages = [ pkgs.socat pkgs.bubblewrap pkgs.pv pkgs.brotli ];
+  home.packages =
+    [ pkgs.socat pkgs.pv pkgs.brotli ]
+    ++ lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.bubblewrap ];
 
   # Atuin shell history
   programs.atuin = {
     enable = true;
+    # Fast-moving; follow unstable (targeted exception, like antigravity-cli).
+    package = lib.mkDefault pkgs.unstable.atuin;
     enableFishIntegration = true;
     enableBashIntegration = true;
     enableZshIntegration = true;
     settings = {
       auto_sync = true;
       sync_frequency = "5m";
-      # Self-hosted atuin server (devdesktop). mkDefault so devdesktop and
-      # work-laptop's host-level sync_address overrides still win.
-      sync_address = lib.mkDefault "http://superfer.aka.corp.amazon.com:8888";
+      # Self-hosted atuin server for the personal fleet (hierro, netbird mesh
+      # only). mkDefault so devdesktop/work-laptop/gravidesktop's host-level
+      # sync_address overrides (work server) still win.
+      sync_address = lib.mkDefault "http://hierro.netbird.cloud:8888";
       key_path = config.sops.secrets.atuin-key.path;
       filter_mode_shell_up_key_binding = "session";
       # Sync server can be slow to reach (netbird mesh); default 5s connect
@@ -153,6 +158,8 @@ in {
 
   programs.antigravity-cli = {
     enable = lib.mkDefault true;
+    # Not packaged in nixos-26.05; keep this as a targeted unstable exception.
+    package = lib.mkDefault pkgs.unstable.antigravity-cli;
   };
   
   # Starship prompt

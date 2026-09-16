@@ -37,9 +37,9 @@ This flake-based configuration supports:
 
 ## Channels & toolchain
 
-- **nixpkgs**: `nixos-26.05` (stable), with `nixpkgs-unstable` and
-  `nixpkgs-master` available as additional inputs for selective pinning
-- **home-manager**: `release-26.05`
+- **nixpkgs**: `nixos-26.05` (stable), with `nixpkgs-unstable` reserved
+  for explicit per-package exceptions
+- **home-manager**: `release-26.05`, using the same stable nixpkgs by default
 - **Deployment**: [Colmena](https://github.com/zhaofengli/colmena) for NixOS
   hosts and [deploy-rs](https://github.com/serokell/deploy-rs) for
   home-manager activations on foreign distros
@@ -369,8 +369,8 @@ nix flake update home-manager nixos-hardware sops-nix
 nix flake metadata
 ```
 
-Key inputs: `nixpkgs` (26.05), `nixpkgs-unstable`, `nixpkgs-master`,
-`home-manager`, `flake-parts`, `import-tree`, `nixos-hardware`, `nix-darwin`,
+Key inputs: `nixpkgs` (26.05), `nixpkgs-unstable`, `home-manager`,
+`flake-parts`, `import-tree`, `nixos-hardware`, `nix-darwin`,
 `sops-nix`, `colmena`, `deploy-rs`, `quadlet-nix`, `airspy-adsb-bin`.
 
 ### Inspecting flake outputs

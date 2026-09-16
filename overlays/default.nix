@@ -42,8 +42,10 @@ in {
     # A standalone terminal coding agent, AND the credential source the
     # pi-kimi-coder extension auto-imports (reads ~/.kimi/credentials/). Bundles
     # four deps nixpkgs lacks (kosong/pykaos/streamingjson/ripgrepy). See
-    # pkgs/kimi-cli/.
-    kimi-cli = final.callPackage ../pkgs/kimi-cli { };
+    # pkgs/kimi-cli/. Not packaged in nixpkgs, so we build our vendored
+    # expression against the UNSTABLE package set (python deps move fast;
+    # the wheel version itself is still pinned manually in pkgs/kimi-cli).
+    kimi-cli = final.unstable.callPackage ../pkgs/kimi-cli { };
 
     # Xilinx forks for the MYIR Z-turn (Zynq-7020). Cross-compile when the
     # consuming config is armv7l (z-turn). See pkgs/zynq/.

@@ -16,13 +16,15 @@
           (builtins.pathExists "${inputs.self}/hosts/${hostname}/home")
           "${inputs.self}/hosts/${hostname}/home";
 
-        # Import nixpkgs-unstable with the SAME platform shape as the system: a
+        # Import stable nixpkgs with the SAME platform shape as the system: a
         # cross set on cross hosts (e.g. armv7l z-turn), native otherwise. A plain
         # `system = hostPlatform.system` would build the home as a *native* target
         # set, so build-time tools (pandoc for eza's manpages → GHC) resolve to
         # the target arch and fail to bootstrap. Native hosts (build == host) get
         # the identical `localSystem`-only set as before, so no rebuild for them.
-        _module.args.pkgs = lib.mkForce (import inputs.nixpkgs-unstable (
+        # The unstable-packages overlay below remains available as `pkgs.unstable`
+        # for deliberate per-package exceptions.
+        _module.args.pkgs = lib.mkForce (import inputs.nixpkgs (
           {
             config = {
               allowUnfree = true;

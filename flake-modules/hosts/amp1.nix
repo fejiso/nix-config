@@ -6,6 +6,9 @@
       pkgs = import inputs.nixpkgs {
         system = "aarch64-linux";
         config.allowUnfree = true;
+        # Stable base with pkgs.unstable available for the explicit exceptions
+        # used by shared home modules (e.g. antigravity-cli).
+        overlays = [ inputs.self.overlays.unstable-packages ];
       };
       extraSpecialArgs = {
         inherit inputs;

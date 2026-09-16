@@ -1,9 +1,5 @@
 { ... }: {
   flake.modules.homeManager.default = { inputs, outputs, lib, config, pkgs, hostname, ... }: {
-    home = {
-      enableNixpkgsReleaseCheck = false;
-    };
-
     home.packages = with pkgs; [
       htop btop tree pstree wget curl unzip zip jq ripgrep fd bat eza zoxide broot fzf nmap
       zellij fish weechat

@@ -7,13 +7,13 @@ in {
   config,
   lib,
   pkgs,
-  inputs,
   ...
 }: {
   imports = [
     # opencode + OpenRouter, dev machines only
     homeModules.opencode
-    # Kilo Code VS Code extension
+    # Kilo Code CLI (disabled below; keep options available for hosts that
+    # override package/provider settings)
     homeModules.kilocode
     # pi coding agent
     homeModules.pi-agent
@@ -74,7 +74,7 @@ in {
       ripgrep
       fd
       nodejs
-      inputs.nixpkgs-unstable.legacyPackages.${pkgs.stdenv.hostPlatform.system}.tree-sitter
+      tree-sitter
 
       # Language servers (already in development tools but explicit here)
       lua-language-server
