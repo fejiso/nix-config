@@ -24,3 +24,6 @@ Thumbs.db
 zturn.img
 /result
 .gemini/
+
+# root-owned perf captures break non-root flake eval
+perf.data*

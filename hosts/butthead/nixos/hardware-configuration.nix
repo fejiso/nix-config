@@ -55,7 +55,11 @@
   fileSystems."/mnt/bcachefs" =
     { device = "/dev/disk/by-uuid/de105d4d-df96-444c-8fdb-b616c589a422";
       fsType = "bcachefs";
-      options = [ "compression=lz4" "background_compression=zstd" "relatime" "discard" "nofail" ];
+      # TEMP: "noauto" added 2026-09-16 - boot-time mount re-triggers a copygc
+      # write deadlock within minutes; pool must stay unmounted so the stale
+      # stripe-bucket repair (check_allocations) can run offline. Remove once
+      # dev-6 (sdj1) is out of the pool.
+      options = [ "compression=lz4" "background_compression=zstd" "relatime" "discard" "nofail" "noauto" ];
     };
 
   # Bind-mount the bcachefs pool at /mnt/user (media layout)
