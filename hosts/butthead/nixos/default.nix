@@ -49,6 +49,28 @@
   # bcachefs support (kernel module + bcachefs-tools)
   hardware.bcachefs-support.enable = true;
 
+  # Stale needs_reconcile fix (patch A, proven on hispanas - see
+  # bcachefs-patchz.md/disks.md): bch2_stripe_repair() early-returns on
+  # non-degraded stripes without clearing needs_reconcile, so stripes flagged
+  # during transient device states spin in reconcile_hipri forever and starve
+  # real repair work. On butthead this additionally wedged the pool on two
+  # consecutive mounts (1.39.5 and vanilla 1.39.6): reconcile parked in
+  # closure_sync_unbounded processing the ~445k-stripe hipri backlog,
+  # deadlocking wb_flush/ec_stripe_create/copygc behind btree node locks -
+  # writes crawled to ~0.7MB/s and `device remove 6` could never drain its
+  # 6152 dead stripe buckets. stripe_degraded() counts evacuating devices as
+  # degraded, so the dev-6 removal path is unaffected by this patch.
+  # Drop when fixed upstream.
+  nixpkgs.overlays = [
+    (_final: prev: {
+      bcachefs-tools = prev.bcachefs-tools.overrideAttrs (old: {
+        patches = (old.patches or [ ]) ++ [
+          ../../../overlays/patches/bcachefs-stripe-repair-clear-stale-needs-reconcile.patch
+        ];
+      });
+    })
+  ];
+
   # llama.cpp RPC worker for hierro's distributed inference master
   # (CUDA build compiles from source on first deploy)
   services.llama-rpc.worker = {
@@ -85,6 +107,14 @@
   # Hibernation configuration
   boot.resumeDevice = "/dev/disk/by-uuid/2ae17721-d56e-4707-90af-9d17b37a14c7";
   boot.kernelParams = [ "resume_offset=3987983" "nvme_core.default_ps_max_latency_us=0" ];
+
+  # Cap the writeback backlog so a burst can't queue gigabytes of dirty pages
+  # and stall every writer (absolute caps override vm.dirty_ratio; 4.5G was
+  # observed queued with the default 20%-of-RAM ratio on the QLC NVMe root)
+  boot.kernel.sysctl = {
+    "vm.dirty_bytes" = 1073741824; # 1 GiB
+    "vm.dirty_background_bytes" = 268435456; # 256 MiB
+  };
 
   # Host-specific networking
   networking.hostName = "butthead";
