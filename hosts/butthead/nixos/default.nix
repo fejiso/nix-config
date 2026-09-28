@@ -12,6 +12,7 @@
     ./hardware-configuration.nix
     ./polystack.nix
     ./homepage.nix
+    ./bor-node.nix
   ];
 
   # Enable quadlet-based containers
@@ -60,12 +61,32 @@
   # writes crawled to ~0.7MB/s and `device remove 6` could never drain its
   # 6152 dead stripe buckets. stripe_degraded() counts evacuating devices as
   # degraded, so the dev-6 removal path is unaffected by this patch.
+  # The second patch (device-remove-dead-stripes) fixes two removal dead
+  # ends proven in ktest (see bcachefs-patchz.md "Patch C"): repair never
+  # reaped degraded-but-empty stripes, and the removal scan loop outran the
+  # reconcile repair it enqueues (10 rapid scans, no waiting).
+  # The third patch (device-remove-orphan-stripe-buckets) sweeps stripe
+  # buckets whose stripe key is gone (1.39.5-era fold-bug orphans: no stripe
+  # key, no backpointer) when the removal scan stalls - butthead's dev-6 has
+  # 6152 of them, verified via list -b stripes 2026-09-19.
   # Drop when fixed upstream.
+  # The fourth patch (userspace-percpu-thread-cap) is TOOLS-ONLY (linux/
+  # shim, not the kernel module): offline fsck aborts mid-repair with
+  # "bch_percpu_thread_init: too many threads (max 256)" -> SIGABRT -
+  # every short-lived workqueue worker permanently burns one of 256
+  # percpu slots, and a repair run with thousands of fixes on slow
+  # devices spawns more than that. Hit twice on butthead 2026-09-20
+  # during check_reconcile_work; slots are NORESERVE address space so
+  # the cap is raised to 8192. Drop when upstream releases slots of
+  # exited threads.
   nixpkgs.overlays = [
     (_final: prev: {
       bcachefs-tools = prev.bcachefs-tools.overrideAttrs (old: {
         patches = (old.patches or [ ]) ++ [
           ../../../overlays/patches/bcachefs-stripe-repair-clear-stale-needs-reconcile.patch
+          ../../../overlays/patches/bcachefs-device-remove-dead-stripes.patch
+          ../../../overlays/patches/bcachefs-device-remove-orphan-stripe-buckets.patch
+          ../../../overlays/patches/bcachefs-userspace-percpu-thread-cap.patch
         ];
       });
     })
@@ -304,7 +325,7 @@
 
   # Open NFS ports in firewall
   networking.firewall = {
-    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 3002 4743 8096 8080 8989 7878 8686 9696 5299 8081 8112 3344 8000 8010 11434 3003 8084 6080 8188 29999 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009 ];
+    allowedTCPPorts = [ 2049 111 20048 8102 8002 44302 8003 44303 3002 4743 8096 8080 8989 7878 8686 9696 5299 8081 8112 3344 8000 8010 11434 3003 8084 6080 8188 29999 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009 ];
     allowedUDPPorts = [ 2049 111 20048 ];
   };
 

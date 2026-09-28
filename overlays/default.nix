@@ -30,6 +30,10 @@ let
 in {
   # This one brings our custom packages from the 'pkgs' directory
   additions = final: prev: {
+    # Polygon node stack (butthead bor-node.nix): upstream release binaries.
+    bor = final.callPackage ../pkgs/bor { };
+    heimdall-v2 = final.callPackage ../pkgs/heimdall-v2 { };
+
     # LazyPi — opinionated one-shot installer that sets up the Pi coding agent
     # with a curated catalog of extensions, skills, prompt templates, and themes
     # (sub-agents, MCP, web access, memory, plan, diff review, powerbar, usage
