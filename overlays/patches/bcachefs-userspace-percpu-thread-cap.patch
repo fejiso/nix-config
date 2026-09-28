@@ -1,0 +1,60 @@
+From: butthead fsck incident 2026-09-20
+Subject: [PATCH] tools: raise userspace percpu thread cap 256 -> 8192
+
+Userspace fsck on a large multi-device filesystem aborts with
+
+    bch_percpu_thread_init: too many threads (max 256)
+    bcachefs: fatal SIGABRT
+
+mid-repair (observed twice in check_reconcile_work while fixing
+stripe_needs_reconcile_not_set on a 10-device pool).
+
+Every OS thread that touches fs code takes a PERMANENT slot via
+bch_percpu_thread_init() - slots are never released on thread exit -
+while workqueue worker pools in the userspace shim grow on demand up
+to WQ_DFL_ACTIVE (256) per queue when work blocks. A repair run doing
+thousands of transaction commits on slow devices grows flush/write
+queues to hundreds of short-lived workers; 256 slots are exhausted and
+fsck dies mid-pass, leaving the filesystem unclean.
+
+The cap is only the size of the chunk-pointer registry plus the abort
+check; chunks are 256MB NORESERVE anonymous mappings, i.e. address
+space, not memory (pages fault in as touched). 8192 slots = 2TB of
+reserved VA on 64-bit, well within the 128TB user address space, and
+gives 32x headroom over the observed failure.
+
+A proper fix (reusing slots of exited threads, with care for stale
+percpu counters and lock-free readers of the chunk registry) is left
+for upstream; this unblocks long userspace repair runs.
+
+Reproduced on bcachefs-tools 1.39.6, 32-core machine, 10-device pool:
+two consecutive offline fsck runs died after ~6.1k and ~4.2k committed
+repairs respectively.
+
+Signed-off-by: z-247
+---
+ include/linux/percpu.h | 12 +++++++++++-
+ 1 file changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/include/linux/percpu.h b/include/linux/percpu.h
+--- a/include/linux/percpu.h
++++ b/include/linux/percpu.h
+@@ -40,7 +40,17 @@ extern char __start_bch_percpu[], __stop_bch_percpu[];
+ 
+ #define DECLARE_PER_CPU(type, name)	extern type name
+ 
+-#define BCH_PERCPU_MAX_CPUS	256
++/*
++ * Slots are never released: every thread that calls
++ * bch_percpu_thread_init() holds its slot until process exit, and
++ * userspace workqueue pools spawn fresh short-lived workers under
++ * blocking load (up to WQ_DFL_ACTIVE per queue). Long repair runs
++ * (offline fsck with thousands of fixes on slow devices) exhaust 256
++ * slots and abort mid-pass. Chunks are NORESERVE address space, not
++ * memory - be generous; 8192 x 256MB = 2TB reserved VA, fine on
++ * 64-bit.
++ */
++#define BCH_PERCPU_MAX_CPUS	8192
+ 
+ /*
+  * Per-thread chunk layout: [static_section][dynamic_arena].

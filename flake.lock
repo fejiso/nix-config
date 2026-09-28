@@ -182,6 +182,19 @@
         "type": "github"
       }
     },
+    "ingress-secrets": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1790580157,
+        "narHash": "sha256-R+fAe9L8yIEWna3eRNeCBjksr4LUxHxMiADMGzKYQXo=",
+        "path": "/var/lib/fleet-secrets",
+        "type": "path"
+      },
+      "original": {
+        "path": "/var/lib/fleet-secrets",
+        "type": "path"
+      }
+    },
     "nix-darwin": {
       "inputs": {
         "nixpkgs": [
@@ -442,10 +455,10 @@
     "polyboh": {
       "flake": false,
       "locked": {
-        "lastModified": 1790243837,
-        "narHash": "sha256-4RxnIUXRl7Xikwn1GcKqojDUnntDUnf6bm1Olulm5o4=",
+        "lastModified": 1790536258,
+        "narHash": "sha256-TCL0wtebfjflXdvN9XmzdL33K7EPLQCTKxRp8Sv+jlU=",
         "ref": "refs/heads/main",
-        "rev": "1fa9a9898835661125077e1eea21fede37dede41",
+        "rev": "8ca8360f7f9d8f7a077c21eb33768c8edd31aea7",
         "revCount": 26,
         "type": "git",
         "url": "ssh://forgejo@hierro.netbird.cloud:2222/fer/polyboh.git"
@@ -462,10 +475,10 @@
         "polyboh": "polyboh"
       },
       "locked": {
-        "lastModified": 1790243867,
-        "narHash": "sha256-pEQHxNi8Eug0etBChySdH96QcO9XWYHhByzd40wF2NE=",
+        "lastModified": 1790538452,
+        "narHash": "sha256-nxPXza5l0dZQhiQ6+sBdDMXII4chkOArMQnmtEWJvj0=",
         "ref": "refs/heads/main",
-        "rev": "61e51d20aa2eb786dd1174a7294ec32021792599",
+        "rev": "37966f9fda364fe95a4e8ad8588c70d9a431f7da",
         "revCount": 100,
         "type": "git",
         "url": "ssh://forgejo@hierro.netbird.cloud:2222/fer/polystack.git"
@@ -498,6 +511,7 @@
         "flake-parts": "flake-parts",
         "home-manager": "home-manager",
         "import-tree": "import-tree",
+        "ingress-secrets": "ingress-secrets",
         "nix-darwin": "nix-darwin",
         "nix-fpga": "nix-fpga",
         "nix-gowin-eda": "nix-gowin-eda",

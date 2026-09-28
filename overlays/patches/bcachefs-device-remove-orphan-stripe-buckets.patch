@@ -1,0 +1,161 @@
+ec: reap orphaned stripe buckets during device removal
+
+A stripe torn down without dropping its bucket refs (e.g. the old-stripe
+fold bug fixed by b1f067414 "ec: sync the old-stripe fold on every path
+out of ec_stripe_create()") leaves a bucket with data_type == stripe that
+no stripe key references. Such a bucket has no live backpointer, so
+bch2_dev_data_drop_by_backpointers() can never reach it, and with no
+stripe key nothing else ever frees it: the device's bucket count never
+drains and removal fails with
+remove_by_backpointer_did_not_terminate no matter how long reconcile is
+given.
+
+Observed on a 10-device pool (bcachefs 1.39.6): 6152 such buckets on an
+evacuated device, surviving reboots and repeated removal attempts; zero
+stripe keys referencing the device (verified via list -b stripes), zero
+needs_reconcile flags. fsck's check_allocations would repair this, but
+that requires unmounting; the removal path should handle it.
+
+Fix: when the data-drop scan stalls, sweep the departing device's alloc
+btree for stripe buckets and, for each, chase every bucket_to_stripe ref
+to its stripe key. If no ref resolves to a stripe that references the
+bucket, the bucket is dead bookkeeping: reset the alloc key (absolute
+stripe_refcount = 0 and dirty_sectors = 0, so a transaction restart
+retry can't double-decrement) and drop the stale bucket_to_stripe refs.
+The alloc trigger re-derives free/need_discard on commit, draining the
+device's bucket count so the removal loop sees progress again.
+
+Open buckets (in-flight stripe creates) are skipped, and the alloc key
+update conflicts with any concurrent create commit, forcing a restart
+that re-validates the orphan check.
+
+--- a/fs/data/ec/init.c
++++ b/fs/data/ec/init.c
+@@ -469,6 +469,99 @@
+ 	return ret;
+ }
+ 
++/*
++ * Orphaned stripe bucket sweep, for device removal.
++ *
++ * A stripe torn down without dropping its bucket refs (e.g. the old-stripe
++ * fold bug fixed by b1f067414, "ec: sync the old-stripe fold on every path
++ * out of ec_stripe_create()") leaves a bucket with data_type == stripe that
++ * no stripe key references: it has no live backpointer, so the removal's
++ * backpointer scan can never reach it, and with no stripe key nothing else
++ * ever frees it - the device can never empty.
++ *
++ * For each stripe bucket on the device, chase every bucket_to_stripe ref to
++ * its stripe key. If no ref resolves to a stripe that references the bucket,
++ * the bucket is dead bookkeeping: reset the alloc key and drop the stale
++ * refs; the alloc trigger re-derives free/need_discard on commit. Buckets a
++ * live stripe still references are owned by the invalidate/repair path and
++ * left alone.
++ */
++static int free_orphan_stripe_bucket(struct btree_trans *trans,
++				     struct bch_dev *ca,
++				     struct bpos bucket)
++{
++	struct bch_fs *c = trans->c;
++	struct bkey_s_c k;
++	bool orphan = true;
++	int ret = 0;
++
++	/* In-flight creates own their buckets - never touch them: */
++	if (bch2_bucket_is_open_safe(c, bucket.inode, bucket.offset))
++		return 0;
++
++	for_each_btree_key_max_norestart(trans, iter, BTREE_ID_bucket_to_stripe,
++				  POS(bucket_to_u64(bucket), 0),
++				  POS(bucket_to_u64(bucket), U64_MAX),
++				  0, k, ret) {
++		if (!orphan)
++			continue;
++
++		CLASS(btree_iter, s_iter)(trans, BTREE_ID_stripes,
++					  POS(0, k.k->p.offset), 0);
++		struct bkey_s_c sk = bkey_try(bch2_btree_iter_peek_slot(&s_iter));
++
++		if (sk.k->type == KEY_TYPE_stripe &&
++		    bucket_matches_stripe(c, bucket, bkey_s_c_to_stripe(sk).v))
++			orphan = false;
++	}
++	try(ret);
++
++	if (!orphan)
++		return 0;
++
++	struct bkey_i_alloc_v4 *a =
++		errptr_try(bch2_trans_start_alloc_update(trans, bucket, 0));
++
++	/* Lost a race with something that already fixed it: */
++	if (a->v.data_type != BCH_DATA_stripe)
++		return 0;
++
++	/*
++	 * Absolute reset, not refcount--; a restart retry must not
++	 * double-decrement, and the alloc trigger re-derives
++	 * free/need_discard on commit:
++	 */
++	a->v.stripe_refcount = 0;
++	a->v.dirty_sectors = 0;
++
++	for_each_btree_key_max_norestart(trans, iter, BTREE_ID_bucket_to_stripe,
++				  POS(bucket_to_u64(bucket), 0),
++				  POS(bucket_to_u64(bucket), U64_MAX),
++				  0, k, ret)
++		try(bch2_btree_bit_mod(trans, BTREE_ID_bucket_to_stripe,
++				       POS(bucket_to_u64(bucket), k.k->p.offset), false));
++	try(ret);
++
++	return 0;
++}
++
++int bch2_dev_free_orphan_stripe_buckets(struct btree_trans *trans,
++					struct bch_dev *ca)
++{
++	return for_each_btree_key_max_commit(trans, iter, BTREE_ID_alloc,
++				      POS(ca->dev_idx, 0),
++				      POS(ca->dev_idx, U64_MAX),
++				      0, k,
++				      NULL, NULL, BCH_TRANS_COMMIT_no_enospc, ({
++		struct bch_alloc_v4 a_convert;
++		const struct bch_alloc_v4 *a = bch2_alloc_to_v4(k, &a_convert);
++
++		a->data_type == BCH_DATA_stripe
++			? free_orphan_stripe_bucket(trans, ca, k.k->p)
++			: 0;
++	}));
++}
++
+ int bch2_bucket_nr_stripes(struct btree_trans *trans, struct bpos bucket)
+ {
+ 	struct bkey_s_c k;
+--- a/fs/data/ec/init.h
++++ b/fs/data/ec/init.h
+@@ -6,6 +6,7 @@
+ 				  struct bkey_s_c, unsigned,
+ 				  unsigned, struct printbuf *, bool *);
+ int bch2_dev_remove_stripes(struct bch_fs *, unsigned, unsigned, struct printbuf *);
++int bch2_dev_free_orphan_stripe_buckets(struct btree_trans *, struct bch_dev *);
+ 
+ void bch2_ec_stop_dev(struct bch_fs *, struct bch_dev *);
+ void bch2_fs_ec_stop(struct bch_fs *);
+--- a/fs/data/migrate.c
++++ b/fs/data/migrate.c
+@@ -302,6 +302,15 @@
+ 			bch2_trans_unlock(trans);
+ 			bch2_reconcile_wakeup(c);
+ 			msleep(100 << min(nr_stalled, 4u));
++
++			/*
++			 * Orphaned stripe buckets - whose stripe key was torn down
++			 * without dropping their bucket refs - have no backpointer
++			 * and can never be reached by this scan; once repair has had
++			 * a chance, sweep them directly.
++			 */
++			if (nr_stalled == 3)
++				try(bch2_dev_free_orphan_stripe_buckets(trans, ca));
+ 		}
+ 
+ 		/*

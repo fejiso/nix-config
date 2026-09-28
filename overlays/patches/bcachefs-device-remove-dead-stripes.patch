@@ -1,0 +1,95 @@
+ec: reap dead stripes in stripe_repair; pace removal scans for repair
+
+Two device-removal dead ends found while removing an evacuated device
+from an EC pool (buckets with no live sectors left behind by stripe
+bookkeeping, removal failing with
+remove_by_backpointer_did_not_terminate):
+
+1. bch2_stripe_repair() early-returns on degraded stripes with zero live
+   data blocks - nothing to repair - without deleting the stripe. Empty
+   stripes are otherwise only reaped via the stripe LRU delete work, which
+   a stripe that emptied while open never reaches. The dead stripe keeps
+   pinning its buckets (and its reconcile work entry) forever; on a device
+   being removed those buckets can never drain.
+
+   Fix: with an intent lock on the stripe key already held, delete
+   degraded+empty stripes in place. The stripe trigger drops the bucket
+   refs and the reconcile_hipri entry as with any other stripe deletion.
+
+2. bch2_dev_data_drop_by_backpointers() runs its scans back-to-back and
+   bails after 10 scans without a new bucket-count low. But the scan
+   enqueues its follow-up work (stripe repair, extent re-replication) to
+   reconcile, which runs asynchronously: 10 scans complete in well under a
+   second, far faster than even a healthy reconcile can rewrite the
+   flagged stripes - so removal fails spuriously on perfectly recoverable
+   state (reproduced in ktest: 5x4G devices, 4G of EC data, remove fails
+   on the first attempt in ~2s and succeeds after reconcile settles).
+
+   Fix: on a stalled scan, wake reconcile and sleep with backoff before
+   rescanning, so the async work the scan itself enqueued has wall-clock
+   time to produce a new low. The stall counter still terminates a
+   genuine livelock.
+
+--- a/fs/data/ec/create.c
+--- a/fs/data/ec/create.c
++++ b/fs/data/ec/create.c
+@@ -2374,8 +2374,27 @@
+ 	for_each_data_block(i, nr_data)
+ 		nr_live_data_blocks += stripe_blockcount_get(old_s, i) != 0;
+ 
+-	if (!nr_live_data_blocks)
+-		return 0;
++	if (!nr_live_data_blocks) {
++		/*
++		 * Degraded stripe with no live data: nothing to repair, but
++		 * the stripe still pins its buckets - e.g. on a device being
++		 * removed, where the dead buckets stall the data-drop scan
++		 * (remove_by_backpointer_did_not_terminate).
++		 *
++		 * Empty stripes are normally reaped via the stripe LRU, but a
++		 * stripe that emptied while open never gets there: the LRU
++		 * delete work skips open stripes, and nothing re-kicks it once
++		 * they close. We hold an intent lock on the stripe key, so
++		 * just delete it - the stripe trigger drops the bucket refs
++		 * and the reconcile work entry.
++		 */
++		if (bch2_stripe_is_open(c, s.k->p.offset))
++			return 0;
++
++		try(bch2_btree_delete_at(trans, iter, 0));
++		return bch2_trans_commit(trans, NULL, NULL,
++					 BCH_TRANS_COMMIT_no_enospc);
++	}
+ 
+ 	struct bch_devs_mask devs;
+ 	bch2_disk_label_ec_devs(c, old_s->disk_label, &devs, le16_to_cpu(old_s->sectors));
+--- a/fs/data/migrate.c
++++ b/fs/data/migrate.c
+@@ -21,6 +21,9 @@
+ #include "data/migrate.h"
+ #include "data/move.h"
+ #include "data/reconcile/trigger.h"
++#include "data/reconcile/work.h"
++
++#include <linux/delay.h>
+ 
+ #include "journal/journal.h"
+ 
+@@ -288,6 +291,17 @@
+ 			prt_printf(err, "%s(): no progress after %u scans, %llu data buckets remain\n",
+ 				   __func__, nr_stalled, data_buckets);
+ 			return bch_err_throw(c, remove_by_backpointer_did_not_terminate);
++		} else {
++			/*
++			 * The scan enqueues its follow-up work (stripe repair,
++			 * re-replication) to reconcile, which runs asynchronously;
++			 * back-to-back scans outpace it and falsely declare a stall.
++			 * Give reconcile wall-clock time before the next scan; the
++			 * stall counter still terminates a genuine livelock.
++			 */
++			bch2_trans_unlock(trans);
++			bch2_reconcile_wakeup(c);
++			msleep(100 << min(nr_stalled, 4u));
+ 		}
+ 
+ 		/*
