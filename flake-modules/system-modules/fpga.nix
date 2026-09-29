@@ -188,8 +188,15 @@ in {
   # openFPGALoader need non-root access to it. This is Sipeed's own
   # 91-anlogic-jtag.rules (z-247 is already in plugdev). See
   # https://tang.sipeed.com/en/getting-started/installing-usb-driver/linux/
+  #
+  # Xilinx Platform Cable USB (VID 03fd): nix-fpga's 10-xilinx-vivado.rules sets
+  # MODE="666" with plain `=` and sorts BEFORE 50-udev-default.rules, which then
+  # resets usb_device nodes to 0664 root:root (observed on butthead with a
+  # 03fd:0013 cable). extraRules lands in 99-local.rules and `:=` is final, so
+  # this sticks.
   services.udev.extraRules = ''
     SUBSYSTEMS=="usb", ATTRS{idVendor}=="0547", ATTRS{idProduct}=="1002", GROUP="plugdev", MODE="0660"
+    SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="03fd", MODE:="0666"
   '';
 };
 }

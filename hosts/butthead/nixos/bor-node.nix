@@ -2,13 +2,13 @@
 # Polygon PoS read node (Bor v2 execution + Heimdall v2 consensus) for the
 # polystack polychain firehose: local eth_getLogs/newHeads/txpool with no
 # public-RPC throttling. Bor's WS (127.0.0.1:8546) is polychain's future
-# rpc_ws once synced; HTTP RPC on 127.0.0.1:8545. Data on the bcachefs root
-# (SSD read cache) — pbss path-scheme state + ~1.5-week tx/log index
-# (history.transactions/logs = 500k @ 2s blocks ≈ 11.6 days).
+# rpc_ws once synced; HTTP RPC on 127.0.0.1:8545. Data on /mnt/bcachefs
+# (53T volume, SSD read cache) — pbss path-scheme state + ~1.5-week tx/log
+# index (history.transactions/logs = 500k @ 2s blocks ≈ 11.6 days).
 #
-# Sync strategy: bor starts from genesis; a full-from-genesis sync on this
-# storage is slow — if that's too slow, drop a Bor snapshot into
-# /var/lib/bor/data and restart (see docs in polystack repo, King Shark plan).
+# Bootstrap: `sudo systemctl start bor-snapshot-fetch` downloads the
+# PublicNode PBSS+pebble snapshot (~6.5TB compressed) into the datadir, then
+# bor catches up the gap itself (bor stays stopped until then).
 let
   borGenesis = pkgs.fetchurl {
     url = "https://github.com/0xPolygon/bor/releases/download/v2.10.1/genesis-mainnet-v1.json";
@@ -27,9 +27,11 @@ let
     mkdir -p $out
     cp -r var/lib/heimdall/config $out/
   '';
+  borData = "/mnt/bcachefs/bor";
+  heimdallHome = "/mnt/bcachefs/heimdall";
   borConf = pkgs.writeText "bor-config.toml" ''
     chain = "mainnet"
-    datadir = "/var/lib/bor/data"
+    datadir = "${borData}/data"
     "db.engine" = "pebble"
     "state.scheme" = "path"
     syncmode = "full"
@@ -59,7 +61,7 @@ let
         gasprice = "25000000000"
 
     [jsonrpc]
-        ipcpath = "/var/lib/bor/bor.ipc"
+        ipcpath = "${borData}/bor.ipc"
         [jsonrpc.http]
             enabled = true
             port = 8545
@@ -94,16 +96,54 @@ in {
   users.users.bor = {
     isSystemUser = true;
     group = "bor";
-    home = "/var/lib/bor";
+    home = borData;
   };
 
   systemd.tmpfiles.rules = [
-    "d /var/lib/heimdall 0755 bor bor -"
-    "d /var/lib/heimdall/config 0755 bor bor -"
-    "d /var/lib/heimdall/data 0755 bor bor -"
-    "d /var/lib/bor 0755 bor bor -"
-    "d /var/lib/bor/data 0755 bor bor -"
+    "d ${heimdallHome} 0755 bor bor -"
+    "d ${heimdallHome}/config 0755 bor bor -"
+    "d ${heimdallHome}/data 0755 bor bor -"
+    "d ${borData} 0755 bor bor -"
+    "d ${borData}/data 0755 bor bor -"
   ];
+
+  # One-shot bootstrap: PublicNode PBSS+pebble snapshot (base 0-75.8M +
+  # part 75.8M-94.5M ≈ 6.5TB compressed). Download → extract → delete, one
+  # file at a time (peak disk ≈ 12TB; the volume has 20T free). Manual:
+  #   sudo systemctl start bor-snapshot-fetch
+  #   journalctl -fu bor-snapshot-fetch
+  systemd.services.bor-snapshot-fetch = {
+    description = "Bor mainnet snapshot fetch+extract (PublicNode PBSS/pebble)";
+    conflicts = [ "bor.service" ];
+    after = [ "network-online.target" ];
+    unitConfig.RequiresMountsFor = borData;
+    serviceConfig = {
+      Type = "oneshot";
+      User = "bor";
+      Group = "bor";
+      TimeoutStartSec = "infinity";
+      RemainAfterExit = true;
+    };
+    path = with pkgs; [ curl lz4 gnutar coreutils ];
+    script = ''
+      set -euo pipefail
+      cd ${borData}/data
+      mkdir -p bor
+      fetch() {
+        name="$1"
+        echo "== downloading $name"
+        curl -fL -C - --retry 8 --retry-delay 30 -o "$name" \
+          "https://snapshots.publicnode.com/$name"
+        echo "== extracting $name"
+        lz4 -dc "$name" | tar -xf - -C ${borData}/data/bor
+        rm "$name"
+        echo "== done $name"
+      }
+      fetch polygon-bor-base-0-75817088.tar.lz4
+      fetch polygon-bor-part-75817089-94508047.tar.lz4
+      echo "snapshot ready — start bor: sudo systemctl start bor"
+    '';
+  };
 
   systemd.services.heimdalld = {
     description = "Polygon Heimdall v2 (consensus layer)";
@@ -111,49 +151,54 @@ in {
     wants = [ "network-online.target" ];
     wantedBy = [ "multi-user.target" ];
     preStart = ''
-      if [ ! -f /var/lib/heimdall/config/node_key.json ]; then
-        ${pkgs.heimdall-v2}/bin/heimdalld init butthead --home /var/lib/heimdall || true
+      if [ ! -f ${heimdallHome}/config/node_key.json ]; then
+        ${pkgs.heimdall-v2}/bin/heimdalld init butthead --home ${heimdallHome} || true
       fi
-      cp -f ${heimdallGenesis} /var/lib/heimdall/config/genesis.json
+      cp -f ${heimdallGenesis} ${heimdallHome}/config/genesis.json
+      # force the sentry reference configs (seeds/persistent_peers) — init
+      # writes a default config.toml with EMPTY seeds if it runs first
       for f in config.toml app.toml client.toml; do
-        if [ ! -f /var/lib/heimdall/config/$f ]; then
-          cp ${heimdallConf}/config/$f /var/lib/heimdall/config/$f
-        fi
+        cp -f ${heimdallConf}/config/$f ${heimdallHome}/config/$f
       done
     '';
     serviceConfig = {
       User = "bor";
       Group = "bor";
-      ExecStart = "${pkgs.heimdall-v2}/bin/heimdalld start --home /var/lib/heimdall";
+      ExecStart = "${pkgs.heimdall-v2}/bin/heimdalld start --home ${heimdallHome}";
       Restart = "on-failure";
       RestartSec = "5s";
       LimitNOFILE = 65536;
+      TimeoutStartSec = "600s";
       TimeoutStopSec = "120s";
     };
   };
 
   systemd.services.bor = {
     description = "Polygon Bor v2 (execution layer)";
-    after = [ "heimdalld.service" "network-online.target" ];
+    after = [ "heimdalld.service" "network-online.target" "bor-snapshot-fetch.service" ];
     wants = [ "network-online.target" ];
     requires = [ "heimdalld.service" ];
     wantedBy = [ "multi-user.target" ];
     preStart = ''
-      cp -f ${borConf} /var/lib/bor/config.toml
-      if [ ! -d /var/lib/bor/data/bor/chaindata ]; then
-        ${pkgs.bor}/bin/bor init --datadir /var/lib/bor/data ${borGenesis} || true
+      cp -f ${borConf} ${borData}/config.toml
+      if [ ! -d ${borData}/data/bor/chaindata ]; then
+        ${pkgs.bor}/bin/bor init --datadir ${borData}/data ${borGenesis} || true
       fi
     '';
     serviceConfig = {
       User = "bor";
       Group = "bor";
-      ExecStart = "${pkgs.bor}/bin/bor server --config /var/lib/bor/config.toml";
+      ExecStart = "${pkgs.bor}/bin/bor server --config ${borData}/config.toml";
       Restart = "on-failure";
       RestartSec = "5s";
       LimitNOFILE = 65536;
+      TimeoutStartSec = "900s";
       TimeoutStopSec = "300s";
     };
   };
+
+  # Bor config's ipcpath points at the datadir.
+  environment.etc."bor/ipc-note".text = "bor ipc lives at ${borData}/bor.ipc";
 
   # P2P: bor 30303, heimdall 26656 (inbound improves peering; outbound-only
   # works with reduced peer counts — router port-forwards are the user's call).

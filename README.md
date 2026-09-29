@@ -173,6 +173,46 @@ automatically. ARM hosts pass `sdImage = true` to also get `images.<name>`.
 11. **Desktop**: Niri Wayland compositor (Sway also available), with the full
     home-manager environment (fish/zsh, wezterm, zellij/tmux, git+GPG, atuin, …).
 12. **Hardware support**: nixos-hardware profiles (including Raspberry Pi 3).
+13. **Declarative ingress & uptime monitoring**: a fleet-wide service registry
+    (`fleet.services` in `flake-modules/fleet-services.nix`) generates nginx
+    vhosts (public TLS ingress on butthead, mesh-only mirror on hierro) and
+    Gatus health checks (incl. push/heartbeat endpoints for backups) on hierro.
+    Onboarding a service = one registry entry. See [Ingress & monitoring](#ingress--monitoring).
+
+## Ingress & monitoring
+
+- **Registry**: `flake-modules/fleet-services.nix` lists every fleet service
+  (`host`, `port`, `public`, `healthPath`, `group`). Consumers:
+  `flake-modules/system-modules/ingress.nix` (nginx vhosts, both flavors) and
+  `flake-modules/system-modules/gatus.nix` (Gatus endpoints + Pushover alerts).
+- **Public ingress** (butthead): nginx terminates TLS for `<sub>.<domain>` on
+  ports **8003/44303** with per-vhost Let's Encrypt certs (ACME HTTP-01 — DNS
+  is managed by the home router, no DNS API). nginx-proxy-manager still owns
+  8002/44302 — flip the router port-forwards to 8003/44303 to cut over; certs
+  issue automatically once port 80 lands on nginx (self-signed fallback until
+  then).
+- **Mesh mirror** (hierro): nginx serves `*.<mesh_domain>` (plain HTTP,
+  netbird `wt0` only) with the same subdomain→service mappings.
+- **Domain secrecy**: external domains never enter this repo. Canonical source
+  is `secrets/ingress.yaml` (sops). nginx/ACME need them at *evaluation* time,
+  so they are rendered to the `ingress-secrets` flake input
+  (`path:/var/lib/fleet-secrets/ingress-domains.nix`) by
+  `scripts/render-ingress-domains.sh` (also refreshes the input's narHash in
+  `flake.lock`). One-time setup per evaluating machine (workstation and
+  hierro's nix-builder): `sudo install -d -o $USER /var/lib/fleet-secrets`,
+  then re-run the script; copy the rendered file to hierro's
+  `/var/lib/fleet-secrets/` as well.
+- **Cert lifecycle**: `acme-<vhost>.timer` units renew automatically
+  (`reloadServices = [ "nginx" ]`). Until the router flip, the daily lego
+  attempts fail (challenges still hit NPM) — expected, ignore the noise.
+  Gatus public endpoints assert `[CERTIFICATE_EXPIRATION] > 168h` as safety
+  net. Bring-up uses the ACME **staging** endpoint (see ingress.nix comment);
+  remove the `defaults.server = ...staging...` line after the first
+  successful production issuance.
+- **Observability**: nginx VTS per-vhost stats (`:9977/status`, mesh-only)
+  scraped by vmagent into VictoriaMetrics (Grafana: "Nginx VTS Stats"
+  dashboard); JSON access logs shipped by vector to VictoriaLogs
+  (`http://hierro.netbird.cloud:9428`, Grafana "VictoriaLogs" datasource).
 
 ## Usage
 

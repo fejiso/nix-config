@@ -21,6 +21,16 @@
   };
 
   ##########################################################################
+  # VictoriaLogs — log database (nginx access logs shipped by vector from
+  # the ingress hosts; see flake-modules/system-modules/ingress.nix)
+  ##########################################################################
+  services.victorialogs = {
+    enable = true;
+    listenAddress = "0.0.0.0:9428";
+    extraOptions = [ "-retentionPeriod=30d" ];
+  };
+
+  ##########################################################################
   # vmagent — Prometheus-style scrape collector, pushes to VictoriaMetrics
   ##########################################################################
   services.vmagent = {
@@ -50,6 +60,19 @@
         {
           job_name = "grafana";
           static_configs = [{ targets = [ "127.0.0.1:3001" ]; }];
+        }
+        {
+          job_name = "gatus";
+          static_configs = [{ targets = [ "127.0.0.1:8080" ]; }];
+        }
+        {
+          # nginx VTS per-vhost stats (module: flake-modules/system-modules/ingress.nix)
+          job_name = "nginx-vts";
+          metrics_path = "/status/format/prometheus";
+          static_configs = [
+            { targets = [ "127.0.0.1:9977" ]; labels.host = "hierro"; }
+            { targets = [ "butthead.netbird.cloud:9977" ]; labels.host = "butthead"; }
+          ];
         }
       ];
     };
@@ -117,6 +140,9 @@
   ##########################################################################
   services.grafana = {
     enable = true;
+    declarativePlugins = with pkgs.grafanaPlugins; [
+      victoriametrics-logs-datasource
+    ];
     settings = {
       server = {
         http_addr = "0.0.0.0";
@@ -130,6 +156,10 @@
     };
     provision = {
       enable = true;
+      dashboards.settings.providers = [{
+        name = "default";
+        options.path = "/etc/grafana-dashboards";
+      }];
       datasources.settings.datasources = [
         {
           name = "VictoriaMetrics";
@@ -149,9 +179,18 @@
             handleGrafanaManagedAlerts = false;
           };
         }
+        {
+          name = "VictoriaLogs";
+          type = "victoriametrics-logs-datasource";
+          uid = "victorialogs";
+          url = "http://127.0.0.1:9428";
+        }
       ];
     };
   };
+
+  # Provisioned dashboards (nginx VTS traffic stats)
+  environment.etc."grafana-dashboards".source = ./grafana-dashboards;
 
   networking.firewall.interfaces.wt0.allowedTCPPorts = [
     8428 # victoriametrics (vmui, query, push)
@@ -159,5 +198,6 @@
     8880 # vmalert
     9093 # alertmanager
     3001 # grafana
+    9428 # victorialogs
   ];
 }

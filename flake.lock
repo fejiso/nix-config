@@ -185,8 +185,8 @@
     "ingress-secrets": {
       "flake": false,
       "locked": {
-        "lastModified": 1790580157,
-        "narHash": "sha256-R+fAe9L8yIEWna3eRNeCBjksr4LUxHxMiADMGzKYQXo=",
+        "lastModified": 1790632322,
+        "narHash": "sha256-GYtdopu2MQb6qdYl8imUmYqEuKzfuXhA4jnTmDoY5dY=",
         "path": "/var/lib/fleet-secrets",
         "type": "path"
       },

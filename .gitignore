@@ -27,3 +27,8 @@ zturn.img
 
 # root-owned perf captures break non-root flake eval
 perf.data*
+
+# Rendered eval-time domain secrets (canonical: secrets/ingress.yaml via
+# scripts/render-ingress-domains.sh; consumed from /var/lib/fleet-secrets or
+# ~/.fleet-secrets). Never commit.
+secrets/ingress-domains.nix

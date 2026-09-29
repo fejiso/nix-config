@@ -32,5 +32,14 @@
   # PL bitstream loader: `load-fpga design.bit.bin` over SSH/netbird. No JTAG.
   environment.systemPackages = [ pkgs.load-fpga ];
 
+  # Watchdog baseline (fpgapuzzler postmortem 2026-09-22: a wedged PL AXI
+  # transaction hard-hung the board; the SoC has two Cadence SWDTs and
+  # /dev/watchdog0 already exists). systemd pets every 15 s; if userspace
+  # dies, the SWDT resets the board after 30 s. NOTE: this alone does NOT
+  # catch a single-process PL AXI stall (systemd stays alive) — the
+  # PL-aware petter (fpgapuzzler host/fpga_wdt.c) covers that. Deploy after
+  # the running 72h M1 soak completes (reboot kills it).
+  systemd.settings.Manager.RuntimeWatchdogSec = "30";
+
   system.stateVersion = "25.05";
 }

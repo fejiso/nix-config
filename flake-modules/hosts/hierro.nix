@@ -11,6 +11,8 @@ import ../../lib/mk-host.nix {
     config.flake.modules.nixos.llama-rpc
     config.flake.modules.nixos.polystack
     config.flake.modules.nixos.polystack-zenohd
+    config.flake.modules.nixos.ingress-mesh
+    config.flake.modules.nixos.gatus
   ];
   homeModules = [
     config.flake.modules.homeManager.default

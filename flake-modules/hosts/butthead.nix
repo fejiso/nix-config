@@ -18,6 +18,7 @@ import ../../lib/mk-host.nix {
     config.flake.modules.nixos.soundcork
     config.flake.modules.nixos.media-storage
     config.flake.modules.nixos.nginx-proxy-manager
+    config.flake.modules.nixos.ingress-public
     config.flake.modules.nixos.haos-vm
     config.flake.modules.nixos.bcachefs
     config.flake.modules.nixos.llama-rpc

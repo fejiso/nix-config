@@ -26,6 +26,16 @@
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
 
+    # Eval-time ingress domain material (public apex + mesh domain + subdomain
+    # map). Kept out of this public repo: rendered from secrets/ingress.yaml
+    # (sops) by scripts/render-ingress-domains.sh into /var/lib/fleet-secrets.
+    # One-time setup on machines that evaluate the flake (workstation,
+    # hierro nix-builder): sudo install -d -o $USER /var/lib/fleet-secrets
+    ingress-secrets = {
+      url = "path:/var/lib/fleet-secrets";
+      flake = false;
+    };
+
     # Colmena for deployment (NixOS hosts)
     colmena.url = "github:zhaofengli/colmena";
 
