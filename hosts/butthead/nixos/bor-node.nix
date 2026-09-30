@@ -154,12 +154,22 @@ in {
       if [ ! -f ${heimdallHome}/config/node_key.json ]; then
         ${pkgs.heimdall-v2}/bin/heimdalld init butthead --home ${heimdallHome} || true
       fi
-      cp -f ${heimdallGenesis} ${heimdallHome}/config/genesis.json
+      # genesis copy: skip when identical (2.2 GB to the array was timing out
+      # at the old 600s TimeoutStartSec on every restart → flap loop)
+      if ! cmp -s ${heimdallGenesis} ${heimdallHome}/config/genesis.json; then
+        cp -f ${heimdallGenesis} ${heimdallHome}/config/genesis.json
+      fi
       # force the sentry reference configs (seeds/persistent_peers) — init
       # writes a default config.toml with EMPTY seeds if it runs first
       for f in config.toml app.toml client.toml; do
         cp -f ${heimdallConf}/config/$f ${heimdallHome}/config/$f
       done
+      # heimdall-v2#616: pre-Zurich (h<47.88M) milestone validation rejects
+      # blocks when the configured bor lacks the checkpoint target — pointing
+      # at the local unsynced bor deadlocks heimdall at genesis AND bor waits
+      # on heimdall. Use synced public bor RPCs until local bor catches up.
+      sed -i 's|^bor_rpc_url = .*|bor_rpc_url = "https://polygon-bor-rpc.publicnode.com,https://polygon.drpc.org"|' \
+        ${heimdallHome}/config/app.toml
     '';
     serviceConfig = {
       User = "bor";
@@ -168,7 +178,7 @@ in {
       Restart = "on-failure";
       RestartSec = "5s";
       LimitNOFILE = 65536;
-      TimeoutStartSec = "600s";
+      TimeoutStartSec = "2400s";
       TimeoutStopSec = "120s";
     };
   };
