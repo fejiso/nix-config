@@ -8,6 +8,7 @@ import ../../lib/mk-host.nix {
     config.flake.modules.nixos.mesh
     config.flake.modules.nixos.laptop
     config.flake.modules.nixos.development
+    config.flake.modules.nixos.fpga
     config.flake.modules.nixos.emulation
     config.flake.modules.nixos.tdarr-worker
     config.flake.modules.nixos.adsb-readsb

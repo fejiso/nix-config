@@ -1,0 +1,98 @@
+ec: bound stripe_reuse search and filter mismatched stripes early
+
+stripe_reuse() searches BTREE_ID_lru (BCH_LRU_STRIPE_FRAGMENTATION, 2)
+for partially filled stripes to reuse when ec_should_reuse_stripe() is
+true (e.g. when any device is low on space, free space <= 40%).
+However, on filesystems with multiple tiers or large numbers of fragmented
+stripes, this search has two critical flaws:
+
+1. stripe_reuse() has no iteration cap. It walks every single key in the
+   LRU fragmentation list across the entire filesystem.
+2. In get_old_stripe(), each key is looked up in BTREE_ID_stripes under an
+   intent lock, and bch2_disk_label_ec_rw_member_devs() + can_widen demotion
+   math are executed BEFORE checking if the stripe matches the allocation's
+   tier label, algorithm, or redundancy. may_reuse_stripe() then rejects
+   the candidate because old->disk_label != new->disk_label.
+
+On pools with multiple tiers (e.g. CMR + SMR), writes to one tier spin in
+stripe_reuse() examining thousands of mismatched stripes from the other tier.
+The writeback flush worker (flush-bcachefs-*) gets pinned at 100% CPU in
+get_old_stripe, collapsing writeback throughput to <1 MB/s, pinning dirty
+pages in meminfo, and throttling all writers in balance_dirty_pages.
+
+Fix:
+1. In get_old_stripe(), check old.v->disk_label, algorithm, and nr_redundant
+   immediately after peeking the stripe key. Skip mismatched stripes before
+   doing device mask lookups or btree modifications.
+2. In stripe_reuse(), bound the search by capping candidate evaluations at
+   128 matching-tier candidates and total LRU entries visited at 512. If no
+   reusable stripe is found, return -BCH_ERR_stripe_alloc_blocked so
+   __stripe_alloc_or_reuse() falls through to new_stripe_alloc_buckets().
+
+--- a/fs/data/ec/create.c
++++ b/fs/data/ec/create.c
+@@ -1622,7 +1622,8 @@
+ 
+ static int get_old_stripe(struct btree_trans *trans,
+ 			  struct ec_stripe_new *new,
+-			  u64 idx)
++			  u64 idx,
++			  bool *is_candidate)
+ {
+ 	struct bch_fs *c = trans->c;
+ 
+@@ -1656,6 +1657,18 @@
+ 	}
+ 
+ 	/*
++	 * Cheap check first: skip stripes with mismatching label, algorithm,
++	 * or redundancy before doing expensive member device / can_widen math.
++	 */
++	if (old.v->disk_label		!= new->new_stripe.key.v.disk_label ||
++	    old.v->algorithm		!= new->new_stripe.key.v.algorithm ||
++	    old.v->nr_redundant		!= new->new_stripe.key.v.nr_redundant)
++		return 0;
++
++	if (is_candidate)
++		*is_candidate = true;
++
++	/*
+ 	 * Demote can_widen if the RW-member set for this disk_label has shrunk
+ 	 * since the last reconcile_scan_stripes pass: a stale-high value would
+ 	 * keep a non-widenable stripe at the top of the LRU, blocking real
+@@ -1805,14 +1818,34 @@
+ 	struct bch_fs *c = trans->c;
+ 	struct bkey_s_c lru_k;
+ 	int ret = 0;
++	unsigned nr_candidates = 0;
++	unsigned nr_visited = 0;
++	const unsigned max_candidates = 128;
++	const unsigned max_visited = 512;
+ 
+ 	for_each_btree_key_max_norestart(trans, lru_iter, BTREE_ID_lru,
+ 			lru_pos(BCH_LRU_STRIPE_FRAGMENTATION, 2, 0),
+ 			lru_pos(BCH_LRU_STRIPE_FRAGMENTATION, 2, LRU_TIME_MAX),
+ 			0, lru_k, ret) {
+-		ret = get_old_stripe(trans, s, lru_k.k->p.offset);
++		bool is_candidate = false;
++
++		nr_visited++;
++		ret = get_old_stripe(trans, s, lru_k.k->p.offset, &is_candidate);
+ 		if (ret)
+ 			break;
++
++		if (is_candidate)
++			nr_candidates++;
++
++		/*
++		 * Bound the search: reuse is an optimization. If we haven't found
++		 * a viable candidate within max_candidates (or after visiting
++		 * max_visited total keys), fall through to fresh stripe allocation
++		 * rather than pinning the writeback thread and holding
++		 * stripe_head_lock across thousands of btree keys.
++		 */
++		if (nr_candidates >= max_candidates || nr_visited >= max_visited)
++			break;
+ 	}
+ 	if (ret <= 0)
+ 		return ret ?: bch_err_throw(c, stripe_alloc_blocked);

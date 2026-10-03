@@ -79,6 +79,14 @@
   # during check_reconcile_work; slots are NORESERVE address space so
   # the cap is raised to 8192. Drop when upstream releases slots of
   # exited threads.
+  # The fifth patch (ec-bound-stripe-reuse, Patch F) bounds the stripe_reuse()
+  # candidate search and filters mismatched disk_labels/algorithm/nr_redundant
+  # early. On pools with multiple tiers (e.g. CMR + SMR), writes to one tier
+  # spun in stripe_reuse() examining thousands of mismatched stripes from the
+  # other tier under intent locks without bounding, pinning flush-bcachefs-*
+  # at 100% CPU and collapsing writeback throughput to <1 MB/s. Candidate
+  # evaluation is capped at 128 matching candidates and 512 total visited keys,
+  # falling through cleanly to new_stripe_alloc_buckets().
   nixpkgs.overlays = [
     (_final: prev: {
       bcachefs-tools = prev.bcachefs-tools.overrideAttrs (old: {
@@ -87,6 +95,7 @@
           ../../../overlays/patches/bcachefs-device-remove-dead-stripes.patch
           ../../../overlays/patches/bcachefs-device-remove-orphan-stripe-buckets.patch
           ../../../overlays/patches/bcachefs-userspace-percpu-thread-cap.patch
+          ../../../overlays/patches/bcachefs-ec-bound-stripe-reuse.patch
         ];
       });
     })
