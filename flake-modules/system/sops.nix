@@ -72,6 +72,11 @@
         owner = "nix-ssh";
         mode = "0400";
       };
+
+      wifi-secrets = {
+        sopsFile = "${inputs.self}/secrets/wifi.yaml";
+        mode = "0400";
+      };
     };
   };
 }
