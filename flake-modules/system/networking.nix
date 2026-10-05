@@ -9,8 +9,10 @@
 }: {
   # Enable NetworkManager for wired, VPN, NetBird, and virtual interfaces
   networking.networkmanager.enable = true;
-  # Tell NetworkManager to ignore Wi-Fi interfaces so iwd manages them standalone
+  # Use iwd backend and tell NetworkManager to ignore Wi-Fi interfaces so iwd manages them standalone
+  networking.networkmanager.wifi.backend = "iwd";
   networking.networkmanager.unmanaged = [ "type:wifi" ];
+  networking.wireless.enable = false;
 
   # Configure iwd standalone for wireless
   networking.wireless.iwd = {
