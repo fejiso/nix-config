@@ -16,6 +16,8 @@ let
       speedFactor = 4;  # Desktop with good CPU
       supportedFeatures = [ "kvm" "big-parallel" ];
       alwaysOn = true;  # Always available for cache
+      # butthead is currently offline; prevent peers from stalling queries to it
+      serveCache = false;
     };
     hierro = {
       system = "x86_64-linux";

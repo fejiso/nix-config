@@ -75,6 +75,7 @@
 
       wifi-secrets = {
         sopsFile = "${inputs.self}/secrets/wifi.yaml";
+        key = "";
         mode = "0400";
       };
     };
