@@ -66,7 +66,7 @@
       {
         "Monitoring" = [
           { "Grafana" = { href = "http://hierro.netbird.cloud:3001"; description = "Dashboards"; }; }
-          { "Uptime Kuma" = { href = "http://butthead.netbird.cloud:3344"; description = "Uptime"; }; }
+          { "Gatus" = { href = "http://hierro.netbird.cloud:8080"; description = "Uptime"; }; }
           { "VictoriaMetrics" = { href = "http://hierro.netbird.cloud:8428/vmui"; description = "Metrics DB"; }; }
           { "vmalert" = { href = "http://hierro.netbird.cloud:8880"; description = "Alert rules"; }; }
           { "Alertmanager" = { href = "http://hierro.netbird.cloud:9093"; description = "Alerts"; }; }

@@ -27,8 +27,14 @@ in
         inherit (svc) group;
         url = "${svc.scheme}://${if svc.upstream != null then svc.upstream else "${svc.host}.netbird.cloud:${toString svc.port}"}${svc.healthPath}";
         interval = "60s";
-        conditions = [ "[STATUS] < 500" ];
-        alerts = [{ type = "custom"; }];
+        conditions = [
+          "[STATUS] >= 200"
+          "[STATUS] < 500"
+        ];
+        alerts = [{
+          type = "pushover";
+          description = "Service mesh endpoint unreachable or returned 5xx";
+        }];
       };
       mkPublic = name: svc: {
         name = "${name}-public";
@@ -36,18 +42,28 @@ in
         url = "https://${sub name}.${domains.domain}${svc.healthPath}";
         interval = "60s";
         conditions = [
+          "[STATUS] >= 200"
           "[STATUS] < 500"
           "[CERTIFICATE_EXPIRATION] > 168h"
         ];
-        alerts = [{ type = "custom"; }];
+        alerts = [{
+          type = "pushover";
+          description = "Public ingress unreachable, TLS invalid, or certificate expiring";
+        }];
       };
       mkMeshMirror = name: svc: {
         name = "${name}-mesh-ingress";
         inherit (svc) group;
         url = "http://${sub name}.${domains.meshDomain}${svc.healthPath}";
         interval = "60s";
-        conditions = [ "[STATUS] < 500" ];
-        alerts = [{ type = "custom"; }];
+        conditions = [
+          "[STATUS] >= 200"
+          "[STATUS] < 500"
+        ];
+        alerts = [{
+          type = "pushover";
+          description = "Mesh ingress proxy unreachable or returned 5xx";
+        }];
       };
     in
     {
@@ -78,14 +94,9 @@ in
             interval = "5m";
           };
 
-          alerting.custom = {
-            url = "https://api.pushover.net/1/messages.json";
-            method = "POST";
-            headers."Content-Type" = "application/x-www-form-urlencoded";
-            # Single-line indented string: ''${...} keeps gatus' env
-            # interpolation literal, and no trailing newline ends up in the
-            # form body.
-            body = ''token=''${PUSHOVER_APP_TOKEN}&user=''${PUSHOVER_USER_KEY}&title=[ALERT_NAME]&message=[ALERT_DESCRIPTION]&priority=0'';
+          alerting.pushover = {
+            application-token = "\${PUSHOVER_APP_TOKEN}";
+            user-key = "\${PUSHOVER_USER_KEY}";
             default-alert = {
               enabled = true;
               failure-threshold = 3;
