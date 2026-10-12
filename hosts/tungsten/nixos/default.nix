@@ -37,12 +37,6 @@
     };
   };
 
-  # The 100MB ESP (nvme0n1p2) is shared with the legacy Windows install and
-  # cannot hold kernel+initrd when the initrd carries the 15MB Intel microcode
-  # early-cpio. Rely on BIOS-level microcode instead (keep BIOS/firmware
-  # updated via fwupd/LVFS).
-  hardware.cpu.intel.updateMicrocode = lib.mkForce false;
-
   # Intel wifi (iwlwifi/iwlmvm) fails to connect with power saving enabled.
   # Disable power saving at both the NetworkManager and driver level.
   networking.networkmanager.wifi.powersave = false;
@@ -77,7 +71,6 @@
   boot.initrd.luks.devices."cryptroot" = {
     device = "/dev/disk/by-uuid/7f1bd4db-58b3-40aa-be5c-d38ba434cfcb";
   };
-  boot.loader.systemd-boot.configurationLimit = 1;
   boot.resumeDevice = "/dev/disk/by-uuid/54cc1038-6f3b-49c0-925b-81ad8127d045";
   boot.kernelParams = [ "resume_offset=533760" ];
 
