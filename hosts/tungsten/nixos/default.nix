@@ -71,6 +71,18 @@
   boot.initrd.luks.devices."cryptroot" = {
     device = "/dev/disk/by-uuid/7f1bd4db-58b3-40aa-be5c-d38ba434cfcb";
   };
+
+  # Encrypted data partition (nvme1n1p2, GPT label "luks-data", created 2026-10-12).
+  # Unlocked in stage 2 via keyfile on the encrypted root — no second passphrase,
+  # no initrd involvement, swapfile hibernation unaffected.
+  environment.etc."crypttab".text = ''
+    cryptdata UUID=9421f644-668a-4b2b-ba25-e0fce5d3ce30 /root/keys/cryptdata.key luks
+  '';
+  fileSystems."/data" = {
+    device = "/dev/mapper/cryptdata";
+    fsType = "btrfs";
+    options = [ "compress=zstd" "nofail" ];
+  };
   boot.resumeDevice = "/dev/disk/by-uuid/54cc1038-6f3b-49c0-925b-81ad8127d045";
   boot.kernelParams = [ "resume_offset=533760" ];
 
