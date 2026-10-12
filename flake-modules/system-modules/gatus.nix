@@ -8,8 +8,11 @@
 #   - mesh-mirror check (public services only): http://<sub>.<meshDomain>
 #     against hierro's own nginx mesh ingress.
 #
-# Alerting: Pushover via gatus' custom provider, creds interpolated from the
-# sops-rendered env file (existing pushover.yaml secrets).
+# Alerting: native Pushover provider, creds interpolated from the
+# sops-rendered env file (existing pushover.yaml secrets). The host is baked
+# into the endpoint group and alert descriptions at eval time — gatus only
+# resolves [ENDPOINT_*] placeholders for the `custom` provider, so with the
+# native pushover provider they would be sent literally.
 let
   registry = config.fleet.services;
 
@@ -24,7 +27,7 @@ in
 
       mkMesh = name: svc: {
         inherit name;
-        inherit (svc) group;
+        group = "${svc.group} (${svc.host})";
         url = "${svc.scheme}://${if svc.upstream != null then svc.upstream else "${svc.host}.netbird.cloud:${toString svc.port}"}${svc.healthPath}";
         interval = "60s";
         conditions = [
@@ -33,12 +36,12 @@ in
         ];
         alerts = [{
           type = "pushover";
-          description = "Service mesh endpoint unreachable or returned 5xx";
+          description = "${svc.host}: service mesh endpoint unreachable or returned 5xx";
         }];
       };
       mkPublic = name: svc: {
         name = "${name}-public";
-        inherit (svc) group;
+        group = "${svc.group} (${svc.host})";
         url = "https://${sub name}.${domains.domain}${svc.healthPath}";
         interval = "60s";
         conditions = [
@@ -48,12 +51,12 @@ in
         ];
         alerts = [{
           type = "pushover";
-          description = "Public ingress unreachable, TLS invalid, or certificate expiring";
+          description = "${svc.host}: public ingress unreachable, TLS invalid, or certificate expiring";
         }];
       };
       mkMeshMirror = name: svc: {
         name = "${name}-mesh-ingress";
-        inherit (svc) group;
+        group = "${svc.group} (${svc.host})";
         url = "http://${sub name}.${domains.meshDomain}${svc.healthPath}";
         interval = "60s";
         conditions = [
@@ -62,7 +65,7 @@ in
         ];
         alerts = [{
           type = "pushover";
-          description = "Mesh ingress proxy unreachable or returned 5xx";
+          description = "${svc.host}: mesh ingress proxy unreachable or returned 5xx";
         }];
       };
     in
