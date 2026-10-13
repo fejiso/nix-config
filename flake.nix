@@ -39,6 +39,14 @@
     # Colmena for deployment (NixOS hosts)
     colmena.url = "github:zhaofengli/colmena";
 
+    # Mobile NixOS: stage-1 + device support for the Galaxy S7 (herolte) port.
+    # Not a flake; used via lib/configuration.nix-style module imports and its
+    # overlay (devices/samsung-herolte/, hosts/herolte).
+    mobile-nixos = {
+      url = "github:mobile-nixos/mobile-nixos/development";
+      flake = false;
+    };
+
     # polystack trading bot (dendritic fleet: hierro root/trade host +
     # zenoh router, butthead observe/soak leaf; see polystack docs/deploy.md).
     # Branch soaks: add a second input pinned at the branch and point the soak

@@ -7,31 +7,29 @@
   pkgs,
   ...
 }: {
-  # Enable NetworkManager for wired, VPN, NetBird, and virtual interfaces
+  # Enable NetworkManager for wired, Wi-Fi, VPN, NetBird, and virtual interfaces
   networking.networkmanager.enable = true;
-  # Tell NetworkManager to ignore Wi-Fi interfaces so iwd manages them standalone
-  networking.networkmanager.unmanaged = [ "type:wifi" ];
+  # Use iwd as the Wi-Fi backend: iwd handles 802.11 auth/association,
+  # NetworkManager handles DHCP, routing, and connection profiles
+  networking.networkmanager.wifi.backend = "iwd";
   networking.wireless.enable = lib.mkForce false;
 
-  # Configure iwd standalone for wireless
+  # iwd runs as NetworkManager's backend - it must NOT do its own
+  # network configuration (DHCP/routing), NetworkManager owns that
   networking.wireless.iwd = {
     enable = true;
     settings = {
       General = {
-        EnableNetworkConfiguration = true;
+        EnableNetworkConfiguration = false;
         NameResolvingService = "systemd";
-      };
-      Network = {
-        EnableIPv6 = true;
-        RoutePriorityOffset = 300;
       };
     };
   };
 
   # Wireless tools for interactive and scriptable network management
+  # (NetworkManager frontends, since NM now manages Wi-Fi via iwd backend)
   environment.systemPackages = with pkgs; [
-    impala
-    iwmenu
+    wifitui
   ];
 
   # Sync sops-managed Wi-Fi network configurations to /var/lib/iwd
