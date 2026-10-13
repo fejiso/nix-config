@@ -142,6 +142,40 @@ short:
 
 4. **Updates**: Run `nix flake update` to update all inputs, then rebuild your systems.
 
+## Deployment
+
+This flake exposes **two** deployment tools, both runnable directly from the flake:
+
+### Colmena (NixOS hosts)
+
+```bash
+nix run .#colmena -- apply              # deploy to all NixOS hosts
+nix run .#colmena -- apply --on butthead
+nix run .#colmena -- apply --on butthead --on blacktop
+nix run .#colmena -- build              # build without deploying
+nix run .#colmena -- apply --dry-run    # show plan
+nix run .#colmena -- exec --on hierro uptime
+```
+
+All NixOS hosts are registered as Colmena nodes. The SD-card ARM hosts `rpi3`,
+`pine64` and `xpi-s905x3` have `targetHost = null` (flash + build on-device
+rather than SSH push). `z-turn` instead sets `targetHost = z-turn.netbird.cloud`,
+so once it's booted and on the mesh it's deployed like any other host — built
+(cross-compiled) on x86 and pushed over SSH. Colmena deploys via SSH as root;
+ensure SSH keys are configured.
+
+### deploy-rs (home-manager on foreign distros)
+
+`deploy-rs` handles home-manager activations on non-NixOS hosts (currently
+`amp1` over Netbird):
+
+```bash
+nix run .#deploy -- .#amp1     # deploy ubuntu@amp1 home-manager profile
+nix run .#deploy               # deploy all deploy-rs nodes
+```
+
+`deploy-rs` validators also run as part of `nix flake check`.
+
 ## Troubleshooting
 
 - If you get "file not found" errors, make sure all files are tracked by git (`git add .`)

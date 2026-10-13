@@ -1,0 +1,14 @@
+Modern GAS (binutils ≥ ~2.41) treats `#` as a comment starter in aarch64
+assembly, breaking `.section ".text.init", #alloc, #execinstr`. Use the
+flag-string form, accepted by old and new assemblers alike.
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -147,7 +147,7 @@
+ 	b	post_ttbr_update_workaround	// Back to C code...
+ ENDPROC(cpu_do_switch_mm)
+ 
+-	.section ".text.init", #alloc, #execinstr
++	.section ".text.init", "ax", %progbits
+ 
+ /*
+  *	__cpu_setup

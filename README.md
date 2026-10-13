@@ -177,44 +177,19 @@ automatically. ARM hosts pass `sdImage = true` to also get `images.<name>`.
     (`fleet.services` in `flake-modules/fleet-services.nix`) generates nginx
     vhosts (public TLS ingress on butthead, mesh-only mirror on hierro) and
     Gatus health checks (incl. push/heartbeat endpoints for backups) on hierro.
-    Onboarding a service = one registry entry. See [Ingress & monitoring](#ingress--monitoring).
+    Onboarding a service = one registry entry. See [INGRESS.md](INGRESS.md).
 
 ## Ingress & monitoring
 
-- **Registry**: `flake-modules/fleet-services.nix` lists every fleet service
-  (`host`, `port`, `public`, `healthPath`, `group`). Consumers:
-  `flake-modules/system-modules/ingress.nix` (nginx vhosts, both flavors) and
-  `flake-modules/system-modules/gatus.nix` (Gatus endpoints + Pushover alerts).
-- **Public ingress** (butthead): nginx terminates TLS for `<sub>.<domain>` on
-  ports **8003/44303** with per-vhost Let's Encrypt certs (ACME HTTP-01 — DNS
-  is managed by the home router, no DNS API). nginx-proxy-manager still owns
-  8002/44302 — flip the router port-forwards to 8003/44303 to cut over; certs
-  issue automatically once port 80 lands on nginx (self-signed fallback until
-  then).
-- **Mesh mirror** (hierro): nginx serves `*.<mesh_domain>` (plain HTTP,
-  netbird `wt0` only) with the same subdomain→service mappings.
-- **Domain secrecy**: external domains never enter this repo. Canonical source
-  is `secrets/ingress.yaml` (sops). nginx/ACME need them at *evaluation* time,
-  so they are rendered to the `ingress-secrets` flake input
-  (`path:/var/lib/fleet-secrets/ingress-domains.nix`) by
-  `scripts/render-ingress-domains.sh` (also refreshes the input's narHash in
-  `flake.lock`). One-time setup per evaluating machine (workstation and
-  hierro's nix-builder): `sudo install -d -o $USER /var/lib/fleet-secrets`,
-  then re-run the script; copy the rendered file to hierro's
-  `/var/lib/fleet-secrets/` as well.
-- **Cert lifecycle**: `acme-<vhost>.timer` units renew automatically
-  (`reloadServices = [ "nginx" ]`). Until the router flip, the daily lego
-  attempts fail (challenges still hit NPM) — expected, ignore the noise.
-  Gatus public endpoints assert `[CERTIFICATE_EXPIRATION] > 168h` as safety
-  net. Bring-up uses the ACME **staging** endpoint (see ingress.nix comment);
-  remove the `defaults.server = ...staging...` line after the first
-  successful production issuance.
-- **Observability**: nginx VTS per-vhost stats (`:9977/status`, mesh-only)
-  scraped by vmagent into VictoriaMetrics (Grafana: "Nginx VTS Stats"
-  dashboard); JSON access logs shipped by vector to VictoriaLogs
-  (`http://hierro.netbird.cloud:9428`, Grafana "VictoriaLogs" datasource).
+A fleet-wide service registry (`flake-modules/fleet-services.nix`) generates
+nginx vhosts (public TLS ingress on butthead, mesh-only mirror on hierro) and
+Gatus health checks. Onboarding a service = one registry entry. See
+[INGRESS.md](INGRESS.md).
 
 ## Usage
+
+Quick reference — full details in [USAGE.md](USAGE.md) (incl. deployment via
+Colmena / deploy-rs).
 
 ### NixOS Systems
 
@@ -222,178 +197,40 @@ automatically. ARM hosts pass `sdImage = true` to also get `images.<name>`.
 # Apply configuration (replace hostname with your system name)
 sudo nixos-rebuild switch --flake .#hostname
 
-# Examples - x86_64 hosts:
-sudo nixos-rebuild switch --flake .#butthead
-sudo nixos-rebuild switch --flake .#hierro
-
-# Examples - ARM64 hosts (on-device or via emulation/remote builder):
-sudo nixos-rebuild switch --flake .#rpi3
-sudo nixos-rebuild switch --flake .#xpi-s905x3
-
-# Build without activating
+# Build without activating / test for current boot only
 sudo nixos-rebuild build --flake .#hostname
-
-# Test (activate for current boot only)
-sudo nixos-rebuild test --flake .#hostname
+sudo nixos-rebuild test  --flake .#hostname
 
 # Build/deploy a host remotely
 nixos-rebuild switch --flake .#hostname --target-host user@hostname --use-remote-sudo
 ```
 
-#### Checking & rolling back
-
-```bash
-# Show what would be built/changed
-sudo nixos-rebuild dry-activate --flake .#hostname
-
-# Show system generations
-sudo nix-env --list-generations --profile /nix/var/nix/profiles/system
-
-# Roll back to previous generation
-sudo nixos-rebuild switch --rollback
-```
-
 ### macOS System (Darwin)
-
-For `work-laptop` (aarch64-darwin):
 
 ```bash
 darwin-rebuild switch --flake .#work-laptop   # apply
-darwin-rebuild build  --flake .#work-laptop   # build only
-darwin-rebuild check  --flake .#work-laptop   # check
-darwin-rebuild generations                    # list generations
-darwin-rebuild switch --rollback              # roll back
 ```
 
 ### Standalone Home Manager (non-NixOS Linux)
 
-Two standalone home-manager configurations are provided:
-- `superfer@devdesktop` — x86_64 Ubuntu
-- `ubuntu@amp1` — aarch64 Ubuntu (also a remote ARM builder)
-
 ```bash
-# Apply
 home-manager switch --flake .#superfer@devdesktop
 home-manager switch --flake .#ubuntu@amp1
-
-# Build only / dry run
-home-manager build   --flake .#superfer@devdesktop
-home-manager dry-run --flake .#superfer@devdesktop
-
-# Generations / rollback
-home-manager generations
-home-manager switch --rollback
 ```
-
-If you don't have home-manager installed: `nix shell nixpkgs#home-manager`.
-
-`amp1` is normally deployed remotely with deploy-rs — see below.
-
-### Deployment
-
-This flake exposes **two** deployment tools, both runnable directly from the flake:
-
-#### Colmena (NixOS hosts)
-
-```bash
-nix run .#colmena -- apply              # deploy to all NixOS hosts
-nix run .#colmena -- apply --on butthead
-nix run .#colmena -- apply --on butthead --on blacktop
-nix run .#colmena -- build              # build without deploying
-nix run .#colmena -- apply --dry-run    # show plan
-nix run .#colmena -- exec --on hierro uptime
-```
-
-All NixOS hosts are registered as Colmena nodes. The SD-card ARM hosts `rpi3`,
-`pine64` and `xpi-s905x3` have `targetHost = null` (flash + build on-device
-rather than SSH push). `z-turn` instead sets `targetHost = z-turn.netbird.cloud`,
-so once it's booted and on the mesh it's deployed like any other host — built
-(cross-compiled) on x86 and pushed over SSH. Colmena deploys via SSH as root;
-ensure SSH keys are configured.
-
-#### deploy-rs (home-manager on foreign distros)
-
-`deploy-rs` handles home-manager activations on non-NixOS hosts (currently
-`amp1` over Netbird):
-
-```bash
-nix run .#deploy -- .#amp1     # deploy ubuntu@amp1 home-manager profile
-nix run .#deploy               # deploy all deploy-rs nodes
-```
-
-`deploy-rs` validators also run as part of `nix flake check`.
 
 ### ARM Single-Board Computers
 
-Supported devices with bootable SD card image generation:
-- **Raspberry Pi 3** (`rpi3`) — RPi 3B/3B+ in 64-bit mode (aarch64)
-- **Pine64** (`pine64`) — aarch64
-- **Amlogic S905X3** (`xpi-s905x3`) — generic S905X3 TV box (aarch64)
-- **MYIR Z-turn** (`z-turn`) — Xilinx Zynq-7020 FPGA SoC (**armv7l**), built
-  with the `linux-xlnx`/`u-boot-xlnx` forks (u-boot SPL acts as the FSBL — no
-  Vivado needed)
-- **AMD/Xilinx KR260** (`kr260`) — Zynq UltraScale+ ZU2EG (**aarch64**), built
-  with the `linux-xlnx` ZynqMP defconfig; no BOOT.BIN on the SD (the board's
-  stock QSPI firmware chain-loads extlinux from the SD FAT)
+SD card images for `rpi3`, `pine64`, `xpi-s905x3`, `z-turn`, `kr260` — btrfs
+roots grown on first boot, cross-compile/native-builder matrix, flashing
+instructions: [ARM-SBC.md](ARM-SBC.md).
 
-#### Build hosts
+### Phones & tablets (Mobile NixOS)
 
-- **aarch64 boards** (`rpi3`, `pine64`, `xpi-s905x3`) build natively on the
-  `amp1` aarch64 remote builder, or via aarch64 emulation on x86 hosts that use
-  the `development` module (`boot.binfmt.emulatedSystems = [ "aarch64-linux" ]`).
-- **`z-turn` is cross-compiled** from x86 (there is no armv7l builder and the
-  repo avoids QEMU binfmt) — so it builds as ordinary x86 work, no emulation.
-  The first build compiles the armv7l world from source (no upstream armv7l
-  cache); results are then cached on the netbird `nix-serve`.
-- **`kr260`** is likewise **cross-compiled from x86** (aarch64), even though the
-  `amp1` native aarch64 builder exists — it builds as ordinary x86 work and is
-  pushed over SSH (netbird), mirroring `z-turn`. Results cache on the netbird
-  `nix-serve` (and overlap with the aarch64 cache used by the other SBCs).
-
-#### Building SD card images
-
-```bash
-nix build .#images.rpi3
-nix build .#images.pine64
-nix build .#images.xpi-s905x3
-nix build .#images.z-turn          # cross-compiled armv7l; long first build
-
-ls -lh result/sd-image/*.img.zst
-```
-
-First emulated builds are slow (10–50× slower than native); subsequent builds
-use the binary cache.
-
-#### Writing an image
-
-```bash
-# Decompress and write in one go (replace /dev/sdX with your card)
-zstd -dc result/sd-image/*.img.zst | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
-```
-
-For `z-turn`, set the board's boot-mode jumper to **SD** and attach a serial
-console at `ttyPS0` 115200 to watch u-boot SPL → u-boot → extlinux → NixOS.
-
-#### Root filesystem: btrfs, grown on first boot
-
-All SD images build a **btrfs** root directly (zstd compression), generically
-via `flake-modules/system-modules/sd-image-btrfs.nix` (wired into every
-`sdImage = true` host by `lib/mk-host.nix`):
-
-- The root partition is created with `make-btrfs-fs`, sized to its contents.
-- On first boot the partition is grown to fill the card (`boot.growPartition`)
-  and the btrfs is grown onto it (`x-systemd.growfs`).
-
-There is no longer an ext4 stage or first-boot conversion. The dual-output
-mechanism (regular config vs. `sd-image.nix`) is described in
-[the FAQ](#how-the-dual-output-sd-card-image-system-works).
-
-#### Embedded optimizations
-
-ARM hosts use `flake-modules/system-modules/embedded.nix`: lighter package set,
-   larger zram swap, serial console (`ttyAMA0` for RPi3, `ttyS0` for Pine64/S905X3,
-   `ttyPS0` for the Zynq `z-turn` and Zynq UltraScale+ `kr260`), no x86-specific
-   hardware, and aggressive GC / journald limits for SD longevity.
+Old Android phones/tablets as headless edge servers (`herolte`, `hammerhead`,
+`tissot`; Kindle WIP ports `thor`/`ford`/`austin`/`mustang`), via a
+mobile-nixos input and in-repo device ports under `devices/`. All
+cross-compiled from x86. See [ANDROID-EDGE-DEVICES.md](ANDROID-EDGE-DEVICES.md)
+for the device matrix, build/flash flows, and bring-up notes.
 
 ### Updating Dependencies
 
@@ -489,40 +326,6 @@ Custom overlays live in `overlays/` and are exposed via
 
 # Troubleshooting / FAQ
 
-## Nix says my repo files don't exist, even though they do!
-
-Nix flakes only see files tracked by git, so `git add .` first. Files in
-`.gitignore` are invisible to nix — this keeps builds reproducible.
-
-## Nix installs the wrong version / can't find new software
-
-Dependencies follow `flake.lock`. Run `nix flake update` to refresh.
-
-## ARM images fail to build with "unsupported system"
-
-Enable aarch64 emulation on the build host (or build via the `amp1` aarch64
-remote builder):
-
-1. Add `boot.binfmt.emulatedSystems = [ "aarch64-linux" ];`
-2. Rebuild: `sudo nixos-rebuild switch`
-3. Verify: `cat /proc/sys/fs/binfmt_misc/qemu-aarch64`
-
-Hosts with the `development` module already enable this.
-
-## How the dual-output SD card image system works
-
-ARM devices use a dual-output approach:
-
-1. **SD image config** (`hosts/<name>/nixos/sd-image.nix` + the shared
-   `sd-image-btrfs-build` module): imported only when building
-   `flake.images.<name>`; produces a bootable **btrfs** image sized to its
-   contents. Not used in normal rebuilds.
-2. **Regular config** (`hosts/<name>/nixos/` + the dendritic feature modules):
-   the actual running system — the same **btrfs** root with compression, managed
-   via Colmena and `nixos-rebuild`.
-3. **Grow on first boot**: the shared `sd-image-btrfs` module enables
-   `boot.growPartition` + `x-systemd.growfs`, so the root partition and btrfs
-   expand to fill the card on the first boot — no ext4 stage or conversion.
-
-This gives easy initial deployment (write the SD image), full ongoing
-configuration management, and an optimal compressed btrfs root.
+Moved to [TROUBLESHOOTING.md](TROUBLESHOOTING.md) — git-tracking gotchas,
+flake.lock refreshes, ARM "unsupported system", and how the dual-output SD
+image system works.
