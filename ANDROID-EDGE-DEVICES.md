@@ -36,17 +36,74 @@ fleet.
 
 ## Building & flashing
 
+All images: `nix build .#images.<host> -o result-<host>` — each output is
+mobile-nixos' `android-fastboot-images` containing `boot.img`, `system.img`
+(the ext4 rootfs), and a reference `flash-critical.sh`. Flashing `userdata`
+**wipes the stock OS** — back up first if you care.
+
+### herolte (Galaxy S7) — heimdall
+
+Prereq: enable *Developer options → OEM unlock* in stock Android first
+(Exynos models need no unlock code).
+
 ```bash
 nix build .#images.herolte -o result-herolte
-scripts/flash-herolte.sh result-herolte      # heimdall (Download mode)
-
-nix build .#images.hammerhead -o result-hammerhead
-scripts/flash-fastboot.sh result-hammerhead  # fastboot
-# tissot: flash lk2nd to `boot` once, then flash-fastboot.sh from inside lk2nd
+scripts/flash-herolte.sh result-herolte
 ```
 
-Each image output is mobile-nixos' `android-fastboot-images`: `boot.img`,
-`system.img` (the ext4 rootfs), and a reference `flash-critical.sh`.
+Phone side: power off → hold Volume Down + Home + Power → Volume Up to
+confirm Download mode → plug in USB. The script verifies the PIT (BOOT +
+USERDATA) before flashing. RECOVERY is untouched — install TWRP there
+beforehand if you want a rescue OS.
+
+### hammerhead (Nexus 5) — fastboot
+
+Prereq: unlock the bootloader: boot into fastboot (power off → Volume Down +
+Power), `fastboot oem unlock` (this wipes the device).
+
+```bash
+nix build .#images.hammerhead -o result-hammerhead
+scripts/flash-fastboot.sh result-hammerhead   # flashes boot + userdata
+fastboot reboot
+```
+
+### tissot (Mi A1) — lk2nd + fastboot
+
+tissot's stock bootloader can't boot a mainline boot.img directly; lk2nd (a
+secondary bootloader living in the `boot` partition) sits in between. One-time
+setup, then normal fastboot flashing via lk2nd.
+
+```bash
+# 0. Prereq: unlock the bootloader (fastboot mode: power off, Vol Down +
+#    Power):  fastboot oem unlock
+
+# 1. Build and flash lk2nd (once per device):
+nix build .#lk2nd-msm8953
+fastboot flash boot result/lk2nd.img
+
+# 2. Boot into lk2nd (it shows a splash and exposes fastboot itself; hold
+#    Volume Down while booting to force its fastboot mode), then flash NixOS:
+nix build .#images.tissot -o result-tissot
+scripts/flash-fastboot.sh result-tissot
+fastboot reboot
+```
+
+lk2nd keeps the real boot image at an offset *inside* the boot partition —
+which is why tissot has no on-device boot.img self-update hook; kernel/stage-1
+changes are reflashed through lk2nd's fastboot (step 2).
+
+### Kindles (thor / ford / austin / mustang) — WIP, exploit first
+
+No official unlock exists for any of these; nothing can be flashed until the
+bootrom/aboot exploit has been applied and fastboot is available:
+
+- `thor` (HDX 7): HDX aboot exploit — downgrade to Fire OS 13.3.2.4 first
+- `ford` / `austin` (Fire 7 2015/2017): [amonet](https://github.com/amonet-kamakiri/amonet) (MT8127)
+- `mustang` (Fire 7 2019): kamakiri (MT8163)
+
+After the exploit, flashing is `scripts/flash-fastboot.sh result-<host>`.
+Remember these ports are skeletons without working WiFi — see the matrix
+above before investing the exploit effort.
 
 ## First boot / secrets chicken-and-egg
 
