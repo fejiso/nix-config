@@ -11,13 +11,16 @@
   hostname,
   ...
 }: let
-  # Only hierro acts as a Reticulum transport node and runs the LXMF
-  # propagation daemon. On other hosts transport mode made rnsd forward the
-  # whole public-hub path-request/announce flood to local clients; when lxmd
-  # stalled, rnsd's unbounded per-client `bytes` transmit buffer
-  # (LocalInterface.process_outgoing, O(n) append + slice per packet) grew
-  # to GBs and pinned a core.
-  isHub = hostname == "hierro";
+  # Only the hubs (hierro, hispanas) act as Reticulum transport nodes, carry
+  # the public-network footprint (ygg/I2P/public TCP hubs, TCP server) and run
+  # the LXMF propagation daemon; every other host is a plain client that just
+  # peers with the hubs over netbird. On non-hub hosts transport mode made
+  # rnsd forward the whole public-hub path-request/announce flood to local
+  # clients; when lxmd stalled, rnsd's unbounded per-client `bytes` transmit
+  # buffer (LocalInterface.process_outgoing, O(n) append + slice per packet)
+  # grew to GBs and pinned a core.
+  hubs = [ "hierro" "hispanas" ];
+  isHub = lib.elem hostname hubs;
 in {
   # Mesh CLI tooling (moved out of base.nix systemPackages).
   environment.systemPackages = with pkgs; [
@@ -104,6 +107,16 @@ in {
         enabled = Yes
         group_id = reticulum
 
+      # Netbird mesh: every host peers with every hub (except itself)
+${lib.concatMapStrings (hub: "      [[Peer ${hub}]]\n        type = TCPClientInterface\n        enabled = yes\n        target_host = ${hub}.netbird.cloud\n        target_port = 4242\n") (lib.remove hostname hubs)}
+      ${lib.optionalString isHub ''
+      # ---- Hub-only: server + public network footprint ----
+      [[TCP Server]]
+        type = TCPServerInterface
+        enabled = yes
+        listen_ip = 0.0.0.0
+        listen_port = 4242
+
       [[Yggdrasil Remote]]
         type = TCPClientInterface
         enabled = yes
@@ -125,6 +138,11 @@ in {
         target_host = 200:b55c:7e7a:80fe:9e32:cded:55d2:91
         target_port = 4242
 
+      [[RNS Testnet I2P Hub A]]
+        type = I2PInterface
+        enabled = yes
+        peers = mrwqlsioq4hoo2lmeeud7dkfscnm7yxak7dmiyvsrnpfag3z5tsq.b32.i2p
+
       # Public Reticulum TCP hubs (geographically distributed)
       [[RNS Dublin]]
         type = TCPClientInterface
@@ -143,26 +161,6 @@ in {
         enabled = yes
         target_host = betweentheborders.com
         target_port = 4242
-
-      [[TCP Server]]
-        type = TCPServerInterface
-        enabled = yes
-        listen_ip = 0.0.0.0
-        listen_port = 4242
-      [[RNS Testnet I2P Hub A]]
-        type = I2PInterface
-        enabled = yes
-        peers = mrwqlsioq4hoo2lmeeud7dkfscnm7yxak7dmiyvsrnpfag3z5tsq.b32.i2p
-
-
-      # Netbird mesh peers (skip self)
-      ${lib.optionalString (hostname != "hierro") ''
-      [[Peer hierro]]
-        type = TCPClientInterface
-        enabled = yes
-        target_host = hierro.netbird.cloud
-        target_port = 4242
-      ''}
 
       [[acehoss]]
         type = TCPClientInterface
@@ -325,17 +323,17 @@ in {
         enabled = yes
         target_host = reticulum.tidudanka.com
         target_port = 37500
-
+      ''}
   '';
 
   # Reticulum ports
-  networking.firewall.allowedTCPPorts = [ 4242 ];  # TCP server
+  networking.firewall.allowedTCPPorts = lib.optional isHub 4242;  # TCP server (hubs only)
   networking.firewall.allowedUDPPorts = [ 29716 42671 ]; # AutoInterface multicast discovery
 
   # Environment variable so all apps use the shared Reticulum instance
   environment.variables.RNS_SHARED_INSTANCE = "Yes";
 
-  # LXMF daemon for message and node announcement (hierro only). Also
+  # LXMF daemon for message and node announcement (hubs only). Also
   # unprivileged; state in /var/lib/lxmf with the /etc config linked in, same
   # as rnsd above.
   systemd.services.lxmd = lib.mkIf isHub {
