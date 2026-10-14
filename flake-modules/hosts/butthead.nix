@@ -5,6 +5,7 @@ import ../../lib/mk-host.nix {
   modules = [
     config.flake.modules.nixos.desktop
     config.flake.modules.nixos.desktop-services
+    config.flake.modules.nixos.pentest
     config.flake.modules.nixos.mesh
     config.flake.modules.nixos.systemd-nspawn
     config.flake.modules.nixos.media-services

@@ -278,12 +278,21 @@ in {
   unstable-packages = final: _prev: {
     unstable =
       let
-        unstablePkgs = import inputs.nixpkgs-unstable {
-          system = final.stdenv.hostPlatform.system;
-          config.allowUnfree = true;
-        };
+        build = final.stdenv.buildPlatform.system;
+        host = final.stdenv.hostPlatform.system;
+        # Cross hosts (z-turn/kr260/phones): import unstable as a CROSS set
+        # (build on x86, target the host arch). A plain `system = host` makes
+        # a *native* target set whose stdenv needs target bootstrap-tools —
+        # which no builder can run (observed: pkgs.unstable.atuin on armv7l
+        # pulling in bootstrap-tools.drv → "platform mismatch").
+        platformArgs =
+          if build == host
+          then { system = host; }
+          else { localSystem = build; crossSystem = host; };
       in
-      unstablePkgs.extend (ufinal: uprev: {
+      (import inputs.nixpkgs-unstable ({
+        config.allowUnfree = true;
+      } // platformArgs)).extend (ufinal: uprev: {
         # kilo (kilocode-cli) 7.3.40 builds kilo-console with vite, whose
         # node_modules scripts carry a #!/usr/bin/env node shebang. The package
         # runs patchShebangs but has only `bun` in its inputs, so patchShebangs

@@ -10,7 +10,15 @@
   pkgs,
   hostname,
   ...
-}: {
+}: let
+  # Only hierro acts as a Reticulum transport node and runs the LXMF
+  # propagation daemon. On other hosts transport mode made rnsd forward the
+  # whole public-hub path-request/announce flood to local clients; when lxmd
+  # stalled, rnsd's unbounded per-client `bytes` transmit buffer
+  # (LocalInterface.process_outgoing, O(n) append + slice per packet) grew
+  # to GBs and pinned a core.
+  isHub = hostname == "hierro";
+in {
   # Mesh CLI tooling (moved out of base.nix systemPackages).
   environment.systemPackages = with pkgs; [
     python3Packages.rns
@@ -76,13 +84,12 @@
   systemd.tmpfiles.rules = [
     "d /etc/reticulum 0755 root root -"
     "d /var/run/reticulum 0777 root root -"
-    "d /etc/lxmf 0755 root root -"
-  ];
+  ] ++ lib.optional isHub "d /etc/lxmf 0755 root root -";
 
   # Reticulum config for shared access
   environment.etc."reticulum/config".text = ''
     [reticulum]
-    enable_transport = True
+    enable_transport = ${if isHub then "True" else "False"}
     share_instance = Yes
     shared_instance_port = 37428
     instance_control_port = 37429
@@ -328,9 +335,10 @@
   # Environment variable so all apps use the shared Reticulum instance
   environment.variables.RNS_SHARED_INSTANCE = "Yes";
 
-  # LXMF daemon for message and node announcement. Also unprivileged; state in
-  # /var/lib/lxmf with the /etc config linked in, same as rnsd above.
-  systemd.services.lxmd = {
+  # LXMF daemon for message and node announcement (hierro only). Also
+  # unprivileged; state in /var/lib/lxmf with the /etc config linked in, same
+  # as rnsd above.
+  systemd.services.lxmd = lib.mkIf isHub {
     description = "LXMF Propagation Daemon";
     after = [ "network.target" "rnsd.service" ];
     bindsTo = [ "rnsd.service" ];
@@ -350,7 +358,7 @@
   };
 
   # LXMF config
-  environment.etc."lxmf/config".text = ''
+  environment.etc."lxmf/config" = lib.mkIf isHub { text = ''
     [propagation]
     enable_node = yes
     node_name = ${hostname}-fer-propagation
@@ -365,7 +373,7 @@
 
     [logging]
     loglevel = 5
-  '';
+  ''; };
 }
 ;
 }
