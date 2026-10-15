@@ -186,6 +186,13 @@ in {
       };
     });
 
+    # gt (git tracker) has an ancient cmake_minimum_required that CMake 4.x
+    # rejects outright. Bump the policy floor so it configures. This affects
+    # cross builds (adbd depends on it) and may affect native builds too.
+    gt = prev.gt.overrideAttrs (old: {
+      cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" ];
+    });
+
     # Pin bcachefs to 1.39.6: fixes EC stripe allocation non-convergence
     # (stripe reuse now engages instead of allocating at BCH_WATERMARK_stripe
     # against copygc, deadlocking stripe creation on a partly-full array) and
@@ -293,6 +300,29 @@ in {
       (import inputs.nixpkgs-unstable ({
         config.allowUnfree = true;
       } // platformArgs)).extend (ufinal: uprev: {
+        # atuin links openssl (via sqlx/native-tls). Cross-compiling builds its
+        # proc-macros (sqlx-macros) for the BUILD machine, which then can't
+        # find -lssl/-lcrypto (openssl is only in host buildInputs). Give the
+        # build machine its own openssl. See the platformArgs note above —
+        # this only bites on cross hosts (phones, z-turn, kr260).
+        atuin =
+          if ufinal.stdenv.buildPlatform != ufinal.stdenv.hostPlatform
+          then uprev.atuin.overrideAttrs (old: {
+            depsBuildBuild = (old.depsBuildBuild or [ ]) ++ [ ufinal.buildPackages.openssl ];
+            # Point openssl-sys (in sqlx' build-time proc-macros) at the BUILD
+            # machine's openssl. MUST be target-prefixed: unprefixed
+            # OPENSSL_LIB_DIR also poisons the host link (armv7 atuin-server
+            # tried to link the x86 libssl). Host-target linking uses the host
+            # openssl via buildInputs/pkg-config.
+            env = (old.env or { }) // {
+              X86_64_UNKNOWN_LINUX_GNU_OPENSSL_DIR = "${ufinal.buildPackages.openssl.dev}";
+              X86_64_UNKNOWN_LINUX_GNU_OPENSSL_LIB_DIR = "${ufinal.buildPackages.openssl.out}/lib";
+              X86_64_UNKNOWN_LINUX_GNU_OPENSSL_INCLUDE_DIR = "${ufinal.buildPackages.openssl.dev}/include";
+              OPENSSL_NO_VENDOR = "1";
+            };
+          })
+          else uprev.atuin;
+
         # kilo (kilocode-cli) 7.3.40 builds kilo-console with vite, whose
         # node_modules scripts carry a #!/usr/bin/env node shebang. The package
         # runs patchShebangs but has only `bun` in its inputs, so patchShebangs

@@ -10,6 +10,7 @@
   imports = [
     ./hardware-configuration.nix
     ./forgejo.nix
+    ./n8n.nix
     ./nats.nix
     ./metrics.nix
     ./polystack.nix

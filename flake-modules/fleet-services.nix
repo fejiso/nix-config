@@ -60,6 +60,10 @@
 
     nats  = { host = "hierro"; port = 8222; group = "Infra"; description = "Messaging monitor"; };
     atuin = { host = "hierro"; port = 8888; group = "Infra"; description = "Shell history sync"; };
+    # Public at n8n.<meshDomain>, TLS terminated directly on hierro (see
+    # hosts/hierro/nixos/n8n.nix) — deliberately NOT `public` here, which
+    # would route it through butthead's home ingress.
+    n8n   = { host = "hierro"; port = 5678; group = "Infra"; description = "Workflow automation"; healthPath = "/healthz"; };
 
     # ── snuffles ────────────────────────────────────────────────────────────
     # Public label is the legacy "adsb.pinto" (subdomains map, ingress.yaml).

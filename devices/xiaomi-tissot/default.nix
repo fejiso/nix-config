@@ -101,6 +101,17 @@ in
     mobile.kernel.structuredConfig = [
       (helpers: with helpers; {
         ARCH_QCOM = mkDefault yes;
+
+        # The vendored pmOS config has CONFIG_IPV6=m. Mobile NixOS requires
+        # the netfilter/nftables chain *builtin* (=y), and kconfig clamps any
+        # =y that depends on an =m symbol back to =m — with IPV6 as a module,
+        # all 17 of them (BRIDGE, NFT_*, IP6_NF_*, XT_MATCH_*) fail config
+        # validation. Build IPV6 and the tproxy/socket parents in.
+        IPV6 = yes;
+        # (NF_TPROXY itself is promptless — selected by NFT_TPROXY — so it
+        # must not be pinned here; oldconfig drops user values for it.)
+        NF_SOCKET_IPV4 = yes;
+        NF_SOCKET_IPV6 = yes;
       })
     ];
   };

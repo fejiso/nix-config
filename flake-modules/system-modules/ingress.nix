@@ -18,7 +18,10 @@ let
   loadDomains = import (inputs.ingress-secrets + "/ingress-domains.nix");
 
   # Shared nginx config for one ingress instance. A NixOS module.
-  mkIngress = { selfHost, domainAttr, tls, httpPort, httpsPort ? 443 }:
+  # listenAddr: when set, every generated vhost binds ONLY to that address
+  # (used by the mesh flavor so the host's public IPs stay free for real
+  # public vhosts — see hosts/hierro/nixos/n8n.nix).
+  mkIngress = { selfHost, domainAttr, tls, httpPort, httpsPort ? 443, listenAddr ? null }:
     { config, lib, pkgs, hostname, ... }:
     let
       domains = loadDomains;
@@ -61,6 +64,8 @@ let
               proxyPass = "${svc.scheme}://${upstream svc}";
               proxyWebsockets = true;
             };
+          } // lib.optionalAttrs (listenAddr != null) {
+            listen = [{ addr = listenAddr; port = httpPort; }];
           } // lib.optionalAttrs tls {
             # Per-vhost HTTP-01 cert (no DNS API available — DNS is managed by
             # the home router). Issues once the router forwards port 80 here;
@@ -71,11 +76,13 @@ let
           })
         ) publicServices // {
           # Catch-all: don't serve a random vhost for unknown Host/SNI.
-          "_" = {
+          "_" = ({
             default = true;
             rejectSSL = tls;
             locations."/".return = "444";
-          };
+          } // lib.optionalAttrs (listenAddr != null) {
+            listen = [{ addr = listenAddr; port = httpPort; }];
+          });
           # VTS per-vhost traffic stats in prometheus format, mesh-only.
           "vts-status" = {
             listen = [{ addr = "0.0.0.0"; port = 9977; }];
@@ -168,6 +175,11 @@ in
         domainAttr = "meshDomain";
         tls = false;
         httpPort = 80;
+        # Bind mesh vhosts to the netbird address only, so hierro's public
+        # 80/443 can serve real public vhosts (n8n) without exposing mesh
+        # services to the internet. UPDATE if netbird ever reassigns
+        # hierro's wt0 address.
+        listenAddr = "100.107.225.121";
       })
     ];
 
