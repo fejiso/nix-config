@@ -193,6 +193,15 @@ in {
       cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" ];
     });
 
+    # mobile-nixos' gadget-tool (USB gadget enabler) is the same upstream `gt`
+    # source but lives under the `gadget-tool` attribute. Fix its CMake floor too.
+    gadget-tool =
+      if prev ? gadget-tool
+      then prev.gadget-tool.overrideAttrs (old: {
+        cmakeFlags = (old.cmakeFlags or [ ]) ++ [ "-DCMAKE_POLICY_VERSION_MINIMUM=3.5" ];
+      })
+      else { };
+
     # Pin bcachefs to 1.39.6: fixes EC stripe allocation non-convergence
     # (stripe reuse now engages instead of allocating at BCH_WATERMARK_stripe
     # against copygc, deadlocking stripe creation on a partly-full array) and

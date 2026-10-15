@@ -29,7 +29,10 @@
     ];
 
     nixpkgs = {
-      overlays = [
+      # Apply our overlays with mkAfter so they run *after* vendor overlays
+      # (e.g. mobile-nixos' gadget-tool). This lets our CMake/bug workarounds
+      # win over vendor-provided package definitions.
+      overlays = lib.mkAfter [
         outputs.overlays.additions
         outputs.overlays.modifications
         outputs.overlays.unstable-packages

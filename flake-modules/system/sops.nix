@@ -77,6 +77,11 @@
         sopsFile = "${inputs.self}/secrets/wifi.yaml";
         key = "";
         mode = "0400";
+        # The sync unit is `wantedBy iwd.service`, so without this a wifi.yaml
+        # edit + `nixos-rebuild switch` changes nothing: iwd isn't restarted
+        # and the oneshot sync never re-runs. sops-nix restarts the sync when
+        # the decrypted content actually changes at activation.
+        restartUnits = [ "iwd-secrets-sync.service" ];
       };
     };
   };
