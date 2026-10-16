@@ -43,6 +43,17 @@
             ingress-domains.nix). Non-public services are mesh-only.
           '';
         };
+        sso = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = ''
+            Protect the ingress vhost with Authelia forward-auth (nginx
+            auth_request, see flake-modules/system-modules/ingress.nix and
+            authelia.nix). Only affects `public` services (the only ones with
+            vhosts). Opt out for services whose clients can't do a browser
+            SSO flow (mobile/desktop apps, APIs, git, webhooks).
+          '';
+        };
         healthPath = lib.mkOption {
           type = lib.types.str;
           default = "/";

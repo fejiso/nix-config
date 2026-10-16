@@ -36,6 +36,11 @@ let
         if svc.upstream != null then svc.upstream
         else if svc.host == selfHost then "127.0.0.1:${toString svc.port}"
         else "${svc.host}.netbird.cloud:${toString svc.port}";
+      # Authelia forward-auth endpoint (auth_request). butthead's public
+      # ingress hits it on loopback; hierro's mesh ingress crosses the mesh.
+      autheliaAuthz =
+        if selfHost == "butthead" then "127.0.0.1:9091"
+        else "butthead.netbird.cloud:9091";
     in
     {
       services.nginx = {
@@ -57,12 +62,46 @@ let
           access_log syslog:server=unix:/dev/log,severity=info json_ingress;
         '';
 
-        # Per-service vhosts from the registry.
+        # Per-service vhosts from the registry. Services with `sso = true`
+        # (the default) sit behind Authelia forward-auth: nginx asks the
+        # authz endpoint per request and bounces unauthenticated browsers to
+        # the auth portal (Location header it returns carries the right
+        # per-domain portal + rd redirect). Identity is passed upstream as
+        # Remote-* headers for apps that support them.
         virtualHosts = lib.mapAttrs' (name: svc:
           lib.nameValuePair "${sub name}.${domain}" ({
-            locations."/" = {
-              proxyPass = "${svc.scheme}://${upstream svc}";
-              proxyWebsockets = true;
+            locations = {
+              "/" = {
+                proxyPass = "${svc.scheme}://${upstream svc}";
+                proxyWebsockets = true;
+                extraConfig = lib.optionalString svc.sso ''
+                  auth_request /authelia;
+                  auth_request_set $redirection_url $upstream_http_location;
+                  auth_request_set $user $upstream_http_remote_user;
+                  auth_request_set $groups $upstream_http_remote_groups;
+                  auth_request_set $name $upstream_http_remote_name;
+                  auth_request_set $email $upstream_http_remote_email;
+                  proxy_set_header Remote-User $user;
+                  proxy_set_header Remote-Groups $groups;
+                  proxy_set_header Remote-Name $name;
+                  proxy_set_header Remote-Email $email;
+                  error_page 401 =302 $redirection_url;
+                '';
+              };
+            } // lib.optionalAttrs svc.sso {
+              # Authelia authz endpoint (4.38+ auth-request variant).
+              "= /authelia" = {
+                proxyPass = "http://${autheliaAuthz}/api/authz/auth-request";
+                extraConfig = ''
+                  internal;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Original-Method $request_method;
+                  proxy_set_header X-Original-URL $scheme://$http_host$request_uri;
+                  proxy_set_header X-Forwarded-For $remote_addr;
+                  proxy_set_header Content-Length "";
+                  proxy_pass_request_body off;
+                '';
+              };
             };
           } // lib.optionalAttrs (listenAddr != null) {
             listen = [{ addr = listenAddr; port = httpPort; }];
