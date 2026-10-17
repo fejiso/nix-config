@@ -144,7 +144,7 @@
                 set -l p (realpath -s -m -- $argv[$i])
                 set -a extra_binds --ro-bind $p $p
               case '--ro=*'
-                set -l p (realpath -s -m -- (string replace -r '^--ro=' '' -- $arg))
+                set -l p (realpath -s -m -- (string replace -r '^--ro=' "" -- $arg))
                 set -a extra_binds --ro-bind $p $p
               case --rw
                 set i (math $i + 1)
@@ -155,7 +155,7 @@
                 set -l p (realpath -s -m -- $argv[$i])
                 set -a extra_binds --bind $p $p
               case '--rw=*'
-                set -l p (realpath -s -m -- (string replace -r '^--rw=' '' -- $arg))
+                set -l p (realpath -s -m -- (string replace -r '^--rw=' "" -- $arg))
                 set -a extra_binds --bind $p $p
               case '*'
                 set -a cmd_args $argv[$i..-1]
@@ -240,7 +240,7 @@
                 end
               case '--ro=*' '--rw=*'
                 set -a bwrap_flags $argv[$i]
-                set -l p (realpath -s -m -- (string replace -r '^--r[ow]=' '' -- $argv[$i]))
+                set -l p (realpath -s -m -- (string replace -r '^--r[ow]=' "" -- $argv[$i]))
                 if test -d "$p"
                   set -a agent_args --add-dir $p
                 end
@@ -273,7 +273,7 @@
                 end
               case '--ro=*' '--rw=*'
                 set -a bwrap_flags $argv[$i]
-                set -l p (realpath -s -m -- (string replace -r '^--r[ow]=' '' -- $argv[$i]))
+                set -l p (realpath -s -m -- (string replace -r '^--r[ow]=' "" -- $argv[$i]))
                 if test -d "$p"
                   set -a agent_args --add-dir $p
                 end
@@ -306,7 +306,7 @@
                 end
               case '--ro=*' '--rw=*'
                 set -a bwrap_flags $argv[$i]
-                set -l p (realpath -s -m -- (string replace -r '^--r[ow]=' '' -- $argv[$i]))
+                set -l p (realpath -s -m -- (string replace -r '^--r[ow]=' "" -- $argv[$i]))
                 if test -d "$p"
                   set -a agent_args --add-dir $p
                 end
