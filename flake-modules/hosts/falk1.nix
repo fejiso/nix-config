@@ -5,6 +5,7 @@ import ../../lib/mk-host.nix {
   system = "x86_64-linux";
   modules = [
     config.flake.modules.nixos.embedded
+    config.flake.modules.nixos.mesh
   ];
   homeModules = [
     config.flake.modules.homeManager.cli-minimal

@@ -31,13 +31,6 @@
   # Allow root SSH login for Colmena deployments (key-only via base.nix / users.nix)
   services.openssh.settings.PermitRootLogin = lib.mkForce "prohibit-password";
 
-  # SOCKS5 proxy over netbird mesh (firewall port 1080 on wt0 is opened by networking.nix)
-  services.microsocks = {
-    enable = true;
-    ip = "0.0.0.0";
-    port = 1080;
-  };
-
   # Static IPv6 from secrets/network.yaml (sops).
   # Prior to falk1's host key being added to .sops.yaml, 10-embedded-wired.network
   # brings up IPv4 DHCP automatically; once sops decrypts this template, 05-falk1-wired
