@@ -57,31 +57,13 @@ let
       supportedFeatures = [ "kvm" ];
       alwaysOn = false;  # Not always on
     };
-    # Native aarch64 builder (Ubuntu + Determinate Nix). Saves hierro from
-    # qemu-emulating ARM builds. Uses the regular `ubuntu` login user since
-    # there's no nix-daemon to constrain a `nix-ssh` role account on. Legacy
-    # `ssh://` protocol because amp1's nix (2.31.5) and hierro's nix-daemon
-    # (2.34.7) disagree on ssh-ng wire format mid-build.
-    amp1 = {
-      system = "aarch64-linux";
-      maxJobs = 4;
-      speedFactor = 1;
-      supportedFeatures = [ ];
-      alwaysOn = true;
-      sshUser = "ubuntu";
-      protocol = "ssh";
-      # Ubuntu host with Determinate Nix — no NixOS-managed nix-serve, so
-      # don't advertise it as a substituter (avoids `Failed to connect to
-      # amp1.netbird.cloud port 5000` spam during every fetch).
-      serveCache = false;
-    };
   };
 
   # Build list of other hosts (exclude current host)
   otherHosts = lib.filterAttrs (name: _: name != hostname) buildHosts;
 
   # Hosts that serve a nix-serve binary cache. Defaults to `alwaysOn`,
-  # overridable per-host (e.g. amp1, which runs Determinate Nix on Ubuntu).
+  # overridable per-host.
   cacheHosts = lib.filterAttrs
     (name: host: name != hostname && host.alwaysOn && (host.serveCache or true))
     buildHosts;

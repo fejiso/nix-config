@@ -25,3 +25,8 @@ mobile-nixos.kernel-builder {
 
   isModular = true;
 }
+
+# The compressed kernel image is `Image.gz`, but mobile-nixos' NixOS glue
+# looks for the uncompressed `Image` unless we set `file`. Point it at the
+# compressed image that actually gets installed.
+// { file = "Image.gz"; }

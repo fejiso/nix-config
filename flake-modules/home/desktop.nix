@@ -10,7 +10,7 @@ in {
   ...
 }: {
   # Media modules live here (not in `default`) so they only land on real
-  # desktops — keeps beets/mpd/tidalcycles off devdesktop, work-laptop, amp1.
+  # desktops — keeps beets/mpd/tidalcycles off devdesktop and work-laptop.
   imports = [
     homeModules.beets
     homeModules.mpd

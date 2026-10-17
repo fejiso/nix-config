@@ -4,7 +4,7 @@
   # 64-bit ARM (Xilinx Zynq UltraScale+ ZU2EG, Cortex-A53). Cross-compile: build
   # on x86, target aarch64. Pure cross (no QEMU binfmt), so everything is
   # produced as ordinary x86 derivations emitting aarch64 output — same model as
-  # z-turn (the repo routes aarch64 via amp1 OR cross; kr260 picks cross).
+  # z-turn.
   nixpkgs.hostPlatform  = lib.mkDefault "aarch64-linux";
   nixpkgs.buildPlatform = lib.mkDefault "x86_64-linux";
 

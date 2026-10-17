@@ -8,12 +8,8 @@
   };
 
   config = lib.mkIf config.development.enable {
-    # aarch64 builds (rpi3 kernel, SD images) are routed to the native amp1
-    # builder. We deliberately do NOT enable qemu binfmt emulation: emulated
-    # kernel builds get SIGKILLed, and nix treats that as a machine failure
-    # and retries the build across every aarch64-capable builder in a loop.
-    # Native amp1 handles aarch64; re-enable emulation only if amp1 is gone.
-    # boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
+    # Enable aarch64 emulation for building ARM SD images and kernels on x86.
+    boot.binfmt.emulatedSystems = [ "aarch64-linux" ];
 
     # Install PlatformIO and related tools
     environment.systemPackages = with pkgs; [

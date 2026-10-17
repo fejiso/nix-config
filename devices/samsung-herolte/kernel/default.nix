@@ -56,3 +56,9 @@ mobile-nixos.kernel-builder {
     } >> arch/arm64/Makefile
   '';
 }
+
+# mobile-nixos' NixOS integration uses `system.boot.loader.kernelFile`, which
+# defaults to the kernel's `file` attribute. The builder exposes `target`
+# (`Image.gz` here) but not `file`, so the system builder looks for the
+# uncompressed `Image` and fails. Tell it where the compressed image is.
+// { file = "Image.gz"; }

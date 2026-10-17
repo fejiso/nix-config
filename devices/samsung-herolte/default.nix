@@ -77,6 +77,14 @@ in
     # The BOOT partition is 64M; xz keeps the kernel+initrd comfortably under.
     mobile.boot.stage-1.compression = mkDefault "xz";
 
+    # The NixOS store closure is much larger than mobile-nixos' default 20 MiB
+    # padding. Give it headroom so make_ext4fs can allocate enough inodes.
+    # The extraPadding is wrapped in mkForce so it overrides the default inside
+    # the mkDefault rootfs attrset without replacing the whole thing.
+    mobile.generatedFilesystems.rootfs = lib.mkDefault {
+      extraPadding = lib.mkForce (pkgs.image-builder.helpers.size.GiB 1);
+    };
+
     # BCM4359 WiFi/BT firmware (unfree, fetched from TheMuppets vendor tree).
     mobile.device.firmware = pkgs.callPackage ./firmware { };
     mobile.device.enableFirmware = true;

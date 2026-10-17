@@ -14,6 +14,7 @@ keys:
   - &snuffles_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOt+r0UbKvmpLwz13qBbxlHyuL0BZ9sg2/L83Q4FA75S
   - &z_turn_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIN1eFJxVzMN3FeBbTas0G1lQgEnxk4oU9PJ5JM8xr5qu
   - &kr260_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKPS9fMrBgKRc/ZsS0LjgjVs1UY7/OQ+1G/L5cEEytFq
+  - &falk1_ssh ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAGITDC/BWgGerlho5ybkEjtDJu9Ry/PqSm+m9LsxGHv
 
   # Phone/tablet edge hosts (Mobile NixOS): SSH host keys are only known after
   # first boot (see README "Phones & tablets"). Once grabbed, add
@@ -33,6 +34,7 @@ keys:
   - &snuffles_age age1t60rm2grrq3zrhpgpgxz4uc3un7wuy93j3nvp6j7uujkn5l52qasclxhdl
   - &z_turn_age age1v4sun8t2ggdyv97kvgcep3mh2fjja95509x7sufkx487jp5egvks7sy8k4
   - &kr260_age age1vsjplswaaj0dja82u939ng9h9wftm6rdjqlzgjsjykg55j7q83csx72nq6
+  - &falk1_age age1v6ujmn3neacak68r8a56zqladt758ctpc6prnf6seuz5xhm8rulqsf53wf
 
 creation_rules:
   # Shared secrets - used by both home-manager (user key) and system services (host keys)
@@ -49,6 +51,7 @@ creation_rules:
       - *snuffles_ssh
       - *z_turn_ssh
       - *kr260_ssh
+      - *falk1_ssh
       - *elitedex_age
       - *hierro_age
       - *blacktop_age
@@ -58,6 +61,7 @@ creation_rules:
       - *snuffles_age
       - *z_turn_age
       - *kr260_age
+      - *falk1_age
 
   # Home-manager secrets - use user SSH key
   - path_regex: 'secrets/(git-credentials-age|beets|music|atuin|silverbullet)\.yaml$'
@@ -85,7 +89,9 @@ creation_rules:
       - *snuffles_ssh
       - *z_turn_ssh
       - *kr260_ssh
+      - *falk1_ssh
       - *user_ssh
+      - *user_age
       - *elitedex_age
       - *hierro_age
       - *blacktop_age
@@ -95,4 +101,5 @@ creation_rules:
       - *snuffles_age
       - *z_turn_age
       - *kr260_age
+      - *falk1_age
 

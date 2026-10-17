@@ -61,6 +61,13 @@ in
     };
     mobile.boot.stage-1.compression = mkDefault "xz";
 
+    # The NixOS closure is far larger than mobile-nixos' default 20 MiB padding.
+    # Add headroom so the ext4 rootfs image has enough inodes/blocks.
+    # Wrapped in mkDefault/mkForce so it merges with rootfs.nix' defaults.
+    mobile.generatedFilesystems.rootfs = lib.mkDefault {
+      extraPadding = lib.mkForce (pkgs.image-builder.helpers.size.GiB 1);
+    };
+
     # Mainline kernel: ConfigFS gadget with RNDIS for USB networking.
     mobile.usb = {
       mode = "gadgetfs";

@@ -1,8 +1,7 @@
 # Galaxy S7 (herolte) hardware/platform wiring: Mobile NixOS module set + the
-# samsung-herolte device port (devices/samsung-herolte/). Built natively for
-# aarch64 (amp1 remote builder or binfmt) — NOT cross-compiled: aarch64 has
-# full binary-cache coverage, and the ancient 3.18 downstream kernel tree is
-# happier on a native toolchain.
+# samsung-herolte device port (devices/samsung-herolte/). Built for aarch64 via
+# binfmt — NOT cross-compiled: aarch64 has full binary-cache coverage, and the
+# ancient 3.18 downstream kernel tree is happier on a native toolchain.
 { inputs, lib, ... }:
 
 {

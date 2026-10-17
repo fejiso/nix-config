@@ -31,17 +31,29 @@
   # Network configuration
   networking.hostName = "hierro";
 
-  # Static IPv6 — Hetzner doesn't do SLAAC/DHCPv6
-  networking.interfaces.enp41s0 = {
-    useDHCP = true; # Keep IPv4 DHCP working (interface exits NetworkManager)
-    ipv6.addresses = [{
-      address = "2a01:4f9:6b:2ba4::1";
-      prefixLength = 64;
-    }];
+  # Static IPv6 — Hetzner doesn't do SLAAC/DHCPv6; address lives in
+  # secrets/network.yaml (sops) and is applied to enp41s0 after sops-nix runs.
+  networking.interfaces.enp41s0.useDHCP = true; # Keep IPv4 DHCP working (interface exits NetworkManager)
+
+  sops.secrets.hierro-ipv6 = {
+    sopsFile = "${inputs.self}/secrets/network.yaml";
+    key = "hierro/ipv6";
   };
-  networking.defaultGateway6 = {
-    address = "fe80::1";
-    interface = "enp41s0";
+
+  systemd.services.hierro-static-ipv6 = {
+    description = "Configure Hetzner static IPv6 on enp41s0 from sops";
+    after = [ "network-online.target" "sops-nix.service" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+    };
+    script = ''
+      addr=$(cat ${config.sops.secrets.hierro-ipv6.path})
+      ${pkgs.iproute2}/bin/ip -6 addr replace "$addr" dev enp41s0
+      ${pkgs.iproute2}/bin/ip -6 route replace default via fe80::1 dev enp41s0
+    '';
   };
 
   # Enable development tools and aarch64 emulation

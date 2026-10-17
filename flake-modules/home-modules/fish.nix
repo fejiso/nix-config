@@ -117,6 +117,207 @@
       mcurl = {
         body = "/usr/bin/curl $argv -L --cookie ~/.midway/cookie --cookie-jar ~/.midway/cookie";
       };
+      bwrap-yolo = {
+        description = "Run a command in a network-enabled bubblewrap sandbox with $HOME masked and only $PWD mounted RW";
+        body = ''
+          set -l workdir (pwd)
+          set -l extra_binds
+          set -l cmd_args
+
+          set -l i 1
+          set -l argc (count $argv)
+          while test $i -le $argc
+            set -l arg $argv[$i]
+            switch $arg
+              case --
+                set i (math $i + 1)
+                if test $i -le $argc
+                  set -a cmd_args $argv[$i..-1]
+                end
+                break
+              case --ro
+                set i (math $i + 1)
+                if test $i -gt $argc
+                  echo "bwrap-yolo: --ro requires a path" >&2
+                  return 1
+                end
+                set -l p (realpath -s -m -- $argv[$i])
+                set -a extra_binds --ro-bind $p $p
+              case '--ro=*'
+                set -l p (realpath -s -m -- (string replace -r '^--ro=' '' -- $arg))
+                set -a extra_binds --ro-bind $p $p
+              case --rw
+                set i (math $i + 1)
+                if test $i -gt $argc
+                  echo "bwrap-yolo: --rw requires a path" >&2
+                  return 1
+                end
+                set -l p (realpath -s -m -- $argv[$i])
+                set -a extra_binds --bind $p $p
+              case '--rw=*'
+                set -l p (realpath -s -m -- (string replace -r '^--rw=' '' -- $arg))
+                set -a extra_binds --bind $p $p
+              case '*'
+                set -a cmd_args $argv[$i..-1]
+                break
+            end
+            set i (math $i + 1)
+          end
+
+          if test (count $cmd_args) -eq 0
+            echo "Usage: bwrap-yolo [--ro <dir>]... [--rw <dir>]... [--] <command> [args...]" >&2
+            return 1
+          end
+
+          # Ensure agent config/state dirs exist on host before binding
+          mkdir -p "$HOME/.kimi" "$HOME/.config/opencode" "$HOME/.local/share/opencode" "$HOME/.claude" "$HOME/.gemini"
+
+          set -l bwrap_args \
+            # 1. Isolate mount, PID, IPC, and UTS namespaces, but KEEP network shared
+            --unshare-all \
+            --share-net \
+            --die-with-parent \
+            # 2. Core virtual filesystems
+            --proc /proc \
+            --dev /dev \
+            --tmpfs /tmp \
+            --tmpfs /run \
+            # 3. Read-only system binaries, libraries, and Nix store (if on NixOS)
+            --ro-bind /usr /usr \
+            --ro-bind-try /bin /bin \
+            --ro-bind-try /lib /lib \
+            --ro-bind-try /lib64 /lib64 \
+            --ro-bind-try /nix /nix \
+            --ro-bind-try /run/current-system /run/current-system \
+            # 4. Network & TLS requirements (DNS + SSL certs + /etc/static for NixOS)
+            --ro-bind /etc/resolv.conf /etc/resolv.conf \
+            --ro-bind-try /etc/hosts /etc/hosts \
+            --ro-bind-try /etc/nsswitch.conf /etc/nsswitch.conf \
+            --ro-bind-try /etc/ssl /etc/ssl \
+            --ro-bind-try /etc/ca-certificates /etc/ca-certificates \
+            --ro-bind-try /etc/pki /etc/pki \
+            --ro-bind-try /etc/static /etc/static \
+            --ro-bind-try /etc/profiles /etc/profiles \
+            # 5. Wipe $HOME with an empty tmpfs so ~/.ssh, ~/.aws, etc. are invisible
+            --tmpfs "$HOME" \
+            # 6. Selectively re-bind only agent auth/state & read-only gitconfig
+            --ro-bind-try "$HOME/.gitconfig" "$HOME/.gitconfig" \
+            --bind-try "$HOME/.kimi" "$HOME/.kimi" \
+            --bind-try "$HOME/.config/opencode" "$HOME/.config/opencode" \
+            --bind-try "$HOME/.local/share/opencode" "$HOME/.local/share/opencode" \
+            --bind-try "$HOME/.claude" "$HOME/.claude" \
+            --ro-bind-try "$HOME/.claude.json" "$HOME/.claude.json" \
+            --bind-try "$HOME/.gemini" "$HOME/.gemini" \
+            # 7. Mount ONLY the current project directory as Read-Write (with .git/hooks & .git/config protected)
+            --bind "$workdir" "$workdir" \
+            --ro-bind-try "$workdir/.git/hooks" "$workdir/.git/hooks" \
+            --ro-bind-try "$workdir/.git/config" "$workdir/.git/config" \
+            # 8. Extra user-specified RO/RW mounts
+            $extra_binds \
+            --chdir "$workdir"
+
+          command bwrap $bwrap_args -- $cmd_args
+        '';
+      };
+      yolo-kimi = {
+        description = "Run Kimi CLI in autonomous YOLO mode inside bwrap-yolo";
+        body = ''
+          set -l bwrap_flags
+          set -l agent_args
+          set -l i 1
+          set -l argc (count $argv)
+          while test $i -le $argc
+            switch $argv[$i]
+              case --ro --rw
+                set -l flag $argv[$i]
+                set i (math $i + 1)
+                if test $i -le $argc
+                  set -l p (realpath -s -m -- $argv[$i])
+                  set -a bwrap_flags $flag $p
+                  if test -d "$p"
+                    set -a agent_args --add-dir $p
+                  end
+                end
+              case '--ro=*' '--rw=*'
+                set -a bwrap_flags $argv[$i]
+                set -l p (realpath -s -m -- (string replace -r '^--r[ow]=' '' -- $argv[$i]))
+                if test -d "$p"
+                  set -a agent_args --add-dir $p
+                end
+              case '*'
+                set -a agent_args $argv[$i]
+            end
+            set i (math $i + 1)
+          end
+          bwrap-yolo $bwrap_flags -- kimi --yolo $agent_args
+        '';
+      };
+      yolo-claude = {
+        description = "Run Claude Code in autonomous YOLO mode inside bwrap-yolo";
+        body = ''
+          set -l bwrap_flags
+          set -l agent_args
+          set -l i 1
+          set -l argc (count $argv)
+          while test $i -le $argc
+            switch $argv[$i]
+              case --ro --rw
+                set -l flag $argv[$i]
+                set i (math $i + 1)
+                if test $i -le $argc
+                  set -l p (realpath -s -m -- $argv[$i])
+                  set -a bwrap_flags $flag $p
+                  if test -d "$p"
+                    set -a agent_args --add-dir $p
+                  end
+                end
+              case '--ro=*' '--rw=*'
+                set -a bwrap_flags $argv[$i]
+                set -l p (realpath -s -m -- (string replace -r '^--r[ow]=' '' -- $argv[$i]))
+                if test -d "$p"
+                  set -a agent_args --add-dir $p
+                end
+              case '*'
+                set -a agent_args $argv[$i]
+            end
+            set i (math $i + 1)
+          end
+          bwrap-yolo $bwrap_flags -- claude --dangerously-skip-permissions --settings '{"sandbox":{"enabled":false}}' $agent_args
+        '';
+      };
+      yolo-agy = {
+        description = "Run Antigravity CLI (agy) in autonomous YOLO mode inside bwrap-yolo";
+        body = ''
+          set -l bwrap_flags
+          set -l agent_args
+          set -l i 1
+          set -l argc (count $argv)
+          while test $i -le $argc
+            switch $argv[$i]
+              case --ro --rw
+                set -l flag $argv[$i]
+                set i (math $i + 1)
+                if test $i -le $argc
+                  set -l p (realpath -s -m -- $argv[$i])
+                  set -a bwrap_flags $flag $p
+                  if test -d "$p"
+                    set -a agent_args --add-dir $p
+                  end
+                end
+              case '--ro=*' '--rw=*'
+                set -a bwrap_flags $argv[$i]
+                set -l p (realpath -s -m -- (string replace -r '^--r[ow]=' '' -- $argv[$i]))
+                if test -d "$p"
+                  set -a agent_args --add-dir $p
+                end
+              case '*'
+                set -a agent_args $argv[$i]
+            end
+            set i (math $i + 1)
+          end
+          bwrap-yolo $bwrap_flags -- agy --dangerously-skip-permissions $agent_args
+        '';
+      };
     };
   };
 }

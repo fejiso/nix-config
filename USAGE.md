@@ -15,12 +15,11 @@ See the "Host roles at a glance" table in README.md for the full list. In
 short:
 
 ### NixOS systems (full system + home-manager) — user: z-247
-`a8`, `blacktop`, `tungsten`, `butthead`, `elitedex`, `hierro`, `hispanas`, `lenovix`,
+`a8`, `blacktop`, `tungsten`, `butthead`, `elitedex`, `hierro`, `falk1`, `hispanas`, `lenovix`,
 `snuffles`, plus ARM/SD-image hosts `pine64`, `rpi3`, `xpi-s905x3`.
 
-### Non-NixOS systems (home-manager only) — user: superfer/ubuntu
+### Non-NixOS systems (home-manager only) — user: superfer
 - **devdesktop**: Amazon Linux development machine (`superfer@devdesktop`)
-- **amp1**: Ubuntu ARM builder (`ubuntu@amp1`)
 - **work-laptop**: macOS laptop with nix-darwin
 
 ## Usage
@@ -166,11 +165,9 @@ ensure SSH keys are configured.
 
 ### deploy-rs (home-manager on foreign distros)
 
-`deploy-rs` handles home-manager activations on non-NixOS hosts (currently
-`amp1` over Netbird):
+`deploy-rs` handles home-manager activations on non-NixOS hosts:
 
 ```bash
-nix run .#deploy -- .#amp1     # deploy ubuntu@amp1 home-manager profile
 nix run .#deploy               # deploy all deploy-rs nodes
 ```
 

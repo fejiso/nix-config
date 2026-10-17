@@ -12,8 +12,8 @@ import ../../lib/mk-host.nix {
   homeModules = [
     config.flake.modules.homeManager.cli-minimal
   ];
-  # Built on x86 and pushed over SSH (netbird) — avoids the amp1 native-builder
-  # round-trip and keeps the board deployable without emulation. Mirrors z-turn.
+  # Built on x86 and pushed over SSH (netbird) — keeps the board deployable
+  # without emulation. Mirrors z-turn.
   targetHost = "kr260.netbird.cloud";
   sdImage = true;
 }

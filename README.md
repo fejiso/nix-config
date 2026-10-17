@@ -20,7 +20,7 @@ them. See [Repository Structure](#repository-structure) below.
 This flake-based configuration supports:
 
 - **x86_64 NixOS systems**: `elitedex`, `lenovix`, `hispanas`, `a8`, `blacktop`,
-  `tungsten`, `hierro`, `butthead`, `snuffles`
+  `tungsten`, `hierro`, `falk1`, `butthead`, `snuffles`
 - **ARM NixOS systems**: `rpi3` (Raspberry Pi 3), `pine64` (Pine64 SBC),
   `xpi-s905x3` (Amlogic S905X3 TV box) — all aarch64 — plus `z-turn`
   (MYIR Z-turn, Xilinx Zynq-7020 FPGA SoC, **armv7l**, cross-compiled with the
@@ -29,8 +29,7 @@ This flake-based configuration supports:
   defconfig; boots off the on-board QSPI firmware)
 - **macOS system**: `work-laptop` (aarch64-darwin, via nix-darwin)
 - **Standalone home-manager configurations** (non-NixOS Linux):
-  `superfer@devdesktop` (x86_64 Ubuntu) and `ubuntu@amp1` (aarch64 Ubuntu,
-  also used as a native ARM remote builder)
+  `superfer@devdesktop` (x86_64 Ubuntu)
 - **SD card image generation**: Bootable **btrfs** images for ARM single-board
   computers (`rpi3`, `pine64`, `xpi-s905x3`, `z-turn`)
 - **Cross-platform support**: aarch64/x86_64 on both Linux and Darwin
@@ -131,6 +130,7 @@ automatically. ARM hosts pass `sdImage = true` to also get `images.<name>`.
 | `tungsten`   | x86_64-linux    | NixOS           | ThinkPad P16 Gen 2 (iGPU + RTX 3500 Ada), development, tdarr worker, ADS-B |
 | `butthead`   | x86_64-linux    | NixOS           | Media/download/container hub (quadlet, nspawn, tdarr) |
 | `hierro`     | x86_64-linux    | NixOS           | Build host, development, OpenClaw |
+| `falk1`      | x86_64-linux    | NixOS           | Lightweight cloud VPS (`embedded` profile) |
 | `hispanas`   | x86_64-linux    | NixOS           | SDR (NovaSDR), desktop, development |
 | `snuffles`   | x86_64-linux    | NixOS           | ADS-B receiver + feeders, network-watchdog |
 | `a8`         | x86_64-linux    | NixOS           | Minimal base host |
@@ -141,7 +141,6 @@ automatically. ARM hosts pass `sdImage = true` to also get `images.<name>`.
 | `kr260`      | aarch64-linux   | NixOS + SD img  | AMD/Xilinx KR260 (Zynq UltraScale+ ZU2EG); linux-xlnx (ZynqMP), cross-compiled; boots off stock QSPI firmware |
 | `work-laptop`| aarch64-darwin  | nix-darwin      | macOS work machine |
 | `devdesktop` | x86_64-linux    | home-manager    | Standalone HM on Ubuntu (`superfer@devdesktop`) |
-| `amp1`       | aarch64-linux   | home-manager    | Standalone HM on Ubuntu + native ARM builder (`ubuntu@amp1`) |
 
 ## Key Features
 
@@ -155,9 +154,8 @@ automatically. ARM hosts pass `sdImage = true` to also get `images.<name>`.
    x86). All build a **btrfs** root directly, grown to fill the card on first
    boot — generic, shared via `flake-modules/system-modules/sd-image-btrfs.nix`.
 4. **Dual deployment**: Colmena for NixOS hosts, deploy-rs for home-manager on
-   foreign distros (e.g. `amp1`).
-5. **Distributed builds**: x86_64 builders plus `amp1` as a native aarch64
-   remote builder, with a `nix-serve` binary cache.
+   foreign distros.
+5. **Distributed builds**: x86_64 builders with a `nix-serve` binary cache.
 6. **Rootless containers**: declarative Podman via quadlet-nix — media stack
    (Sonarr/Radarr/Lidarr/Prowlarr/Emby/qBittorrent/SABnzbd/Gluetun, …) and
    utility containers, plus systemd-nspawn where needed.
@@ -215,7 +213,6 @@ darwin-rebuild switch --flake .#work-laptop   # apply
 
 ```bash
 home-manager switch --flake .#superfer@devdesktop
-home-manager switch --flake .#ubuntu@amp1
 ```
 
 ### ARM Single-Board Computers
