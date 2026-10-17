@@ -35,7 +35,7 @@
     };
     falk1 = {
       hostPublicKey = "AAAAC3NzaC1lZDI1NTE5AAAAIAGITDC/BWgGerlho5ybkEjtDJu9Ry/PqSm+m9LsxGHv";
-      nixPublicKey = "";
+      nixPublicKey = "falk1.netbird.cloud:tLCVWQAWcXy9dhtzh3WV1jCJzCT0xTaMepbTEHCMZr8=";
     };
   };
 }
