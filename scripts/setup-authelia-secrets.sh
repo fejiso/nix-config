@@ -28,18 +28,27 @@ if [ -z "$hash" ]; then
   exit 1
 fi
 
-rand() { openssl rand -hex 64; }
+# 32 random bytes -> 64 hex chars, via coreutils only (od/tr are always
+# present on NixOS; openssl is not in the default system profile).
+rand() { od -vN 32 -A n -t x1 /dev/urandom | tr -d ' \n'; }
 
 cleanup() { [ -f "$target" ] && ! grep -q '^sops:' "$target" && shred -u "$target"; }
 trap cleanup EXIT
+
+jwt=$(rand)
+sess=$(rand)
+stor=$(rand)
+for v in "$jwt" "$sess" "$stor"; do
+  [ ${#v} -eq 64 ] || { echo "error: failed to generate random secret" >&2; exit 1; }
+done
 
 cat > "$target" <<EOF
 # Authelia SSO secrets. users_database is the whole file-based user DB as a
 # single string (mounted as-is). Add users by appending to it; hash passwords
 # with: nix run nixpkgs#authelia -- crypto hash generate argon2
-jwt_secret: $(rand)
-session_secret: $(rand)
-storage_encryption_key: $(rand)
+jwt_secret: $jwt
+session_secret: $sess
+storage_encryption_key: $stor
 users_database: |
   users:
     ${username}:
