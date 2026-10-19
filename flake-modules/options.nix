@@ -39,8 +39,8 @@
           default = false;
           description = ''
             Expose through the public ingress as <sub>.<domain> (subdomain map
-            lives in secrets/ingress.yaml, rendered to the eval-time-only
-            ingress-domains.nix). Non-public services are mesh-only.
+            lives in the private repo's ingress-domains.nix). Non-public
+            services are mesh-only.
           '';
         };
         sso = lib.mkOption {

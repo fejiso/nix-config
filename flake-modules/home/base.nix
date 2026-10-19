@@ -28,30 +28,29 @@
 
     sops = {
       age.keyFile = "${config.home.homeDirectory}/.config/sops/age/keys.txt";
-      defaultSopsFile = "${inputs.self}/secrets/secrets.yaml";
       validateSopsFiles = false;
 
       secrets = {
         git-credentials = {
-          sopsFile = "${inputs.self}/secrets/git-credentials-age.yaml";
+          sopsFile = "${inputs.private}/secrets/git-credentials-age.yaml";
           key = "git_credentials";
           path = "${config.home.homeDirectory}/.git-credentials";
           mode = "0600";
         };
         acoustid-apikey = {
-          sopsFile = "${inputs.self}/secrets/beets.yaml";
+          sopsFile = "${inputs.private}/secrets/beets.yaml";
           key = "acoustid_apikey";
         };
         lastfm-password = {
-          sopsFile = "${inputs.self}/secrets/music.yaml";
+          sopsFile = "${inputs.private}/secrets/music.yaml";
           key = "lastfm_password_hash";
         };
         listenbrainz-token = {
-          sopsFile = "${inputs.self}/secrets/music.yaml";
+          sopsFile = "${inputs.private}/secrets/music.yaml";
           key = "listenbrainz_token";
         };
         atuin-key = {
-          sopsFile = "${inputs.self}/secrets/atuin.yaml";
+          sopsFile = "${inputs.private}/secrets/atuin.yaml";
           key = "atuin_key";
           path = "${config.home.homeDirectory}/.local/share/atuin/key";
           mode = "0600";

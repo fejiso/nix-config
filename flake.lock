@@ -147,19 +147,6 @@
         "type": "github"
       }
     },
-    "ingress-secrets": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1792308531,
-        "narHash": "sha256-qtkp2na58i8NZ3k9RLjorgAEmDIG84UmF97bdyfKe34=",
-        "path": "/var/lib/fleet-secrets",
-        "type": "path"
-      },
-      "original": {
-        "path": "/var/lib/fleet-secrets",
-        "type": "path"
-      }
-    },
     "mobile-nixos": {
       "flake": false,
       "locked": {
@@ -470,6 +457,22 @@
         "url": "ssh://forgejo@hierro.netbird.cloud:2222/fer/polystack.git"
       }
     },
+    "private": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1792407321,
+        "narHash": "sha256-Ge/E5WHYbQCJrEisuGvSHXJ6VLsY59DvsqTzDjTwsDw=",
+        "ref": "refs/heads/master",
+        "rev": "fd95be3fef946bbd198eb77cf1c399f00bed5c16",
+        "revCount": 1,
+        "type": "git",
+        "url": "ssh://git@github.com/fejiso/nix-config-private.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://git@github.com/fejiso/nix-config-private.git"
+      }
+    },
     "quadlet-nix": {
       "locked": {
         "lastModified": 1790641475,
@@ -493,7 +496,6 @@
         "flake-parts": "flake-parts",
         "home-manager": "home-manager",
         "import-tree": "import-tree",
-        "ingress-secrets": "ingress-secrets",
         "mobile-nixos": "mobile-nixos",
         "nix-darwin": "nix-darwin",
         "nix-fpga": "nix-fpga",
@@ -503,6 +505,7 @@
         "nixpkgs-unstable": "nixpkgs-unstable",
         "noctalia": "noctalia",
         "polystack": "polystack",
+        "private": "private",
         "quadlet-nix": "quadlet-nix",
         "sops-nix": "sops-nix"
       }

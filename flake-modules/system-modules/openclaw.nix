@@ -103,7 +103,7 @@ in {
     # Add the key with: sops secrets/openclaw.yaml  ->  telegram_bot_token: <token>
     sops.secrets = mkIf cfg.telegram.enable {
       openclaw-telegram-bot-token = {
-        sopsFile = "${inputs.self}/secrets/openclaw.yaml";
+        sopsFile = "${inputs.private}/secrets/openclaw.yaml";
         key = "telegram_bot_token";
         mode = "0444";
       };

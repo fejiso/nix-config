@@ -38,7 +38,7 @@ in {
     home.packages = [ pkgs.silverbullet ];
 
     sops.secrets.silverbullet-auth = {
-      sopsFile = "${inputs.self}/secrets/silverbullet.yaml";
+      sopsFile = "${inputs.private}/secrets/silverbullet.yaml";
       key = "sb_user_env";
       mode = "0600";
     };

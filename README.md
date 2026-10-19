@@ -15,6 +15,12 @@ The flake follows the **dendritic** pattern: it is built with
 central wiring file — modules contribute to shared option trees and hosts compose
 them. See [Repository Structure](#repository-structure) below.
 
+> **Note for replicators**: this flake will **not** evaluate as-is for you.
+> Secrets, ingress domains, and ACME email live in a private `private` flake
+> input you don't have access to. See [docs/REPLICATING.md](docs/REPLICATING.md)
+> for how to wire up your own private repo — or strip the sops/ingress/authelia
+> modules entirely.
+
 ## What this provides
 
 This flake-based configuration supports:
@@ -44,7 +50,9 @@ This flake-based configuration supports:
   home-manager activations on foreign distros
 - **Containers**: rootless Podman managed declaratively with
   [quadlet-nix](https://github.com/SEIAROTg/quadlet-nix)
-- **Secrets**: [sops-nix](https://github.com/Mic92/sops-nix)
+- **Secrets**: [sops-nix](https://github.com/Mic92/sops-nix) — secrets and
+  the ingress domain registry live in a **separate private repo**
+  (`nix-config-private`), pulled in as the `private` flake input
 
 # Repository Structure
 
@@ -88,7 +96,9 @@ The configuration is organized as follows:
 
 - **`overlays/`**: Custom package overlays (exposed via `flake-modules/overlays.nix`).
 
-- **`secrets/`**: Encrypted secrets managed by sops-nix.
+- **`secrets/`**: not in this repo — sops-encrypted secrets live in the
+  private `nix-config-private` repo (the `private` flake input), alongside
+  `ingress-domains.nix` and the sops creation rules (`.sops.yaml`).
 
 ## How a host is composed
 
@@ -160,7 +170,8 @@ automatically. ARM hosts pass `sdImage = true` to also get `images.<name>`.
    (Sonarr/Radarr/Lidarr/Prowlarr/Emby/qBittorrent/SABnzbd/Gluetun, …) and
    utility containers, plus systemd-nspawn where needed.
 7. **Secrets management**: sops-nix for netbird keys, VPN/API credentials,
-   backup passwords, Pushover tokens, etc.
+   backup passwords, Pushover tokens, etc. — all in the private
+   `nix-config-private` repo (see [docs/REPLICATING.md](docs/REPLICATING.md)).
 8. **Netbird mesh VPN**: all hosts join the mesh (`wt0` interface); several
    services are firewalled to mesh-only.
 9. **Backups**: Kopia-based snapshot backups (migrated from Borg) and a Hetzner
@@ -173,16 +184,15 @@ automatically. ARM hosts pass `sdImage = true` to also get `images.<name>`.
 12. **Hardware support**: nixos-hardware profiles (including Raspberry Pi 3).
 13. **Declarative ingress & uptime monitoring**: a fleet-wide service registry
     (`fleet.services` in `flake-modules/fleet-services.nix`) generates nginx
-    vhosts (public TLS ingress on butthead, mesh-only mirror on hierro) and
-    Gatus health checks (incl. push/heartbeat endpoints for backups) on hierro.
-    Onboarding a service = one registry entry. See [INGRESS.md](INGRESS.md).
+    vhosts (public TLS ingress on butthead, public TLS *backup* ingress on
+    hierro) and Gatus health checks (incl. push/heartbeat endpoints for
+    backups) on hierro. Onboarding a service = one registry entry.
 
 ## Ingress & monitoring
 
 A fleet-wide service registry (`flake-modules/fleet-services.nix`) generates
-nginx vhosts (public TLS ingress on butthead, mesh-only mirror on hierro) and
-Gatus health checks. Onboarding a service = one registry entry. See
-[INGRESS.md](INGRESS.md).
+nginx vhosts (public TLS ingress on butthead, public TLS backup ingress on
+hierro) and Gatus health checks. Onboarding a service = one registry entry.
 
 ## Usage
 
@@ -245,7 +255,9 @@ nix flake metadata
 
 Key inputs: `nixpkgs` (26.05), `nixpkgs-unstable`, `home-manager`,
 `flake-parts`, `import-tree`, `nixos-hardware`, `nix-darwin`,
-`sops-nix`, `colmena`, `deploy-rs`, `quadlet-nix`, `airspy-adsb-bin`.
+`sops-nix`, `colmena`, `deploy-rs`, `quadlet-nix`, `airspy-adsb-bin`,
+`private` (secrets + ingress domains, see
+[docs/REPLICATING.md](docs/REPLICATING.md)).
 
 ### Inspecting flake outputs
 

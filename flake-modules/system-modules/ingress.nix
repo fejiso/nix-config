@@ -6,28 +6,28 @@
 #     Let's Encrypt wildcard cert (ACME DNS-01 via Namecheap), on alternate
 #     ports 8003/44303 alongside nginx-proxy-manager until the router
 #     port-forwards are flipped manually.
-#   ingress-mesh    (hierro): plain HTTP <sub>.<meshDomain> on the netbird
-#     mesh only; same subdomain->upstream mappings, proxy (no redirect).
+#   ingress-mesh    (hierro): public BACKUP ingress for <sub>.<meshDomain> —
+#     TLS-terminated on hierro's public IPs (per-vhost ACME HTTP-01, hierro
+#     owns the IP so no router flip needed), proxying to backends over the
+#     mesh. Same subdomain->upstream mappings as the public flavor.
 #
-# Domains come from the `ingress-secrets` flake input (path:/var/lib/fleet-secrets,
-# never committed) — rendered from secrets/ingress.yaml by
-# scripts/render-ingress-domains.sh.
+# Domains come from the `private` flake input (nix-config-private repo,
+# <input>/ingress-domains.nix — hand-edited, never committed here).
 let
   registry = config.fleet.services;
 
-  loadDomains = import (inputs.ingress-secrets + "/ingress-domains.nix");
+  loadDomains = import (inputs.private + "/ingress-domains.nix");
 
   # Shared nginx config for one ingress instance. A NixOS module.
-  # listenAddr: when set, every generated vhost binds ONLY to that address
-  # (used by the mesh flavor so the host's public IPs stay free for real
-  # public vhosts — see hosts/hierro/nixos/n8n.nix).
-  mkIngress = { selfHost, domainAttr, tls, httpPort, httpsPort ? 443, listenAddr ? null }:
+  # includeService: extra predicate on top of `public` (the mesh flavor uses
+  # it to drop lan-upstream services it can't reach).
+  mkIngress = { selfHost, domainAttr, tls, httpPort, httpsPort ? 443, includeService ? (_: true) }:
     { config, lib, pkgs, hostname, ... }:
     let
       domains = loadDomains;
       domain = domains.${domainAttr};
 
-      publicServices = lib.filterAttrs (_: s: s.public) registry;
+      publicServices = lib.filterAttrs (_: s: s.public && includeService s) registry;
       sub = name: domains.subdomains.${name} or name;
       # Local services are proxied via loopback so the ingress survives
       # netbird hiccups; cross-host goes over the mesh; `upstream` overrides
@@ -103,8 +103,6 @@ let
                 '';
               };
             };
-          } // lib.optionalAttrs (listenAddr != null) {
-            listen = [{ addr = listenAddr; port = httpPort; }];
           } // lib.optionalAttrs tls {
             # Per-vhost HTTP-01 cert (no DNS API available — DNS is managed by
             # the home router). Issues once the router forwards port 80 here;
@@ -119,8 +117,6 @@ let
             default = true;
             rejectSSL = tls;
             locations."/".return = "444";
-          } // lib.optionalAttrs (listenAddr != null) {
-            listen = [{ addr = listenAddr; port = httpPort; }];
           });
           # VTS per-vhost traffic stats in prometheus format, mesh-only.
           "vts-status" = {
@@ -206,22 +202,34 @@ in
   };
 
 
-  # Mesh-only ingress (hierro): same mappings, plain HTTP, netbird only.
+  # Backup ingress (hierro): same mappings, TLS-terminated on hierro's
+  # public IPs. *.<meshDomain> has a wildcard record -> hierro, so this
+  # is the working path when the home line (butthead ingress) is down.
+  # LAN-upstream services (router/router3) are excluded — hierro can't reach
+  # the home LAN. Vhosts listen on the wildcard address: n8n.nix also listens
+  # on the wildcard, so server_name routing decides (explicit-address binds
+  # would create separate sockets and shadow each other).
   flake.modules.nixos.ingress-mesh = { ... }: {
     imports = [
       (mkIngress {
         selfHost = "hierro";
         domainAttr = "meshDomain";
-        tls = false;
+        tls = true;
         httpPort = 80;
-        # Bind mesh vhosts to the netbird address only, so hierro's public
-        # 80/443 can serve real public vhosts (n8n) without exposing mesh
-        # services to the internet. UPDATE if netbird ever reassigns
-        # hierro's wt0 address.
-        listenAddr = "100.107.225.121";
+        includeService = svc: svc.upstream == null;
       })
     ];
 
-    networking.firewall.interfaces.wt0.allowedTCPPorts = [ 80 ];
+    # Production Let's Encrypt, per-vhost HTTP-01 (hierro owns the public IP;
+    # the staging endpoint is only in butthead's ingress-public bring-up).
+    # Owns ACME on hierro — n8n's vhost certs use these defaults too.
+    security.acme = {
+      acceptTerms = true;
+      defaults.email = loadDomains.acmeEmail;
+      defaults.reloadServices = [ "nginx" ];
+      defaults.group = "nginx";
+    };
+
+    networking.firewall.interfaces.wt0.allowedTCPPorts = [ 80 443 ];
   };
 }

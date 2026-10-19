@@ -1,7 +1,7 @@
 { config, lib, pkgs, inputs, ... }:
 {
   sops.secrets.grafana-secret-key = {
-    sopsFile = "${inputs.self}/secrets/grafana.yaml";
+    sopsFile = "${inputs.private}/secrets/grafana.yaml";
     key = "secret_key";
     owner = "grafana";
     group = "grafana";

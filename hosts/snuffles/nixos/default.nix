@@ -16,32 +16,32 @@
 
   # PiAware feeder ID secret
   sops.secrets.piaware-feeder-id = {
-    sopsFile = "${inputs.self}/secrets/piaware.yaml";
+    sopsFile = "${inputs.private}/secrets/piaware.yaml";
     key = hostname;
   };
 
   # FR24 sharing key secret
   sops.secrets.fr24feed-key = {
-    sopsFile = "${inputs.self}/secrets/fr24feed.yaml";
+    sopsFile = "${inputs.private}/secrets/fr24feed.yaml";
     key = hostname;
   };
 
   # ADS-B Location secrets
   sops.secrets.adsb-lat = {
-    sopsFile = "${inputs.self}/secrets/adsb-location.yaml";
+    sopsFile = "${inputs.private}/secrets/adsb-location.yaml";
     key = "${hostname}/latitude";
   };
   sops.secrets.adsb-lon = {
-    sopsFile = "${inputs.self}/secrets/adsb-location.yaml";
+    sopsFile = "${inputs.private}/secrets/adsb-location.yaml";
     key = "${hostname}/longitude";
   };
   sops.secrets.adsb-alt = {
-    sopsFile = "${inputs.self}/secrets/adsb-location.yaml";
+    sopsFile = "${inputs.private}/secrets/adsb-location.yaml";
     key = "${hostname}/altitude";
   };
   
   sops.secrets.adsb-uuid = {
-    sopsFile = "${inputs.self}/secrets/adsbfi.yaml";
+    sopsFile = "${inputs.private}/secrets/adsbfi.yaml";
     key = "${hostname}";
   };
 

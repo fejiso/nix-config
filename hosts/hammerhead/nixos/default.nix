@@ -57,7 +57,8 @@
   # WiFi: shared iwd + sops wifi-secrets stack from `cli`. Mainline brcmfmac
   # on a 6.11 kernel works with iwd. Same first-boot key flow as herolte
   # (grab host key via console, add &hammerhead_ssh/&hammerhead_age to
-  # .sops.yaml, sops updatekeys secrets/wifi.yaml, colmena apply).
+  # .sops.yaml in nix-config-private, sops updatekeys secrets/wifi.yaml
+  # there, push + nix flake update private, colmena apply).
 
   systemd.network.networks."20-wifi" = {
     matchConfig.Name = "wlan0";

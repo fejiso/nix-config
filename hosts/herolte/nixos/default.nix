@@ -75,7 +75,9 @@
   # First-boot flow (chicken-and-egg: wifi.yaml isn't encrypted for the
   # phone's host key yet): boot, log in on the display or `adb shell`, grab
   # the SSH host key (ssh-keyscan localhost), add &herolte_ssh/&herolte_age
-  # to .sops.yaml, `sops updatekeys secrets/wifi.yaml`, then colmena apply.
+  # to .sops.yaml in the nix-config-private repo, `sops updatekeys
+  # secrets/wifi.yaml` there, push, `nix flake update private`, then colmena
+  # apply.
 
   # Don't let a missing AP stall boot into multi-user.
   systemd.network.networks."20-wifi" = {

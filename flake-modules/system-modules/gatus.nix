@@ -5,8 +5,10 @@
 #   - public check (public services only): https://<sub>.<domain> — exercises
 #     DNS, the router path, ingress TLS and the upstream; also asserts cert
 #     expiry > 7d as the safety net for ACME renewal failures.
-#   - mesh-mirror check (public services only): http://<sub>.<meshDomain>
-#     against hierro's own nginx mesh ingress.
+#   - mesh-mirror check (public services only): https://<sub>.<meshDomain>
+#     against hierro's backup ingress (TLS, full path + cert expiry, same
+#     rigor as the public check). LAN-upstream services are excluded —
+#     hierro can't reach the home LAN, and the mesh flavor doesn't serve them.
 #
 # Alerting: native Pushover provider, creds interpolated from the
 # sops-rendered env file (existing pushover.yaml secrets). The host is baked
@@ -16,7 +18,7 @@
 let
   registry = config.fleet.services;
 
-  loadDomains = import (inputs.ingress-secrets + "/ingress-domains.nix");
+  loadDomains = import (inputs.private + "/ingress-domains.nix");
 in
 {
   flake.modules.nixos.gatus = { config, lib, ... }:
@@ -24,6 +26,8 @@ in
       domains = loadDomains;
       sub = name: domains.subdomains.${name} or name;
       publicServices = lib.filterAttrs (_: s: s.public) registry;
+      # Mirror the ingress-mesh filter (lan upstreams unreachable from hierro).
+      meshMirrorServices = lib.filterAttrs (_: s: s.upstream == null) publicServices;
 
       mkMesh = name: svc: {
         inherit name;
@@ -57,11 +61,12 @@ in
       mkMeshMirror = name: svc: {
         name = "${name}-mesh-ingress";
         group = "${svc.group} (${svc.host})";
-        url = "http://${sub name}.${domains.meshDomain}${svc.healthPath}";
+        url = "https://${sub name}.${domains.meshDomain}${svc.healthPath}";
         interval = "60s";
         conditions = [
           "[STATUS] >= 200"
           "[STATUS] < 500"
+          "[CERTIFICATE_EXPIRATION] > 168h"
         ];
         alerts = [{
           type = "pushover";
@@ -112,7 +117,7 @@ in
           endpoints =
             lib.mapAttrsToList mkMesh registry
             ++ lib.mapAttrsToList mkPublic publicServices
-            ++ lib.mapAttrsToList mkMeshMirror publicServices;
+            ++ lib.mapAttrsToList mkMeshMirror meshMirrorServices;
         };
       };
 

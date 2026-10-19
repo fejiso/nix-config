@@ -13,7 +13,9 @@
     # Expose `nix run .#deploy` alongside the existing `nix run .#colmena`.
     packages.deploy = inputs.deploy-rs.packages.${system}.default;
 
-    # `nix flake check` runs deploy-rs's per-node validators.
-    checks = inputs.deploy-rs.lib.${system}.deployChecks config.flake.deploy;
+    # `nix flake check` runs deploy-rs's per-node validators (skipped while
+    # no deploy nodes are defined — deployChecks requires .nodes).
+    checks = lib.optionalAttrs (config.flake.deploy ? nodes)
+      (inputs.deploy-rs.lib.${system}.deployChecks config.flake.deploy);
   };
 }

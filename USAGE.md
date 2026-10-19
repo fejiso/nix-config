@@ -96,8 +96,11 @@ short:
 ├── lib/                       # mk-host.nix and other helpers
 ├── overlays/                  # Nixpkgs overlays + patches
 ├── scripts/                   # Maintenance scripts (snapraid, builders, …)
-└── secrets/                   # sops-nix encrypted secrets
+└── docs/                      # Guides (REPLICATING.md, …)
 ```
+
+> Secrets live in the separate private `nix-config-private` repo (the
+> `private` flake input) — see docs/REPLICATING.md.
 
 ## Customization
 
@@ -136,8 +139,9 @@ short:
 
 2. **Git Integration**: This configuration assumes git tracking. Make sure to `git add` new files before building.
 
-3. **Secrets Management**: Secrets are managed with sops-nix (see
-   `secrets/` and `.sops.yaml`; bootstrap a new machine with `setup-sops.sh`).
+3. **Secrets Management**: Secrets are managed with sops-nix and live in the
+   separate private `nix-config-private` repo (the `private` flake input) —
+   see docs/REPLICATING.md.
 
 4. **Updates**: Run `nix flake update` to update all inputs, then rebuild your systems.
 

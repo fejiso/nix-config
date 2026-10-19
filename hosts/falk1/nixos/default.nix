@@ -36,7 +36,7 @@
   # brings up IPv4 DHCP automatically; once sops decrypts this template, 05-falk1-wired
   # takes precedence and configures both DHCPv4 and static IPv6.
   sops.secrets.falk1-ipv6 = {
-    sopsFile = "${inputs.self}/secrets/network.yaml";
+    sopsFile = "${inputs.private}/secrets/network.yaml";
     key = "falk1/ipv6";
   };
 

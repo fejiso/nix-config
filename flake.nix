@@ -26,13 +26,13 @@
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
 
-    # Eval-time ingress domain material (public apex + mesh domain + subdomain
-    # map). Kept out of this public repo: rendered from secrets/ingress.yaml
-    # (sops) by scripts/render-ingress-domains.sh into /var/lib/fleet-secrets.
-    # One-time setup on machines that evaluate the flake (workstation,
-    # hierro nix-builder): sudo install -d -o $USER /var/lib/fleet-secrets
-    ingress-secrets = {
-      url = "path:/var/lib/fleet-secrets";
+    # Private companion repo (github.com/fejiso/nix-config-private): sops
+    # secrets (<input>/secrets/*.yaml, referenced via sopsFile) and the
+    # eval-time ingress domain registry (<input>/ingress-domains.nix).
+    # git+ssh like polystack below — machines that eval as root (hierro
+    # nix-builder) need a read-only deploy key on the private repo.
+    private = {
+      url = "git+ssh://git@github.com/fejiso/nix-config-private.git";
       flake = false;
     };
 

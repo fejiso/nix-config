@@ -5,9 +5,9 @@
   #
   # Onboarding a new service = one entry here; proxying (if `public`) and
   # monitoring appear on the next rebuild. `public` services get a
-  # <sub>.<domain> vhost; non-default subdomain labels and both domains are
-  # secret (secrets/ingress.yaml -> /var/lib/fleet-secrets/ingress-domains.nix,
-  # see scripts/render-ingress-domains.sh). Ports/groups mirror homepage.nix.
+  # <sub>.<domain> vhost; non-default subdomain labels and both domains live
+  # in the private repo (nix-config-private/ingress-domains.nix).
+  # Ports/groups mirror homepage.nix.
   #
   # `public` flags were seeded 2026-09-28 from the nginx-proxy-manager proxy
   # host list, with each destination probed for liveness; dead NPM entries

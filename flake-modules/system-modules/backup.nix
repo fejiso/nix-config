@@ -88,11 +88,11 @@ in {
       environment.systemPackages = [ kopia ];
 
       sops.secrets.kopia_repo_password = {
-        sopsFile = "${inputs.self}/secrets/kopia.yaml";
+        sopsFile = "${inputs.private}/secrets/kopia.yaml";
         key = "repo_password";
       };
       sops.secrets.kopia_server_password = {
-        sopsFile = "${inputs.self}/secrets/kopia.yaml";
+        sopsFile = "${inputs.private}/secrets/kopia.yaml";
         key = "server_password";
       };
 

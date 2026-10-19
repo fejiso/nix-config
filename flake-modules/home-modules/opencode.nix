@@ -81,19 +81,19 @@
       };
       sops.secrets = {
         openrouter-api-key = {
-          sopsFile = "${inputs.self}/secrets/openrouter.yaml";
+          sopsFile = "${inputs.private}/secrets/openrouter.yaml";
           key = "openrouter_api_key";
           path = "${config.home.homeDirectory}/.local/share/opencode/openrouter-api-key";
           mode = "0600";
         };
         opencodego-api-key = {
-          sopsFile = "${inputs.self}/secrets/opencodego.yaml";
+          sopsFile = "${inputs.private}/secrets/opencodego.yaml";
           key = "opencodego_api_key";
           path = "${config.home.homeDirectory}/.local/share/opencode/opencodego-api-key";
           mode = "0600";
         };
         zai-api-key = {
-          sopsFile = "${inputs.self}/secrets/zai.yaml";
+          sopsFile = "${inputs.private}/secrets/zai.yaml";
           key = "zai_api_key";
           path = "${config.home.homeDirectory}/.local/share/opencode/zai-api-key";
           mode = "0600";

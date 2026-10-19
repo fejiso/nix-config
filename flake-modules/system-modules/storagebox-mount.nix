@@ -13,15 +13,15 @@ with lib;
 
   config = mkIf config.services.storagebox-mount.enable {
     sops.secrets.storagebox-username = {
-      sopsFile = "${inputs.self}/secrets/storagebox.yaml";
+      sopsFile = "${inputs.private}/secrets/storagebox.yaml";
       key = "username";
     };
     sops.secrets.storagebox-password = {
-      sopsFile = "${inputs.self}/secrets/storagebox.yaml";
+      sopsFile = "${inputs.private}/secrets/storagebox.yaml";
       key = "password";
     };
     sops.secrets.storagebox-share = {
-      sopsFile = "${inputs.self}/secrets/storagebox.yaml";
+      sopsFile = "${inputs.private}/secrets/storagebox.yaml";
       key = "share";
     };
 

@@ -6,20 +6,20 @@
 # Runs co-located with the public ingress; the mesh ingress on hierro reaches
 # the authz endpoint over netbird (port 9091 is opened on wt0 only).
 #
-# Secrets (secrets/authelia.yaml, sops — generate with
-# scripts/setup-authelia-secrets.sh):
-#   jwt_secret, session_secret, storage_encryption_key: random 128-hex strings
+# Secrets (secrets/authelia.yaml in the nix-config-private repo — generate
+# with scripts/setup-authelia-secrets.sh there):
+#   jwt_secret, session_secret, storage_encryption_key: random 64-hex strings
 #   users_database: file-based user DB (argon2id hashes), the whole file as
 #     one YAML string key; adding a friend = edit + redeploy.
 #
 # The portal vhost is the registry entry `auth` below (auth.<domain> and
 # auth.<meshDomain>); the entry sets sso = false to avoid the chicken-and-egg.
 #
-# Caveat: mesh SSO runs over plain HTTP (auth.<meshDomain>); if browsers
-# refuse the session cookie there (Secure attribute), set sso = false on the
-# mesh flavor in ingress.nix or expose the portal over HTTPS on the mesh.
+# Mesh SSO runs over TLS: auth.<meshDomain> is served by hierro's backup
+# ingress (ingress-mesh, per-vhost LE certs), so the https authelia_url
+# satisfies Authelia's validation and Secure cookies work.
 let
-  loadDomains = import (inputs.ingress-secrets + "/ingress-domains.nix");
+  loadDomains = import (inputs.private + "/ingress-domains.nix");
 in
 {
   # Registry entry: generates the auth.<domain> / auth.<meshDomain> vhosts.
@@ -40,19 +40,19 @@ in
     {
       sops.secrets = {
         authelia-jwt-secret = {
-          sopsFile = "${inputs.self}/secrets/authelia.yaml";
+          sopsFile = "${inputs.private}/secrets/authelia.yaml";
           key = "jwt_secret";
         };
         authelia-session-secret = {
-          sopsFile = "${inputs.self}/secrets/authelia.yaml";
+          sopsFile = "${inputs.private}/secrets/authelia.yaml";
           key = "session_secret";
         };
         authelia-storage-key = {
-          sopsFile = "${inputs.self}/secrets/authelia.yaml";
+          sopsFile = "${inputs.private}/secrets/authelia.yaml";
           key = "storage_encryption_key";
         };
         authelia-users-db = {
-          sopsFile = "${inputs.self}/secrets/authelia.yaml";
+          sopsFile = "${inputs.private}/secrets/authelia.yaml";
           key = "users_database";
         };
       };
@@ -127,7 +127,7 @@ in
               }
               {
                 domain = domains.meshDomain;
-                authelia_url = "http://auth.${domains.meshDomain}";
+                authelia_url = "https://auth.${domains.meshDomain}";
               }
             ];
             redis = {

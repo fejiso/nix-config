@@ -36,7 +36,7 @@
   networking.interfaces.enp41s0.useDHCP = true; # Keep IPv4 DHCP working (interface exits NetworkManager)
 
   sops.secrets.hierro-ipv6 = {
-    sopsFile = "${inputs.self}/secrets/network.yaml";
+    sopsFile = "${inputs.private}/secrets/network.yaml";
     key = "hierro/ipv6";
   };
 

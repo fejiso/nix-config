@@ -4,21 +4,23 @@ This configuration adds NetBird VPN to all NixOS hosts with the setup key secure
 
 ## Initial Setup
 
-1. **Generate age key and setup sops:**
+1. **In the private repo** (`~/dev/nix-config-private`), edit the encrypted
+   secrets file (its `.sops.yaml` drives recipients):
    ```bash
-   ./setup-sops.sh
-   ```
-
-2. **Encrypt the secrets file:**
-   ```bash
+   cd ~/dev/nix-config-private
    sops secrets/netbird.yaml
    ```
-   This will open your editor to encrypt the file. The setup key `5A4D518F-CBCD-45A0-8454-7B747333A09B` is already in the file.
 
-3. **Commit your changes:**
+2. **Push, then update the input in this repo:**
    ```bash
-   git add .
-   git commit -m "Add NetBird configuration with sops-encrypted setup key"
+   git -C ~/dev/nix-config-private commit -am "Update netbird setup key" && git -C ~/dev/nix-config-private push
+   nix flake update private
+   ```
+
+3. **Commit the flake.lock change:**
+   ```bash
+   git add flake.lock
+   git commit -m "Update private input (netbird)"
    ```
 
 ## Deployment

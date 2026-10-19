@@ -109,14 +109,16 @@ above before investing the exploit effort.
 
 WiFi uses the shared iwd + sops `wifi-secrets` stack
 (`flake-modules/system/networking.nix`). The phone's SSH host key isn't in
-`.sops.yaml` until it has booted once:
+the private repo's `.sops.yaml` until it has booted once:
 
 1. Flash, boot, log in on the display (root/`<hostname>`) or `adb shell`
    (herolte enables adbd).
 2. Grab the host key (`ssh-keyscan localhost`), add `&<host>_ssh` /
-   `&<host>_age` anchors to `.sops.yaml`, and append them to the generic
-   `secrets/.*$` creation rule (placeholders are commented there).
-3. `sops updatekeys secrets/wifi.yaml`, then `colmena apply --on <host>`.
+   `&<host>_age` anchors to `.sops.yaml` **in `~/dev/nix-config-private`**, and
+   append them to the generic `secrets/.*$` creation rule (placeholders are
+   commented there).
+3. `sops updatekeys secrets/wifi.yaml` (in the private repo), push, then
+   `nix flake update private` here, then `colmena apply --on <host>`.
 
 ## Updates
 

@@ -5,13 +5,13 @@
   pkgs,
   ...
 }:
-# n8n workflow automation — the fleet's only directly-public hierro service:
-# TLS terminated HERE (not via butthead's home ingress) because hierro is a
-# Hetzner box with a real public IP and n8n webhooks must be reachable from
-# the internet. Mesh vhosts are bound to wt0 only (see ingress-mesh
-# listenAddr), so opening public 80/443 exposes just this one vhost.
+# n8n workflow automation. TLS terminated HERE (not via butthead's home
+# ingress) because hierro is a Hetzner box with a real public IP and n8n
+# webhooks must be reachable from the internet. Shares the box with the
+# backup ingress (ingress-mesh): both listen on the wildcard address and
+# nginx server_name routing keeps them apart.
 let
-  domains = import (inputs.ingress-secrets + "/ingress-domains.nix");
+  domains = import (inputs.private + "/ingress-domains.nix");
   domain = domains.meshDomain;
 
   # Declaratively managed community nodes. n8n reconciles EXACTLY this set on
@@ -77,38 +77,25 @@ in
   systemd.services.n8n.path = [ pkgs.nodejs pkgs.gnutar pkgs.gzip ];
 
   sops.secrets.n8n-encryption-key = {
-    sopsFile = "${inputs.self}/secrets/n8n.yaml";
+    sopsFile = "${inputs.private}/secrets/n8n.yaml";
     key = "encryption_key";
   };
 
-  # Public vhost, bound to hierro's public addresses only (mesh vhosts are
-  # bound to wt0 — see ingress-mesh). Listens on 80 for ACME HTTP-01 +
-  # redirect (forceSSL), 443 for the real thing.
+  # Public vhost. Wildcard listen (like the backup-ingress vhosts) so all
+  # vhosts share the same sockets and server_name routing decides; the
+  # ingress-mesh catch-all rejects unknown Host/SNI. Listens on 80 for ACME
+  # HTTP-01 + redirect (forceSSL), 443 for the real thing.
   services.nginx.virtualHosts."n8n.${domain}" = {
     forceSSL = true;
     enableACME = true;
-    listen = [
-      { addr = "65.108.100.35"; port = 80; }
-      { addr = "65.108.100.35"; port = 443; ssl = true; }
-      { addr = "[2a01:4f9:6b:2ba4::1]"; port = 80; }
-      { addr = "[2a01:4f9:6b:2ba4::1]"; port = 443; ssl = true; }
-    ];
     locations."/" = {
       proxyPass = "http://127.0.0.1:5678";
       proxyWebsockets = true;
     };
   };
 
-  # Production Let's Encrypt (the staging endpoint is only in butthead's
-  # ingress-public bring-up).
-  security.acme = {
-    acceptTerms = true;
-    defaults.email = domains.acmeEmail;
-    defaults.reloadServices = [ "nginx" ];
-    defaults.group = "nginx";
-  };
-
-  # 80/443 public (n8n vhost only — mesh vhosts don't listen on public IPs).
+  # 80/443 public (n8n + backup-ingress vhosts). ACME defaults (production
+  # LE) live in the ingress-mesh module.
   # 5678 mesh-only, for the Gatus health check and direct mesh access.
   networking.firewall.allowedTCPPorts = [ 80 443 ];
   networking.firewall.interfaces.wt0.allowedTCPPorts = [ 5678 ];
