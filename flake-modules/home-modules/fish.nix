@@ -197,6 +197,7 @@
             --ro-bind-try /etc/ca-certificates /etc/ca-certificates \
             --ro-bind-try /etc/pki /etc/pki \
             --ro-bind-try /etc/static /etc/static \
+            --ro-bind-try /opt /opt \
             --ro-bind-try /etc/profiles /etc/profiles \
             # 5. Wipe $HOME with an empty tmpfs so ~/.ssh, ~/.aws, etc. are invisible
             --tmpfs "$HOME" \
