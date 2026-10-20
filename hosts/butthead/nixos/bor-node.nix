@@ -8,7 +8,9 @@
 #
 # Bootstrap: `sudo systemctl start bor-snapshot-fetch` downloads the
 # PublicNode PBSS+pebble snapshot (~6.5TB compressed) into the datadir, then
-# bor catches up the gap itself (bor stays stopped until then).
+# bor catches up the gap itself (bor is MANUAL-START until then — a genesis
+# sync on shared storage thrashes the archive array for weeks; measured
+# 858 MB/s seq writes 2026-10-20, so the snapshot path itself is viable).
 let
   borGenesis = pkgs.fetchurl {
     url = "https://github.com/0xPolygon/bor/releases/download/v2.10.1/genesis-mainnet-v1.json";
@@ -21,8 +23,9 @@ let
   # Upstream mainnet sentry configs (seeds/bootnodes baked in).
   heimdallConf = pkgs.runCommand "heimdall-mainnet-conf" { nativeBuildInputs = [ pkgs.dpkg pkgs.zstd ]; } ''
     dpkg-deb -x ${pkgs.fetchurl {
-      url = "https://github.com/0xPolygon/heimdall-v2/releases/download/v0.11.0/heimdall-mainnet-sentry-config_v0.11.0-all.deb";
-      hash = "sha256-FVXt5CnD+24Pv/0svJ8YDVatU/mIpL9jpUuqyQJqeL4=";
+      # latest published MAINNET sentry config (v0.12.2 shipped amoy-only)
+      url = "https://github.com/0xPolygon/heimdall-v2/releases/download/v0.12.1/heimdall-mainnet-sentry-config_v0.12.1-all.deb";
+      hash = "sha256-/njS84CEsGFgSOOb8z7eK2CTItwBC5RvM4hHCn2MN2s=";
     }} .
     mkdir -p $out
     cp -r var/lib/heimdall/config $out/
@@ -105,6 +108,14 @@ in {
     "d ${heimdallHome}/data 0755 bor bor -"
     "d ${borData} 0755 bor bor -"
     "d ${borData}/data 0755 bor bor -"
+    # `d` only sets ownership at creation — the config dir ended up owned by
+    # media-podman (2026-09-30) and `d` never repaired it, breaking sed -i in
+    # heimdalld's preStart. `z` fixes mode/ownership of EXISTING dirs.
+    "z ${heimdallHome} 0755 bor bor -"
+    "z ${heimdallHome}/config 0755 bor bor -"
+    "z ${heimdallHome}/data 0755 bor bor -"
+    "z ${borData} 0755 bor bor -"
+    "z ${borData}/data 0755 bor bor -"
   ];
 
   # One-shot bootstrap: PublicNode PBSS+pebble snapshot (base 0-75.8M +
@@ -150,6 +161,10 @@ in {
     after = [ "network-online.target" ];
     wants = [ "network-online.target" ];
     wantedBy = [ "multi-user.target" ];
+    # NixOS unit default PATH has coreutils+gnused but NOT diffutils — `cmp`
+    # was silently missing → the genesis guard never fired → full 2.36GB
+    # recopy on every restart (flap loop #5774, 2026-10-20).
+    path = [ pkgs.diffutils ];
     preStart = ''
       if [ ! -f ${heimdallHome}/config/node_key.json ]; then
         ${pkgs.heimdall-v2}/bin/heimdalld init butthead --home ${heimdallHome} || true
@@ -183,12 +198,15 @@ in {
     };
   };
 
+  # MANUAL START ONLY (no wantedBy): a from-genesis sync is impractical even
+  # on healthy storage — fetch the snapshot first (bor-snapshot-fetch), then
+  # `sudo systemctl start bor`. requires=heimdalld stays: bor needs the
+  # consensus layer up.
   systemd.services.bor = {
     description = "Polygon Bor v2 (execution layer)";
     after = [ "heimdalld.service" "network-online.target" "bor-snapshot-fetch.service" ];
     wants = [ "network-online.target" ];
     requires = [ "heimdalld.service" ];
-    wantedBy = [ "multi-user.target" ];
     preStart = ''
       cp -f ${borConf} ${borData}/config.toml
       if [ ! -d ${borData}/data/bor/chaindata ]; then

@@ -3,11 +3,12 @@
 # The deb ships only /usr/bin/bor; the mainnet config comes from the module.
 stdenvNoCC.mkDerivation rec {
   pname = "bor";
-  version = "2.10.1";
+  version = "2.10.3";
 
   src = fetchurl {
     url = "https://github.com/0xPolygon/bor/releases/download/v${version}/bor-v${version}-amd64.deb";
-    hash = "sha256-AclS6ToDbwE+voEOsfp61CZcGlFylmjIRvv2tgxACeI=";
+    # upstream .checksum asset (GitHub release v2.10.3)
+    hash = "sha256-3C6V6BfzhqheXjPS6H0Ym9XnIyqLkc4g27538XC0XR4=";
   };
 
   nativeBuildInputs = [ dpkg zstd autoPatchelfHook ];

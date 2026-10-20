@@ -2,11 +2,12 @@
 # Polygon Heimdall v2 (consensus layer, CometBFT) — upstream release binary.
 stdenvNoCC.mkDerivation rec {
   pname = "heimdall-v2";
-  version = "0.11.0";
+  version = "0.12.2";
 
   src = fetchurl {
     url = "https://github.com/0xPolygon/heimdall-v2/releases/download/v${version}/heimdall-v${version}-amd64.deb";
-    hash = "sha256-4Zoad45Bi/yIHQEYrehNjiY1z20oBYlfIHm+6f4jvoU=";
+    # upstream .checksum asset (GitHub release v0.12.2)
+    hash = "sha256-9QVGDReQVQL8UfWHyZafKyA091LGe+6OPCBj4N6DTUk=";
   };
 
   nativeBuildInputs = [ dpkg zstd autoPatchelfHook ];
