@@ -477,11 +477,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792594941,
-        "narHash": "sha256-lFwdkQWmRhE0/Ods2UG8xD+uRqMMX3sE02Ht/k/E980=",
+        "lastModified": 1792612254,
+        "narHash": "sha256-iHZAQSne7NdwORwIkOsrawhQC7IbQ7drAX8vb8w86Es=",
         "owner": "noctalia-dev",
         "repo": "noctalia",
-        "rev": "86ab912ea30928fcc2ff68e4e9431b0a2ff8b576",
+        "rev": "c7ad3cae733c32fcc9c2d65b32501117779e945f",
         "type": "github"
       },
       "original": {
@@ -573,11 +573,11 @@
     "private": {
       "flake": false,
       "locked": {
-        "lastModified": 1792608787,
-        "narHash": "sha256-AzUJOslVtlmtZfmTtsC7gmhYPOO8i9zejGGvLxS6wDk=",
+        "lastModified": 1792618764,
+        "narHash": "sha256-uU0R29ZOYa6bu2QjoynRuvmt1pTXiDqXpLi6icH02qw=",
         "ref": "refs/heads/master",
-        "rev": "99be56a76b68100477e24ca199ac64f64931eb1d",
-        "revCount": 13,
+        "rev": "5802103008878ba01481a7f9bf8dc000b9a45dcb",
+        "revCount": 17,
         "type": "git",
         "url": "ssh://git@github.com/fejiso/nix-config-private.git"
       },
