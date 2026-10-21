@@ -28,3 +28,5 @@ zturn.img
 # root-owned perf captures break non-root flake eval
 perf.data*
 
+
+# OpenWrt router config backups (cleartext secrets — never commit)

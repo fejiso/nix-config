@@ -53,6 +53,9 @@ This flake-based configuration supports:
 - **Secrets**: [sops-nix](https://github.com/Mic92/sops-nix) — secrets and
   the ingress domain registry live in a **separate private repo**
   (`nix-config-private`), pulled in as the `private` flake input
+- **OpenWrt routers**: declarative fleet management with
+  [openwrt-nix/nuci](https://github.com/lonerOrz/openwrt-nix); the router
+  models and topology live in the private repo (see `docs/ROUTERS.md` there)
 
 # Repository Structure
 

@@ -32,6 +32,15 @@ let
   '';
   borData = "/mnt/bcachefs/bor";
   heimdallHome = "/mnt/bcachefs/heimdall";
+  # Bootstrap mode was going to pin peering to the one full-history node —
+  # SUPERSEDED 2026-10-21 by the pruned-snapshot path below (heimdall
+  # snapshot-fetch restores h≈54.63M; remaining ~1.4M blocks sync fine from
+  # pruned peers). Keep the full verified peer set always.
+  # Live mainnet peers harvested 2026-10-20 from the Sept addrbook (probed
+  # alive + verified on heimdallv2-137 at tip via their RPC /status). The 8
+  # official sentry seeds handshake-and-drop (custom seed servers, capacity
+  # shedding) — they never served us a single pex address; these full nodes do.
+  extraHeimdallPeers = "4fd3d83669b6910270bcdd31f22f3404e3041c6d@103.60.111.230:26656,58c1a9189f569c526ec512e8ab8773a5e2861c28@157.90.130.204:26656,3b17b17e871e2d48b020e869757f4e08863ee08c@65.109.26.235:26656,1664b81d646516883008a855ff94bd40e9f166f1@51.210.155.95:26656,1c1c7a7f290bd60e541c4b787b86a1f2fa592850@148.251.8.7:26656,e0d3d261845418ef9540897498343ca1d07362a3@144.126.147.62:26656";
   borConf = pkgs.writeText "bor-config.toml" ''
     chain = "mainnet"
     datadir = "${borData}/data"
@@ -156,6 +165,49 @@ in {
     '';
   };
 
+  # One-shot bootstrap: stakepool mainnet snapshot. PRUNED attempt
+  # (heimdall-pruned-mainnet_34, 2026-10-01) was DEFECTIVE upstream — tar
+  # missing the tail of application.db (live-tar race; MANIFEST refs tables
+  # beyond EOF). FULL snapshot heimdall-mainnet_61 (2026-08-06, h≈50.9M,
+  # 1.87TB tar.zst) is the fallback: its catch-up range 50.9M→53.5M is
+  # servable by 103.60.111.230 (earliest 47.87M) + matic-full-node-de-2
+  # (archive), the rest by every pruned peer. Written pre-Lugano (v0.11.0
+  # era) — fine: Lugano changes are height-gated at 54.627M, and the earlier
+  # AppHash panic was proven to be the corrupt bcachefs genesis, not v0.11.0
+  # state. Manual:
+  #   sudo systemctl stop heimdalld
+  #   sudo systemctl start heimdall-snapshot-fetch   # stops heimdalld itself
+  #   journalctl -fu heimdall-snapshot-fetch
+  #   sudo systemctl start heimdalld
+  systemd.services.heimdall-snapshot-fetch = {
+    description = "Heimdall mainnet full snapshot fetch+extract (stakepool)";
+    conflicts = [ "heimdalld.service" ];
+    after = [ "network-online.target" ];
+    unitConfig.RequiresMountsFor = heimdallHome;
+    serviceConfig = {
+      Type = "oneshot";
+      User = "bor";
+      Group = "bor";
+      TimeoutStartSec = "infinity";
+      RemainAfterExit = true;
+    };
+    path = with pkgs; [ aria2 curl zstd gnutar coreutils ];
+    script = ''
+      set -euo pipefail
+      cd ${heimdallHome}
+      url="https://snap.stakepool.work/snapshots-stakepool/heimdall-mainnet_61.tar.zst"
+      echo "== downloading $url (aria2c, 16 conns; curl fallback)"
+      aria2c -x16 -s16 -c --max-tries=0 --retry-wait=10 -d . -o heimdall-snapshot.tar.zst "$url" \
+        || curl -fL -C - --retry 8 --retry-delay 30 -o heimdall-snapshot.tar.zst "$url"
+      echo "== wiping old data dir"
+      rm -rf data
+      echo "== extracting"
+      zstd -dc heimdall-snapshot.tar.zst | tar -xf - -C ${heimdallHome}
+      rm heimdall-snapshot.tar.zst
+      echo "snapshot ready — start heimdall: sudo systemctl start heimdalld"
+    '';
+  };
+
   systemd.services.heimdalld = {
     description = "Polygon Heimdall v2 (consensus layer)";
     after = [ "network-online.target" ];
@@ -179,12 +231,34 @@ in {
       for f in config.toml app.toml client.toml; do
         cp -f ${heimdallConf}/config/$f ${heimdallHome}/config/$f
       done
+      # The upstream template ships another host's identity (moniker
+      # "ip-10-1-2-107", external_address "15.165.197.16:26656") — advertising
+      # that address poisons our pex propagation. Reset both, and append the
+      # verified live peers (extraHeimdallPeers) to persistent_peers — the
+      # official sentries alone never let us past the handshake.
+      sed -i \
+        -e 's|^moniker = .*|moniker = "butthead"|' \
+        -e 's|^external_address = .*|external_address = ""|' \
+        -e 's|^persistent_peers = "\(.*\)"|persistent_peers = "\1,${extraHeimdallPeers}"|' \
+        ${heimdallHome}/config/config.toml
       # heimdall-v2#616: pre-Zurich (h<47.88M) milestone validation rejects
       # blocks when the configured bor lacks the checkpoint target — pointing
       # at the local unsynced bor deadlocks heimdall at genesis AND bor waits
       # on heimdall. Use synced public bor RPCs until local bor catches up.
       sed -i 's|^bor_rpc_url = .*|bor_rpc_url = "https://polygon-bor-rpc.publicnode.com,https://polygon.drpc.org"|' \
         ${heimdallHome}/config/app.toml
+      # statesync DISABLED 2026-10-21: nobody on mainnet serves snapshots
+      # (template ships snapshot-interval=0 → discovery finds nothing, verified
+      # with 19 healthy peers). Blocksync from the 24.4M migration height with
+      # the verified peer set instead. Keep the trust anchor around in case a
+      # snapshot-serving peer shows up (flip enable to true + wipe data).
+      sed -i \
+        -e '/^\[statesync\]/,/^\[/ s|^enable = true|enable = false|' \
+        -e '/^\[statesync\]/,/^\[/ s|^rpc_servers = .*|rpc_servers = "https://tendermint-api.polygon.technology,https://polygon-heimdall-rpc.publicnode.com"|' \
+        -e '/^\[statesync\]/,/^\[/ s|^trust_height = .*|trust_height = 56006054|' \
+        -e '/^\[statesync\]/,/^\[/ s|^trust_hash = .*|trust_hash = "69813B4864DF3B5A46C9FED8A92C778A60DD76766AC6A49F05958B9201C42A67"|' \
+        -e '/^\[statesync\]/,/^\[/ s|^trust_period = .*|trust_period = "720h0m0s"|' \
+        ${heimdallHome}/config/config.toml
     '';
     serviceConfig = {
       User = "bor";

@@ -64,11 +64,11 @@
         "utils": "utils"
       },
       "locked": {
-        "lastModified": 1791381442,
-        "narHash": "sha256-TQiEqCAQ4bWppfeRGX4O3lwopsgsd2OvcOHTEQRRwEQ=",
+        "lastModified": 1792446739,
+        "narHash": "sha256-eINUtQW48bf9G3EYprthHMll8VDKxaXQP52TZFuwMmE=",
         "owner": "serokell",
         "repo": "deploy-rs",
-        "rev": "45ba3f8c5cb28396fff71671806e2550b464ac86",
+        "rev": "1cec0527bd09074bbee6d4461900ce5d58267217",
         "type": "github"
       },
       "original": {
@@ -111,6 +111,46 @@
         "type": "github"
       }
     },
+    "flake-parts_2": {
+      "inputs": {
+        "nixpkgs-lib": "nixpkgs-lib_2"
+      },
+      "locked": {
+        "lastModified": 1785627969,
+        "narHash": "sha256-4dtXQk/NMePegK/nWp5NSeuZKLATItOq61lpEvmXqGw=",
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "rev": "427bf4bd9435fdf21321c8cc628c24efc14c0f7a",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "type": "github"
+      }
+    },
+    "flake-parts_3": {
+      "inputs": {
+        "nixpkgs-lib": [
+          "openwrt-nix",
+          "openwrt-imagebuilder",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1772408722,
+        "narHash": "sha256-rHuJtdcOjK7rAHpHphUb1iCvgkU3GpfvicLMwwnfMT0=",
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "rev": "f20dc5d9b8027381c474144ecabc9034d6a839a3",
+        "type": "github"
+      },
+      "original": {
+        "owner": "hercules-ci",
+        "repo": "flake-parts",
+        "type": "github"
+      }
+    },
     "home-manager": {
       "inputs": {
         "nixpkgs": [
@@ -118,11 +158,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1790996401,
-        "narHash": "sha256-f+kOxEmOUnQazVAmGg0i8hzwgd1kX/geY+k/Dpheye8=",
+        "lastModified": 1792438572,
+        "narHash": "sha256-5mQQOcggBRBXB7NlzUxO0dbvQN4euJOISjNybrtfxPk=",
         "owner": "nix-community",
         "repo": "home-manager",
-        "rev": "db7d5e2332710f5abb088f6b5de927d7f9511b35",
+        "rev": "24f8f8e786f87d6a818e1746cb2389bf922afdab",
         "type": "github"
       },
       "original": {
@@ -229,11 +269,11 @@
         "nixpkgs": "nixpkgs_4"
       },
       "locked": {
-        "lastModified": 1744447522,
-        "narHash": "sha256-B4VaYKt/YT0P5wNfp2O6j5HYXJ/Hg0W5/6km9VcnFts=",
+        "lastModified": 1792295619,
+        "narHash": "sha256-bxPYSannw0nCcSDeU5Mlkflto7eOpSU5eJuL+znDCZ0=",
         "owner": "scottwillmoore",
         "repo": "nix-gowin-eda",
-        "rev": "489f21920b58669370a6e5366b59589d98ccc30d",
+        "rev": "0ded375af8838c3dc5d45a86e2d09156bc6e4fb8",
         "type": "github"
       },
       "original": {
@@ -247,11 +287,11 @@
         "nixpkgs": "nixpkgs_5"
       },
       "locked": {
-        "lastModified": 1791721963,
-        "narHash": "sha256-BYhx89XJltnRyQeuDKHVL5eSqbbfAcOKuDts7QRsrxQ=",
+        "lastModified": 1792491056,
+        "narHash": "sha256-6n1Dn+WYtD8lprnSi+0k4FjbKfIVNG8lblpJ5MiiqXs=",
         "owner": "NixOS",
         "repo": "nixos-hardware",
-        "rev": "60a624466c08787ee8303393b7d4752d1826f14f",
+        "rev": "efb6d0d5e2394c3c5416a18652808aba206c0988",
         "type": "github"
       },
       "original": {
@@ -292,13 +332,28 @@
         "type": "github"
       }
     },
+    "nixpkgs-lib_2": {
+      "locked": {
+        "lastModified": 1785031560,
+        "narHash": "sha256-OmshNvn2vupOFpYinLUu+1Dnpu4n7Q5N3ggGVNHpkUI=",
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "rev": "0e79af5e3d4dcfcd676ab5ba3f95d2e3352e078c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "nixpkgs.lib",
+        "type": "github"
+      }
+    },
     "nixpkgs-unstable": {
       "locked": {
-        "lastModified": 1791594108,
-        "narHash": "sha256-XK4KceonkwD8LuMAt/vNrz982mXJM5jeHAxMwsUXXAQ=",
+        "lastModified": 1792502884,
+        "narHash": "sha256-IoNisKcGbUjdd45qCqywGMCYmZ5EnkxezvLII0FWwNA=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "6510408d147d8c5e6d76043e899e9251756f6a75",
+        "rev": "02c087f3fe673c9e317f206a627cb6b910336dbe",
         "type": "github"
       },
       "original": {
@@ -342,11 +397,11 @@
     },
     "nixpkgs_4": {
       "locked": {
-        "lastModified": 1791487292,
-        "narHash": "sha256-tqM7xDEsaeK1p6VvRygeZ9LkQRpUUkbRT02BHv6hnTM=",
+        "lastModified": 1792116957,
+        "narHash": "sha256-EjZqHKObBfIOeHZnMRVV87HB3pPq/WBkmRJWyFxmZu8=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "8edc0c72e3a38faf5434e40d1f19431125fe4b30",
+        "rev": "f20cd90e28fe0403873f473b29e42662cd86e8c4",
         "type": "github"
       },
       "original": {
@@ -371,11 +426,11 @@
     },
     "nixpkgs_6": {
       "locked": {
-        "lastModified": 1791662279,
-        "narHash": "sha256-xI8L+UwJLIg75yVJwLPsY+AUEP1teCT3FyuvodyJu2Y=",
+        "lastModified": 1792503283,
+        "narHash": "sha256-vhe2jyvRCgufWPqDuDq1S3t3ypE+ka46IFutV02xKso=",
         "owner": "nixos",
         "repo": "nixpkgs",
-        "rev": "6fcc160353f63555b560f25588925133c8f61f2a",
+        "rev": "cd4ea8d57de16f4810bc5f14207bac45fbf19f67",
         "type": "github"
       },
       "original": {
@@ -386,6 +441,20 @@
       }
     },
     "nixpkgs_7": {
+      "locked": {
+        "lastModified": 1786106723,
+        "narHash": "sha256-CgKDSHL6rqAAQkkvg1xaZDQXb77+4XW73iGcUMJ+2w0=",
+        "rev": "f13ff45afd1bb73e640eaa08a7066dbed07e3238",
+        "type": "tarball",
+        "url": "https://releases.nixos.org/nixos/unstable/nixos-26.11pre1049422.f13ff45afd1b/nixexprs.tar.xz"
+      },
+      "original": {
+        "id": "nixpkgs",
+        "ref": "nixos-unstable",
+        "type": "indirect"
+      }
+    },
+    "nixpkgs_8": {
       "locked": {
         "lastModified": 1785692966,
         "narHash": "sha256-vUfIeBEfpbAfZ5zjgIkYk7eHBeVfCYVjLbWnMkseYnk=",
@@ -408,16 +477,60 @@
         ]
       },
       "locked": {
-        "lastModified": 1791799089,
-        "narHash": "sha256-MaI/uiLleCQvsb/3pgsVhZ9l/HfneVcmh1td84ZBwPU=",
+        "lastModified": 1792594941,
+        "narHash": "sha256-lFwdkQWmRhE0/Ods2UG8xD+uRqMMX3sE02Ht/k/E980=",
         "owner": "noctalia-dev",
         "repo": "noctalia",
-        "rev": "dcfde39b7b1df386d4b063abe471367702725ff6",
+        "rev": "86ab912ea30928fcc2ff68e4e9431b0a2ff8b576",
         "type": "github"
       },
       "original": {
         "owner": "noctalia-dev",
         "repo": "noctalia",
+        "type": "github"
+      }
+    },
+    "openwrt-imagebuilder": {
+      "inputs": {
+        "flake-parts": "flake-parts_3",
+        "nixpkgs": [
+          "openwrt-nix",
+          "nixpkgs"
+        ],
+        "systems": "systems_3"
+      },
+      "locked": {
+        "lastModified": 1786354751,
+        "narHash": "sha256-Cj++DBPbHgjylJet3MFnXItnWpyBiSLPoF6Q8ntusyA=",
+        "owner": "astro",
+        "repo": "nix-openwrt-imagebuilder",
+        "rev": "30087bb0d4360858f0dd4946b02ae3bbe6f9eb7b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "astro",
+        "repo": "nix-openwrt-imagebuilder",
+        "type": "github"
+      }
+    },
+    "openwrt-nix": {
+      "inputs": {
+        "flake-parts": "flake-parts_2",
+        "nixpkgs": "nixpkgs_7",
+        "openwrt-imagebuilder": "openwrt-imagebuilder",
+        "treefmt-nix": "treefmt-nix"
+      },
+      "locked": {
+        "lastModified": 1788196604,
+        "narHash": "sha256-kXh7XIBukm/XDe4SbUBPbbT8GFF4ItyL25YEZdU6mo4=",
+        "owner": "lonerOrz",
+        "repo": "openwrt-nix",
+        "rev": "7d0cc8db7be221ffdfbbe9ec31a64f227badf30b",
+        "type": "github"
+      },
+      "original": {
+        "owner": "lonerOrz",
+        "repo": "openwrt-nix",
         "type": "github"
       }
     },
@@ -440,7 +553,7 @@
     "polystack": {
       "inputs": {
         "crane": "crane",
-        "nixpkgs": "nixpkgs_7",
+        "nixpkgs": "nixpkgs_8",
         "polyboh": "polyboh"
       },
       "locked": {
@@ -460,11 +573,11 @@
     "private": {
       "flake": false,
       "locked": {
-        "lastModified": 1792407321,
-        "narHash": "sha256-Ge/E5WHYbQCJrEisuGvSHXJ6VLsY59DvsqTzDjTwsDw=",
+        "lastModified": 1792608787,
+        "narHash": "sha256-AzUJOslVtlmtZfmTtsC7gmhYPOO8i9zejGGvLxS6wDk=",
         "ref": "refs/heads/master",
-        "rev": "fd95be3fef946bbd198eb77cf1c399f00bed5c16",
-        "revCount": 1,
+        "rev": "99be56a76b68100477e24ca199ac64f64931eb1d",
+        "revCount": 13,
         "type": "git",
         "url": "ssh://git@github.com/fejiso/nix-config-private.git"
       },
@@ -504,6 +617,7 @@
         "nixpkgs": "nixpkgs_6",
         "nixpkgs-unstable": "nixpkgs-unstable",
         "noctalia": "noctalia",
+        "openwrt-nix": "openwrt-nix",
         "polystack": "polystack",
         "private": "private",
         "quadlet-nix": "quadlet-nix",
@@ -517,11 +631,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1791710405,
-        "narHash": "sha256-mVD4XIc5JkqMW2K04IkFUzHgHmyJZlzw5ktfgMDCbKU=",
+        "lastModified": 1792056300,
+        "narHash": "sha256-YU1LjDe1o2Ymg5zEiCHbmMXLkDCtxHQRiVqZ3nC5GGk=",
         "owner": "Mic92",
         "repo": "sops-nix",
-        "rev": "ee48786c6f9160d2c1a084aac841f68195b8420c",
+        "rev": "44931708c62937c2b1bf7953902989fa5bb9ee1b",
         "type": "github"
       },
       "original": {
@@ -573,6 +687,42 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
+        "type": "github"
+      }
+    },
+    "systems_3": {
+      "locked": {
+        "lastModified": 1680978846,
+        "narHash": "sha256-Gtqg8b/v49BFDpDetjclCYXm8mAnTrUzR0JnE2nv5aw=",
+        "owner": "nix-systems",
+        "repo": "x86_64-linux",
+        "rev": "2ecfcac5e15790ba6ce360ceccddb15ad16d08a8",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-systems",
+        "repo": "x86_64-linux",
+        "type": "github"
+      }
+    },
+    "treefmt-nix": {
+      "inputs": {
+        "nixpkgs": [
+          "openwrt-nix",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1785945821,
+        "narHash": "sha256-NLSyTCW4K4ofhNBllt3omPasm6QpralXH1DBZOc91Dw=",
+        "owner": "numtide",
+        "repo": "treefmt-nix",
+        "rev": "ae7910970dddc408fe6ab1c8e4b277bb21d72dc0",
+        "type": "github"
+      },
+      "original": {
+        "owner": "numtide",
+        "repo": "treefmt-nix",
         "type": "github"
       }
     },
