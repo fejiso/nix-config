@@ -34,6 +34,9 @@ in
         uci.writeUci {
           imports = [
             "${routerDir}/common.nix"
+            "${routerDir}/modules/firewall-stock-rules.nix"
+            "${routerDir}/modules/netbird.nix"
+            "${routerDir}/modules/wg-spoke.nix"
             "${routerDir}/${name}.nix"
           ];
           _module.args = { inherit inputs; };

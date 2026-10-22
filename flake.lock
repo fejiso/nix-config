@@ -211,11 +211,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792625244,
-        "narHash": "sha256-BdwzMI6eVtJxFZW5aXgOaMhTiOtDlRsd/gmFb2SpGiA=",
+        "lastModified": 1792671426,
+        "narHash": "sha256-2Oy9LrNcKI51O4Xkp9fqnoj1eQBtMOLHy8NSGjZLdLs=",
         "owner": "nix-darwin",
         "repo": "nix-darwin",
-        "rev": "4459544d8296fa2cca7168de1e54a6691ec48a17",
+        "rev": "7d0ed403831921ab9720f6e0ee9653d89ca61f8a",
         "type": "github"
       },
       "original": {
@@ -477,11 +477,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1792653901,
-        "narHash": "sha256-78muVLcTK0P73ir65B88rr+MesTEemMrxywYQs9RVLk=",
+        "lastModified": 1792678324,
+        "narHash": "sha256-fSVMK24w3l90FQZ4XHuXLP3fZfBA3N4qtB1A8Odfwz0=",
         "owner": "noctalia-dev",
         "repo": "noctalia",
-        "rev": "15051a8251435dfcb9abdb2c63b9cf401f2f0d58",
+        "rev": "1407471c6db77deccfa6392f1026081ec635e7d1",
         "type": "github"
       },
       "original": {
@@ -573,11 +573,11 @@
     "private": {
       "flake": false,
       "locked": {
-        "lastModified": 1792678509,
-        "narHash": "sha256-PywHQG0tDc0RVMbuq1FTsrnsxjYOMbwT9W3dtkirfz8=",
+        "lastModified": 1792709341,
+        "narHash": "sha256-jNd6/DjfVzXsEgJntKoiQbrR7EUPPnvG0F6RN6NyDAU=",
         "ref": "refs/heads/master",
-        "rev": "987863e58af5bae05b35cb25917a7e2f6af9aad3",
-        "revCount": 36,
+        "rev": "b750990cf4cb7152561e9605a3ff88483c83e7c8",
+        "revCount": 37,
         "type": "git",
         "url": "ssh://git@github.com/fejiso/nix-config-private.git"
       },
