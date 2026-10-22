@@ -573,11 +573,11 @@
     "private": {
       "flake": false,
       "locked": {
-        "lastModified": 1792709418,
-        "narHash": "sha256-pf79bVwzkm3GWj+5q+kQ4Ncu4FZTlxGBXUQkhsXtKbU=",
+        "lastModified": 1792710615,
+        "narHash": "sha256-Gf6cH/LT5wpo1pYFc70fRGztcvrD6traVaplNZIQS58=",
         "ref": "refs/heads/master",
-        "rev": "33971d953cccbdb47ac1d55e5d1e6fbcdb5387f1",
-        "revCount": 38,
+        "rev": "55e2f5fd43ebb1bac4c8ebf8e7cfc5cd92c1918b",
+        "revCount": 39,
         "type": "git",
         "url": "ssh://git@github.com/fejiso/nix-config-private.git"
       },
