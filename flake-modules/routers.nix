@@ -44,10 +44,25 @@ in
         let
           targetArg =
             if target != null then
-              ''TARGET="root@${target}"; [ $# -ge 1 ] && TARGET="$1" && shift''
+              ''TARGET="root@${target}"; [ $# -ge 1 ] && [ "''${1#-}" = "$1" ] && TARGET="$1" && shift''
             else
               ''TARGET="''${1:?usage: ${verb}-${name} root@<ip> [nuci flags]}"; shift'';
           watchdog = lib.optionalString (verb == "deploy") "--watchdog-timeout 120";
+          confirm = lib.optionalString (verb == "deploy") ''
+            # Show the read-only diff first, then ask for confirmation.
+            # -y/--yes skips the prompt (for scripts/headless use).
+            SKIP=0
+            args=()
+            for a in "$@"; do
+              if [ "$a" = "-y" ] || [ "$a" = "--yes" ]; then SKIP=1; else args+=("$a"); fi
+            done
+            set -- "''${args[@]}"
+            if [ "$SKIP" != 1 ]; then
+              ${uci.nuci}/bin/nuci diff ${cfg.json} --target "$TARGET" || true
+              printf '\nDeploy to %s? [y/N] ' "$TARGET"
+              read -r ans < /dev/tty || { echo "no tty; aborting"; exit 1; }
+              case "$ans" in y|Y|yes) ;; *) echo aborted; exit 1 ;; esac
+            fi'';
         in
         {
           name = "${verb}-${name}";
@@ -58,6 +73,7 @@ in
                 set -euo pipefail
                 export PATH="${lib.makeBinPath [ pkgs.openssh pkgs.sops pkgs.age ]}:$PATH"
                 ${targetArg}
+                ${confirm}
                 exec ${uci.nuci}/bin/nuci ${verb} ${cfg.json} --target "$TARGET" ${watchdog} "$@"
               ''
             );

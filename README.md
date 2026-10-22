@@ -1,7 +1,8 @@
-# Multi-Platform Nix Configuration
+# My whole infrastructure flake
+
 
 This repository contains a comprehensive Nix configuration for managing multiple
-systems across different platforms:
+systems across different platforms, spanning the entirety of my homelab/infrastructure:
 
 - NixOS (Linux) — x86_64 and ARM64 (aarch64)
 - macOS (via nix-darwin)
