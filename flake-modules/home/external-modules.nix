@@ -24,6 +24,7 @@
       config.flake.modules.homeManager.ideavim
       config.flake.modules.homeManager.keychain
       config.flake.modules.homeManager.nethack
+      config.flake.modules.homeManager.ssh
       config.flake.modules.homeManager.wezterm
       config.flake.modules.homeManager.zellij
       config.flake.modules.homeManager.zsh
