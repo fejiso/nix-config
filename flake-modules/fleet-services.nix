@@ -1,4 +1,4 @@
-{ ... }: {
+{ inputs, ... }: {
   # Fleet-wide service registry — single source of truth consumed by:
   #   - flake-modules/system-modules/ingress.nix (nginx vhosts on butthead + hierro)
   #   - flake-modules/system-modules/gatus.nix   (health checks + alerting)
@@ -15,6 +15,20 @@
   # motion, omv, pintoradio, prometheus, qdirstat, readarr, romm, router2,
   # search, serge*, syncthing, task, unmanic, webz, grafana/prometheus on
   # butthead) were NOT onboarded.
+  # NixOS fleet hosts (all dirs under hosts/ except the shared `common`),
+  # probed over SSH/SOCKS by gatus and rendered as matrix columns by the
+  # blinkenlights display. 25 hosts + 7 routers = exactly 32 columns.
+  fleet.hosts = [
+    "a8" "austin" "blacktop" "butthead" "devdesktop" "elitedex" "falk1"
+    "ford" "gravidesktop" "hammerhead" "herolte" "hierro" "hispanas"
+    "kr260" "lenovix" "mustang" "pine64" "rpi3" "snuffles" "thor"
+    "tissot" "tungsten" "work-laptop" "xpi-s905x3" "z-turn"
+  ];
+
+  # Router fleet names from the private repo's routers/registry.nix (same
+  # import as flake-modules/routers.nix).
+  fleet.routers = builtins.attrNames (import "${inputs.private}/routers/registry.nix");
+
   fleet.services = {
     # ── butthead ────────────────────────────────────────────────────────────
     # sso = false: friends + mobile/TV apps use Emby's own auth; forward-auth

@@ -37,6 +37,7 @@ in
             "${routerDir}/modules/firewall-stock-rules.nix"
             "${routerDir}/modules/netbird.nix"
             "${routerDir}/modules/wg-spoke.nix"
+            "${routerDir}/modules/stratum1.nix"
             "${routerDir}/${name}.nix"
           ];
           _module.args = { inherit inputs; };

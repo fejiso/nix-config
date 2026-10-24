@@ -18,6 +18,24 @@
     };
   };
 
+  options.fleet.hosts = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    default = [ ];
+    description = ''
+      NixOS fleet hostnames (NetBird-resolvable) probed by gatus over SSH/SOCKS
+      and rendered as matrix columns by the blinkenlights display.
+    '';
+  };
+
+  options.fleet.routers = lib.mkOption {
+    type = lib.types.listOf lib.types.str;
+    default = [ ];
+    description = ''
+      Router fleet hostnames (from the private repo's routers/registry.nix),
+      probed by gatus over SSH and rendered as matrix columns.
+    '';
+  };
+
   options.fleet.services = lib.mkOption {
     type = lib.types.attrsOf (lib.types.submodule {
       options = {

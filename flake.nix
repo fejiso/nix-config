@@ -36,6 +36,14 @@
       flake = false;
     };
 
+    # Blinkenlights ESP32 firmware (github.com/fejiso/blinkenlights): HUB75
+    # Gatus status matrix. Source-only input; see flake-modules/blinkenlights.nix
+    # for the dev shell and pio build/flash apps.
+    blinkenlights = {
+      url = "git+ssh://git@github.com/fejiso/blinkenlights.git";
+      flake = false;
+    };
+
     # Colmena for deployment (NixOS hosts)
     colmena.url = "github:zhaofengli/colmena";
 

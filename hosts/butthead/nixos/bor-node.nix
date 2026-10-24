@@ -247,6 +247,10 @@ in {
       # on heimdall. Use synced public bor RPCs until local bor catches up.
       sed -i 's|^bor_rpc_url = .*|bor_rpc_url = "https://polygon-bor-rpc.publicnode.com,https://polygon.drpc.org"|' \
         ${heimdallHome}/config/app.toml
+      # iavl node cache: default 781k nodes (~0.3GB) starves replay execution;
+      # box has 62GB RAM. 20M nodes ≈ 5-8GB. (2026-10-24 catch-up tuning)
+      sed -i 's|^iavl-cache-size = .*|iavl-cache-size = 20000000|' \
+        ${heimdallHome}/config/app.toml
       # statesync DISABLED 2026-10-21: nobody on mainnet serves snapshots
       # (template ships snapshot-interval=0 → discovery finds nothing, verified
       # with 19 healthy peers). Blocksync from the 24.4M migration height with

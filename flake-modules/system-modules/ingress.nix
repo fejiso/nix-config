@@ -15,13 +15,18 @@
 # <input>/ingress-domains.nix — hand-edited, never committed here).
 let
   registry = config.fleet.services;
+  fleetHosts = config.fleet.hosts;
+  fleetRouters = config.fleet.routers;
 
   loadDomains = import (inputs.private + "/ingress-domains.nix");
 
   # Shared nginx config for one ingress instance. A NixOS module.
   # includeService: extra predicate on top of `public` (the mesh flavor uses
   # it to drop lan-upstream services it can't reach).
-  mkIngress = { selfHost, domainAttr, tls, httpPort, httpsPort ? 443, includeService ? (_: true) }:
+  # matrixPort: when set, also serve the blinkenlights ESP32 endpoints on that
+  # port (plain HTTP): a PromQL proxy to VictoriaMetrics on hierro over the
+  # mesh, plus the eval-time-generated matrix_config.json layout.
+  mkIngress = { selfHost, domainAttr, tls, httpPort, httpsPort ? 443, includeService ? (_: true), matrixPort ? null }:
     { config, lib, pkgs, hostname, ... }:
     let
       domains = loadDomains;
@@ -41,6 +46,16 @@ let
       autheliaAuthz =
         if selfHost == "butthead" then "127.0.0.1:9091"
         else "butthead.netbird.cloud:9091";
+
+      # Blinkenlights layout, generated at eval time from the fleet registries:
+      # rows = ssh/socks pseudo-services + every fleet.services entry, columns
+      # = NixOS hosts + routers (both capped at 32 for the LED matrix).
+      matrixConfigFile = pkgs.writeText "matrix_config.json" (builtins.toJSON {
+        version = 1;
+        panels = 2;
+        services = lib.take 32 ([ "ssh" "socks" ] ++ builtins.attrNames registry);
+        hosts = lib.take 32 (fleetHosts ++ fleetRouters);
+      });
     in
     {
       services.nginx = {
@@ -127,6 +142,28 @@ let
             '';
             locations."/".return = "404";
           };
+        } // lib.optionalAttrs (matrixPort != null) {
+          # Blinkenlights ESP32 endpoint: unauthenticated plain HTTP (LAN
+          # gadget), wildcard bind — butthead's LAN address is a router DHCP
+          # reservation, and nginx must not fail to bind if it changes.
+          "matrix-lan" = {
+            listen = [{ addr = "0.0.0.0"; port = matrixPort; }];
+            locations."/api/v1/query" = {
+              proxyPass = "http://hierro.netbird.cloud:8428/api/v1/query";
+              extraConfig = ''
+                proxy_buffering off;
+                proxy_read_timeout 10s;
+              '';
+            };
+            locations."= /matrix_config.json" = {
+              alias = "${matrixConfigFile}";
+              extraConfig = ''
+                default_type application/json;
+                add_header Cache-Control "public, max-age=3600";
+              '';
+            };
+            locations."/".return = "404";
+          };
         };
       } // lib.optionalAttrs tls {
         defaultSSLListenPort = httpsPort;
@@ -177,6 +214,7 @@ in
         tls = true;
         httpPort = 8003;
         httpsPort = 44303;
+        matrixPort = 8428;
       })
     ];
 
@@ -197,8 +235,8 @@ in
     };
 
     # Ingress ports (LAN/mesh-reachable; router forwards land here only
-    # after the manual flip).
-    networking.firewall.allowedTCPPorts = [ 8003 44303 ];
+    # after the manual flip). 8428 = blinkenlights matrix endpoint (LAN).
+    networking.firewall.allowedTCPPorts = [ 8003 44303 8428 ];
   };
 
 

@@ -17,6 +17,8 @@
 # native pushover provider they would be sent literally.
 let
   registry = config.fleet.services;
+  fleetHosts = config.fleet.hosts;
+  fleetRouters = config.fleet.routers;
 
   loadDomains = import (inputs.private + "/ingress-domains.nix");
 in
@@ -73,6 +75,33 @@ in
           description = "${svc.host}: mesh ingress proxy unreachable or returned 5xx";
         }];
       };
+
+      # Fleet-wide TCP probes feeding the blinkenlights matrix rows 0/1.
+      # Routers get SSH only (they run netbird per routers/modules/netbird.nix
+      # but no microsocks); NixOS hosts get SSH + SOCKS5 (port 1080 is opened
+      # on wt0 fleet-wide by flake-modules/system/networking.nix).
+      mkSshEndpoint = host: {
+        name = "ssh-${host}";
+        group = "System (${host})";
+        url = "tcp://${host}.netbird.cloud:22";
+        interval = "60s";
+        conditions = [ "[CONNECTED] == true" ];
+        alerts = [{
+          type = "pushover";
+          description = "${host}: SSH unreachable";
+        }];
+      };
+      mkSocksEndpoint = host: {
+        name = "socks-${host}";
+        group = "Mesh (${host})";
+        url = "tcp://${host}.netbird.cloud:1080";
+        interval = "60s";
+        conditions = [ "[CONNECTED] == true" ];
+        alerts = [{
+          type = "pushover";
+          description = "${host}: SOCKS5 proxy unreachable";
+        }];
+      };
     in
     {
       sops.templates."gatus-env" = {
@@ -117,7 +146,9 @@ in
           endpoints =
             lib.mapAttrsToList mkMesh registry
             ++ lib.mapAttrsToList mkPublic publicServices
-            ++ lib.mapAttrsToList mkMeshMirror meshMirrorServices;
+            ++ lib.mapAttrsToList mkMeshMirror meshMirrorServices
+            ++ map mkSshEndpoint (fleetHosts ++ fleetRouters)
+            ++ map mkSocksEndpoint fleetHosts;
         };
       };
 

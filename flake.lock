@@ -19,6 +19,22 @@
         "type": "github"
       }
     },
+    "blinkenlights": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1792844101,
+        "narHash": "sha256-P1ZczvAyTNVE7QYtrVPVNWbqg3qA+1lLVBv74uIA4ZQ=",
+        "ref": "refs/heads/master",
+        "rev": "14fafce4ea56c8cc6fdb7a240a269c279cd29678",
+        "revCount": 2,
+        "type": "git",
+        "url": "ssh://git@github.com/fejiso/blinkenlights.git"
+      },
+      "original": {
+        "type": "git",
+        "url": "ssh://git@github.com/fejiso/blinkenlights.git"
+      }
+    },
     "colmena": {
       "inputs": {
         "nix-github-actions": "nix-github-actions",
@@ -573,11 +589,11 @@
     "private": {
       "flake": false,
       "locked": {
-        "lastModified": 1792710615,
-        "narHash": "sha256-Gf6cH/LT5wpo1pYFc70fRGztcvrD6traVaplNZIQS58=",
+        "lastModified": 1792713589,
+        "narHash": "sha256-007k42fIqao/fd6NsM3wbW1JnPRthJPGCsyzsB4JaWQ=",
         "ref": "refs/heads/master",
-        "rev": "55e2f5fd43ebb1bac4c8ebf8e7cfc5cd92c1918b",
-        "revCount": 39,
+        "rev": "ef597046ecc3d2725c68c7464b2a663159b607ea",
+        "revCount": 40,
         "type": "git",
         "url": "ssh://git@github.com/fejiso/nix-config-private.git"
       },
@@ -604,6 +620,7 @@
     "root": {
       "inputs": {
         "airspy-adsb-bin": "airspy-adsb-bin",
+        "blinkenlights": "blinkenlights",
         "colmena": "colmena",
         "deploy-rs": "deploy-rs",
         "flake-parts": "flake-parts",

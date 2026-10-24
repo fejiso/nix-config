@@ -63,6 +63,15 @@
     # Set hostname
     networking.hostName = hostname;
 
+    # Network time synchronization: MiniPooper01 (local Stratum-1 GNSS server)
+    # with upstream public pool fallback
+    networking.timeServers = lib.mkDefault [
+      "10.2.3.224"            # MiniPooper01 (LAN mgmt IP)
+      "10.200.0.3"            # MiniPooper01 (WireGuard mesh spoke)
+      "0.nixos.pool.ntp.org"
+      "1.nixos.pool.ntp.org"
+    ];
+
     # Bootloader configuration
     boot.loader.systemd-boot.enable = lib.mkDefault true;
     boot.loader.efi.canTouchEfiVariables = lib.mkDefault true;
