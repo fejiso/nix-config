@@ -208,6 +208,38 @@ in {
     '';
   };
 
+  # Watchdog (2026-10-25): a total peer wipeout collapses the BlockPool's
+  # maxPeerHeight to 0 → IsCaughtUp()==true → PERMANENT switch to consensus
+  # mode (~1.5 blk/s vs ~6.5 in blocksync), never re-engaged. Seen twice in
+  # 24h after home-internet EOF bursts. Detect (not catching_up AND >10k
+  # blocks behind the public tip) → clear cs.wal → restart into blocksync.
+  # NOTE: max_packet_msg_payload_size stays at the official 1024 — some peers
+  # bump it (their >1KB packets get them dropped from us, cosmetic).
+  systemd.services.heimdall-sync-watchdog = {
+    description = "Force heimdalld back into blocksync if stuck in consensus behind tip";
+    path = with pkgs; [ curl jq coreutils systemd ];
+    serviceConfig.Type = "oneshot";
+    script = ''
+      set -uo pipefail
+      st=$(curl -s -m 5 http://127.0.0.1:26657/status) || exit 0
+      local_h=$(echo "$st" | jq -r '.result.sync_info.latest_block_height // "0"')
+      catching=$(echo "$st" | jq -r '.result.sync_info.catching_up // "true"')
+      tip=$(curl -s -m 8 https://tendermint-api.polygon.technology/status | jq -r '.result.sync_info.latest_block_height // "0"') || exit 0
+      [ "''${local_h:-0}" = "0" ] && exit 0
+      [ "''${tip:-0}" = "0" ] && exit 0
+      if [ "$catching" = "false" ] && [ "$tip" -gt $((local_h + 10000)) ]; then
+        echo "heimdalld in consensus at $local_h with tip $tip — clearing cs.wal + restart into blocksync"
+        systemctl stop heimdalld
+        rm -rf ${heimdallHome}/data/cs.wal
+        systemctl start heimdalld
+      fi
+    '';
+  };
+  systemd.timers.heimdall-sync-watchdog = {
+    wantedBy = [ "timers.target" ];
+    timerConfig = { OnBootSec = "10min"; OnUnitActiveSec = "5min"; };
+  };
+
   systemd.services.heimdalld = {
     description = "Polygon Heimdall v2 (consensus layer)";
     after = [ "network-online.target" ];
