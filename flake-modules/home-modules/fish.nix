@@ -208,6 +208,7 @@
             --bind-try "$HOME/.local/share/opencode" "$HOME/.local/share/opencode" \
             --bind-try "$HOME/.claude" "$HOME/.claude" \
             --ro-bind-try "$HOME/.claude.json" "$HOME/.claude.json" \
+            --ro-bind-try "$HOME/dev" "$HOME/dev" \
             --bind-try "$HOME/.gemini" "$HOME/.gemini" \
             # 7. Mount ONLY the current project directory as Read-Write (with .git/hooks & .git/config protected)
             --bind "$workdir" "$workdir" \
