@@ -250,6 +250,20 @@ in {
       ];
       doInstallCheck = false;
     });
+
+    # SDRplay removed 3.15.1 from www.sdrplay.com/software/ (404), and sdrplay is
+    # unfree so cache.nixos.org does not mirror the installer. Add the
+    # Archive.org snapshot (identical hash/FOD name) so uncached builds succeed.
+    sdrplay = prev.sdrplay.overrideAttrs (old: {
+      src = prev.fetchurl {
+        inherit (old.src) name;
+        urls = [
+          "https://www.sdrplay.com/software/SDRplay_RSP_API-Linux-${old.version}.run"
+          "https://web.archive.org/web/20260116000508if_/https://www.sdrplay.com/software/SDRplay_RSP_API-Linux-${old.version}.run"
+        ];
+        hash = old.src.outputHash;
+      };
+    });
   };
 
   # Force every buildGo*Module vendor fetch through GOPROXY=direct / GOSUMDB=off.
