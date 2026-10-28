@@ -1,7 +1,7 @@
 { ... }: {
   flake.modules.homeManager.default = { inputs, outputs, lib, config, pkgs, hostname, ... }: {
     home.packages = with pkgs; [
-      htop btop tree pstree wget curl unzip zip jq ripgrep fd bat eza zoxide broot fzf nmap
+      htop btop hwatch tree pstree wget curl unzip zip jq ripgrep fd bat eza zoxide broot fzf nmap
       zellij fish weechat
       git git-annex gh direnv colmena
       vim nano

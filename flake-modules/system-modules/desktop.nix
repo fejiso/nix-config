@@ -117,6 +117,8 @@ services.desktopManager.gnome.enable = lib.mkIf config.services.xserver.enable f
     chromium
     git
     alacritty
+    foot
+    ghostty
     pciutils
     usbutils
     pcsclite

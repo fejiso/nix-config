@@ -18,7 +18,7 @@
     manual.json.enable = false;
     news.display = "silent";
 
-    home.packages = with pkgs; [ eza ripgrep fd fzf tree htop ];
+    home.packages = with pkgs; [ eza ripgrep fd fzf tree htop hwatch ];
 
     programs.fish = {
       enable = true;

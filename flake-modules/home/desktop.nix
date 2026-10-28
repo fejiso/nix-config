@@ -13,11 +13,16 @@ in {
   # desktops — keeps beets/mpd/tidalcycles off devdesktop and work-laptop.
   imports = [
     homeModules.beets
+    homeModules.ghostty
     homeModules.mpd
     homeModules.tidalcycles
   ];
 
   home.packages = with pkgs; [
+    # Terminal emulators
+    foot
+    ghostty
+
     # GUI development IDEs (moved here from the `development` module so they
     # only land on real desktops, not headless work boxes).
     jetbrains.idea

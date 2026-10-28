@@ -36,6 +36,15 @@ let
   # SUPERSEDED 2026-10-21 by the pruned-snapshot path below (heimdall
   # snapshot-fetch restores h≈54.63M; remaining ~1.4M blocks sync fine from
   # pruned peers). Keep the full verified peer set always.
+  # Archive-only bootstrap (2026-10-26): with 50+ pex-learned peers the
+  # BlockPool's requests mostly land on pruned peers (they can't serve
+  # <53.76M) → ~2 blk/s. Pin to the two full-history archives so EVERY
+  # request is servable. EXCLUDES 103.60.111.230 (earliest 47.87M): its
+  # max_packet_msg_payload_size >1024 makes its block responses arrive as
+  # >1034B packets, which we reject → it can never actually serve us.
+  # FLIP to false once past 53.76M (pruned peers join in then).
+  heimdallBootstrapArchiveOnly = true;
+  archiveNodePeers = "58c1a9189f569c526ec512e8ab8773a5e2861c28@157.90.130.204:26656,7f295ad86d3a9a47b297810b37fa9f99d38357e5@168.119.90.117:26656";
   # Live mainnet peers harvested 2026-10-20 from the Sept addrbook (probed
   # alive + verified on heimdallv2-137 at tip via their RPC /status). The 8
   # official sentry seeds handshake-and-drop (custom seed servers, capacity
@@ -271,17 +280,28 @@ in {
       sed -i \
         -e 's|^moniker = .*|moniker = "butthead"|' \
         -e 's|^external_address = .*|external_address = ""|' \
-        -e 's|^persistent_peers = "\(.*\)"|persistent_peers = "\1,${extraHeimdallPeers}"|' \
         ${heimdallHome}/config/config.toml
+      ${if heimdallBootstrapArchiveOnly then ''
+        sed -i \
+          -e 's|^persistent_peers = .*|persistent_peers = "${archiveNodePeers}"|' \
+          -e 's|^seeds = .*|seeds = ""|' \
+          -e 's|^max_num_outbound_peers = .*|max_num_outbound_peers = 2|' \
+          ${heimdallHome}/config/config.toml
+      '' else ''
+        sed -i \
+          -e 's|^persistent_peers = "\(.*\)"|persistent_peers = "\1,${extraHeimdallPeers}"|' \
+          ${heimdallHome}/config/config.toml
+      ''}
       # heimdall-v2#616: pre-Zurich (h<47.88M) milestone validation rejects
       # blocks when the configured bor lacks the checkpoint target — pointing
       # at the local unsynced bor deadlocks heimdall at genesis AND bor waits
       # on heimdall. Use synced public bor RPCs until local bor catches up.
       sed -i 's|^bor_rpc_url = .*|bor_rpc_url = "https://polygon-bor-rpc.publicnode.com,https://polygon.drpc.org"|' \
         ${heimdallHome}/config/app.toml
-      # iavl node cache: default 781k nodes (~0.3GB) starves replay execution;
-      # box has 62GB RAM. 20M nodes ≈ 5-8GB. (2026-10-24 catch-up tuning)
-      sed -i 's|^iavl-cache-size = .*|iavl-cache-size = 20000000|' \
+      # iavl node cache: default 781k nodes (~0.3GB). 20M was tried and ate
+      # 23GB+ RSS (2026-10-27, full-swap thrash) — 4M (~2-4GB) is the safe
+      # middle ground for replay.
+      sed -i 's|^iavl-cache-size = .*|iavl-cache-size = 4000000|' \
         ${heimdallHome}/config/app.toml
       # statesync DISABLED 2026-10-21: nobody on mainnet serves snapshots
       # (template ships snapshot-interval=0 → discovery finds nothing, verified
@@ -302,6 +322,9 @@ in {
       ExecStart = "${pkgs.heimdall-v2}/bin/heimdalld start --home ${heimdallHome}";
       Restart = "on-failure";
       RestartSec = "5s";
+      # Backstop against another cache-driven memory blowout: OOM-kill rather
+      # than letting the box swap-thrash (blocksync resumes on restart).
+      MemoryMax = "16G";
       LimitNOFILE = 65536;
       TimeoutStartSec = "2400s";
       TimeoutStopSec = "120s";

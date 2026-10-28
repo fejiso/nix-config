@@ -182,8 +182,8 @@ with lib;
       ''}
 
       binds {
-          Mod+T { spawn "wezterm"; }
-          Mod+Return { spawn "wezterm"; }
+          Mod+T { spawn "ghostty"; }
+          Mod+Return { spawn "ghostty"; }
           Mod+Q repeat=false { close-window; }
 
           Mod+Space { spawn-sh "noctalia msg panel-toggle launcher"; }

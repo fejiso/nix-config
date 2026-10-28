@@ -34,6 +34,27 @@ let
       scalar-fastapi = super.scalar-fastapi.overridePythonAttrs (_: {
         dontUsePytestCheck = true;
       });
+      # nixpkgs 26.05 moved mcp to 2.x, whose renames (McpError→MCPError etc.)
+      # break fastmcp-slim 3.4.7 at import time. fastmcp 3.4.7 declares
+      # mcp>=1.24,<2 — pin the last 1.x for kimi-cli's env only. Also drops
+      # the v2-only deps mcp-types and httpx2 (plain httpx is required).
+      mcp = super.mcp.overridePythonAttrs (old: rec {
+        version = "1.30.0";
+        src = fetchPypi {
+          pname = "mcp";
+          inherit version;
+          hash = "sha256-RFQUYl/OXClfqlBbsRus7OZhq29AKNV8k121eCC3o+Q=";
+        };
+        dependencies = (builtins.filter (
+          p: !(builtins.elem (p.pname or "") [ "mcp-types" "httpx2" ])
+        ) old.dependencies) ++ [ self.httpx self.httpx-sse self.pydantic-settings ];
+        doCheck = false;
+      });
+      # fastmcp's own suite with the mcp 1.30 pin: 5785 pass, 1 unrelated
+      # OAuth-storage assertion fails against newer deps. Tests off here.
+      fastmcp = super.fastmcp.overridePythonAttrs (_: {
+        doCheck = false;
+      });
     };
   }).pkgs;
 

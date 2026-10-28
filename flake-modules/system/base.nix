@@ -139,6 +139,7 @@
       git-crypt
       htop
       btop
+      hwatch
       nmon
       lshw
       sysstat
