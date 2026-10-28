@@ -29,13 +29,11 @@
     # Whether `adsb-readsb` already manages RTL-SDR udev/kernel blacklists on this host.
     adsbManagesRtlsdrHw = config.services.adsb-readsb.enableRtlSdrHardware or false;
 
-    sdrppWithSdrplay = pkgs.sdrpp.override {
-      sdrplay_source = cfg.devices.sdrplay;
-    };
-
-    # SoapySDR plugins enabled on this host (excludes any device claimed by ADS-B).
-    enabledSoapyPlugins =
-      lib.optional cfg.devices.limesdr pkgs.limesuite
+    # Local hardware SoapySDR plugins enabled on this host (excludes any device
+    # claimed by ADS-B, and excludes soapyremote so SoapySDRServer only exports
+    # local hardware without recursive network discovery).
+    localSoapyPlugins =
+      lib.optional cfg.devices.limesdr pkgs.limesuiteWithGui
       ++ lib.optional cfg.devices.airspy pkgs.soapyairspy
       ++ lib.optional cfg.devices.bladerf pkgs.soapybladerf
       ++ lib.optional cfg.devices.plutosdr pkgs.soapyplutosdr
@@ -44,9 +42,726 @@
       ++ [
         pkgs.soapyaudio
         pkgs.soapyhackrf
-        pkgs.soapyremote
         pkgs.soapyuhd
       ];
+
+    # Full client plugin set (local hardware + SoapyRemote client support).
+    enabledSoapyPlugins = localSoapyPlugins ++ [ pkgs.soapyremote ];
+
+    soapyPluginSearchPath =
+      lib.makeSearchPath pkgs.soapysdr.passthru.searchPath enabledSoapyPlugins;
+
+    soapyServerPluginSearchPath =
+      lib.makeSearchPath pkgs.soapysdr.passthru.searchPath localSoapyPlugins;
+
+    soapysdrWithPlugins = pkgs.soapysdr.override {
+      extraPackages = enabledSoapyPlugins;
+    };
+
+    defaultRemoteStr = lib.concatStringsSep "," cfg.soapyServer.remotes;
+
+    soapySourceMainCpp = pkgs.writeText "soapy_source_main.cpp" ''
+      #include <SoapySDR/Constants.h>
+      #include <imgui.h>
+      #include <utils/flog.h>
+      #include <module.h>
+      #include <gui/gui.h>
+      #include <gui/widgets/stepped_slider.h>
+      #include <signal_path/signal_path.h>
+      #include <SoapySDR/Device.hpp>
+      #include <SoapySDR/Modules.hpp>
+      #include <SoapySDR/Logger.hpp>
+      #include <core.h>
+      #include <gui/style.h>
+      #include <gui/smgui.h>
+      #include <future>
+      #include <sstream>
+      #include <cstring>
+      #include <algorithm>
+
+      #define CONCAT(a, b) ((std::string(a) + b).c_str())
+
+      SDRPP_MOD_INFO{
+          /* Name:            */ "soapy_source",
+          /* Description:     */ "SoapySDR source module for SDR++",
+          /* Author:          */ "Ryzerth",
+          /* Version:         */ 0, 2, 0,
+          /* Max instances    */ 1
+      };
+
+      ConfigManager config;
+
+      class SoapyModule : public ModuleManager::Instance {
+      public:
+          SoapyModule(std::string name) {
+              this->name = name;
+
+              uiGains = new float[1];
+              std::memset(remoteHost, 0, sizeof(remoteHost));
+
+              config.acquire();
+              if (config.conf.contains("remote") && config.conf["remote"].is_string()) {
+                  std::string rem = config.conf["remote"];
+                  std::strncpy(remoteHost, rem.c_str(), sizeof(remoteHost) - 1);
+              }
+              std::string devName = config.conf.contains("device") && config.conf["device"].is_string()
+                  ? std::string(config.conf["device"])
+                  : "";
+              config.release();
+
+              refresh();
+              selectDevice(devName);
+
+              handler.ctx = this;
+              handler.selectHandler = menuSelected;
+              handler.deselectHandler = menuDeselected;
+              handler.menuHandler = menuHandler;
+              handler.startHandler = start;
+              handler.stopHandler = stop;
+              handler.tuneHandler = tune;
+              handler.stream = &stream;
+              sigpath::sourceManager.registerSource("SoapySDR", &handler);
+          }
+
+          ~SoapyModule() {
+              stop(this);
+              sigpath::sourceManager.unregisterSource("SoapySDR");
+          }
+
+          void postInit() {}
+
+          void enable() {
+              enabled = true;
+          }
+
+          void disable() {
+              enabled = false;
+          }
+
+          bool isEnabled() {
+              return enabled;
+          }
+
+          template <typename T>
+          std::string to_string_with_precision(const T a_value, const int n = 6) {
+              std::ostringstream out;
+              out.precision(n);
+              out << std::fixed << a_value;
+              return out.str();
+          }
+
+      private:
+          static std::vector<std::string> splitRemotes(const std::string& str) {
+              std::vector<std::string> out;
+              std::string cur;
+              for (char c : str) {
+                  if (c == ',' || c == ';' || c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+                      if (!cur.empty()) {
+                          out.push_back(cur);
+                          cur.clear();
+                      }
+                  }
+                  else {
+                      cur += c;
+                  }
+              }
+              if (!cur.empty()) {
+                  out.push_back(cur);
+              }
+              return out;
+          }
+
+          void refresh() {
+              txtDevList = "";
+              devList.clear();
+
+              auto localFuture = std::async(std::launch::async, []() -> SoapySDR::KwargsList {
+                  try {
+                      return SoapySDR::Device::enumerate();
+                  }
+                  catch (const std::exception& e) {
+                      flog::error("Could not list local SoapySDR devices: {}", e.what());
+                      return {};
+                  }
+              });
+
+              auto remotes = splitRemotes(std::string(remoteHost));
+              std::vector<std::pair<std::string, std::future<SoapySDR::KwargsList>>> remoteFutures;
+              for (const auto& host : remotes) {
+                  remoteFutures.emplace_back(host, std::async(std::launch::async, [host]() -> SoapySDR::KwargsList {
+                      try {
+                          SoapySDR::Kwargs args;
+                          args["driver"] = "remote";
+                          args["remote"] = host;
+                          args["remote:timeout"] = "500000";
+                          return SoapySDR::Device::enumerate(args);
+                      }
+                      catch (const std::exception& e) {
+                          flog::warn("Could not query SoapySDRServer '{}': {}", host, e.what());
+                          return {};
+                      }
+                  }));
+              }
+
+              devList = localFuture.get();
+
+              for (auto& [host, fut] : remoteFutures) {
+                  for (auto& rdev : fut.get()) {
+                      std::string baseLabel;
+                      if (rdev.count("label") && !rdev["label"].empty()) {
+                          baseLabel = rdev["label"];
+                      }
+                      else if (rdev.count("remote:driver") && !rdev["remote:driver"].empty()) {
+                          baseLabel = rdev["remote:driver"];
+                          if (rdev.count("serial") && !rdev["serial"].empty()) {
+                              baseLabel += " :: " + rdev["serial"];
+                          }
+                      }
+                      else {
+                          baseLabel = rdev.count("driver") && !rdev["driver"].empty() ? rdev["driver"] : "SoapySDR";
+                      }
+
+                      if (baseLabel.find(host) == std::string::npos) {
+                          rdev["label"] = baseLabel + " [" + host + "]";
+                      }
+                      else {
+                          rdev["label"] = baseLabel;
+                      }
+                      devList.push_back(rdev);
+                  }
+              }
+
+              int i = 0;
+              for (auto& dev : devList) {
+                  if (!dev.count("label") || dev["label"].empty()) {
+                      std::string lbl = dev.count("driver") && !dev["driver"].empty() ? dev["driver"] : "SoapySDR";
+                      if (dev.count("serial") && !dev["serial"].empty()) {
+                          lbl += " :: " + dev["serial"];
+                      }
+                      else {
+                          lbl += " #" + std::to_string(i);
+                      }
+                      dev["label"] = lbl;
+                  }
+                  txtDevList += dev["label"];
+                  txtDevList += '\0';
+                  i++;
+              }
+          }
+
+          float selectBwBySr(double samplerate) {
+              float cur = bandwidthList[1];
+              std::vector<float> bwListReversed = bandwidthList;
+              std::reverse(bwListReversed.begin(), bwListReversed.end());
+              for (auto bw : bwListReversed) {
+                  if (bw >= samplerate) {
+                      cur = bw;
+                  }
+                  else {
+                      break;
+                  }
+              }
+              flog::info("Bandwidth for samplerate {0} is {1}", samplerate, cur);
+              return cur;
+          }
+
+          void selectSampleRate(double samplerate) {
+              flog::info("Setting sample rate to {0}", samplerate);
+              if (sampleRates.size() == 0) {
+                  devId = -1;
+                  return;
+              }
+              bool found = false;
+              int i = 0;
+              for (auto& sr : sampleRates) {
+                  if (sr == samplerate) {
+                      srId = i;
+                      sampleRate = sr;
+                      found = true;
+                      core::setInputSampleRate(sampleRate);
+                      break;
+                  }
+                  i++;
+              }
+              if (!found) {
+                  selectSampleRate(sampleRates[0]);
+              }
+          }
+
+          void selectDevice(std::string name) {
+              if (devList.size() == 0) {
+                  devId = -1;
+                  return;
+              }
+              bool found = false;
+              int i = 0;
+              for (auto& args : devList) {
+                  if (args["label"] == name) {
+                      devArgs = args;
+                      devId = i;
+                      found = true;
+                      break;
+                  }
+                  i++;
+              }
+              if (!found) {
+                  devArgs = devList[0];
+                  devId = 0;
+                  name = devArgs["label"];
+              }
+
+              SoapySDR::Device* dev = NULL;
+              try {
+                  dev = SoapySDR::Device::make(devArgs);
+              }
+              catch (const std::exception& e) {
+                  flog::error("Could not open device: {}", e.what());
+                  return;
+              }
+
+              antennaList = dev->listAntennas(SOAPY_SDR_RX, channelId);
+              txtAntennaList = "";
+              for (const std::string& ant : antennaList) {
+                  txtAntennaList += ant + '\0';
+              }
+
+              gainList = dev->listGains(SOAPY_SDR_RX, channelId);
+              delete[] uiGains;
+              uiGains = new float[std::max<size_t>(1, gainList.size())];
+              gainRanges.clear();
+
+              for (auto gain : gainList) {
+                  gainRanges.push_back(dev->getGainRange(SOAPY_SDR_RX, channelId, gain));
+              }
+
+              SoapySDR::RangeList bandwidthRange = dev->getBandwidthRange(SOAPY_SDR_RX, channelId);
+
+              txtBwList = "";
+              bandwidthList.clear();
+              bandwidthList.push_back(-1);
+              txtBwList += "Auto";
+              txtBwList += '\0';
+
+              for (auto bwr : bandwidthRange) {
+                  float bw = bwr.minimum();
+                  bandwidthList.push_back(bw);
+                  if (bw > 1.0e3 && bw <= 1.0e6) {
+                      txtBwList += to_string_with_precision((bw / 1.0e3), 2) + " kHz";
+                  }
+                  else if (bw > 1.0e6) {
+                      txtBwList += to_string_with_precision((bw / 1.0e6), 2) + " MHz";
+                  }
+                  else {
+                      txtBwList += to_string_with_precision(bw, 0);
+                  }
+                  txtBwList += '\0';
+              }
+
+              sampleRates = dev->listSampleRates(SOAPY_SDR_RX, channelId);
+              if (sampleRates.empty()) {
+                  sampleRates.push_back(2.0e6);
+              }
+              txtSrList = "";
+              for (double sr : sampleRates) {
+                  if (sr > 1.0e3 && sr <= 1.0e6) {
+                      txtSrList += to_string_with_precision((sr / 1.0e3), 2) + " kHz";
+                  }
+                  else if (sr > 1.0e6) {
+                      txtSrList += to_string_with_precision((sr / 1.0e6), 2) + " MHz";
+                  }
+                  else {
+                      txtSrList += to_string_with_precision(sr, 0);
+                  }
+                  txtSrList += '\0';
+              }
+
+              hasAgc = dev->hasGainMode(SOAPY_SDR_RX, channelId);
+
+              SoapySDR::Device::unmake(dev);
+
+              config.acquire();
+              if (config.conf["devices"].contains(name)) {
+                  if (config.conf["devices"][name].contains("antenna")) {
+                      uiAntennaId = config.conf["devices"][name]["antenna"];
+                  }
+                  else {
+                      uiAntennaId = 0;
+                  }
+                  int i = 0;
+                  for (auto gain : gainList) {
+                      if (config.conf["devices"][name]["gains"].contains(gain)) {
+                          uiGains[i] = config.conf["devices"][name]["gains"][gain];
+                      }
+                      else {
+                          uiGains[i] = gainRanges[i].minimum();
+                      }
+                      i++;
+                  }
+                  if (config.conf["devices"][name].contains("bandwidth")) {
+                      uiBandwidthId = config.conf["devices"][name]["bandwidth"];
+                  }
+                  else if (bandwidthList.size() > 2) {
+                      uiBandwidthId = 0;
+                  }
+                  if (hasAgc && config.conf["devices"][name].contains("agc")) {
+                      agc = config.conf["devices"][name]["agc"];
+                  }
+                  else {
+                      agc = false;
+                  }
+                  if (config.conf["devices"][name].contains("sampleRate")) {
+                      selectSampleRate(config.conf["devices"][name]["sampleRate"]);
+                  }
+                  else {
+                      selectSampleRate(sampleRates[0]);
+                  }
+              }
+              else {
+                  uiAntennaId = 0;
+                  int i = 0;
+                  for (auto gain : gainList) {
+                      uiGains[i] = gainRanges[i].minimum();
+                      i++;
+                  }
+                  if (bandwidthList.size() > 2)
+                      uiBandwidthId = 0;
+                  if (hasAgc) {
+                      agc = false;
+                  }
+                  selectSampleRate(sampleRates[0]);
+              }
+              config.release();
+          }
+
+          void saveCurrent() {
+              json conf;
+              conf["sampleRate"] = sampleRate;
+              conf["antenna"] = uiAntennaId;
+              int i = 0;
+              for (auto gain : gainList) {
+                  conf["gains"][gain] = uiGains[i];
+                  i++;
+              }
+              if (bandwidthList.size() > 2)
+                  conf["bandwidth"] = uiBandwidthId;
+              if (hasAgc) {
+                  conf["agc"] = agc;
+              }
+              config.acquire();
+              config.conf["devices"][devArgs["label"]] = conf;
+              config.release(true);
+          }
+
+          static void menuSelected(void* ctx) {
+              SoapyModule* _this = (SoapyModule*)ctx;
+              flog::info("SoapyModule '{0}': Menu Select!", _this->name);
+              if (_this->devList.size() == 0) {
+                  return;
+              }
+              core::setInputSampleRate(_this->sampleRate);
+          }
+
+          static void menuDeselected(void* ctx) {
+              SoapyModule* _this = (SoapyModule*)ctx;
+              flog::info("SoapyModule '{0}': Menu Deselect!", _this->name);
+          }
+
+          static void start(void* ctx) {
+              SoapyModule* _this = (SoapyModule*)ctx;
+              if (_this->running) { return; }
+              if (_this->devId < 0) {
+                  flog::error("No device available");
+                  return;
+              }
+
+              try {
+                  _this->dev = SoapySDR::Device::make(_this->devArgs);
+              }
+              catch (const std::exception& e) {
+                  flog::error("Failed to open device: {}", e.what());
+                  return;
+              }
+
+              _this->dev->setSampleRate(SOAPY_SDR_RX, _this->channelId, _this->sampleRate);
+
+              if (!_this->antennaList.empty() && _this->uiAntennaId >= 0 && _this->uiAntennaId < (int)_this->antennaList.size()) {
+                  _this->dev->setAntenna(SOAPY_SDR_RX, _this->channelId, _this->antennaList[_this->uiAntennaId]);
+              }
+
+              if (_this->bandwidthList.size() > 2) {
+                  if (_this->bandwidthList[_this->uiBandwidthId] == -1)
+                      _this->dev->setBandwidth(SOAPY_SDR_RX, _this->channelId, _this->selectBwBySr(_this->sampleRates[_this->srId]));
+                  else
+                      _this->dev->setBandwidth(SOAPY_SDR_RX, _this->channelId, _this->bandwidthList[_this->uiBandwidthId]);
+              }
+
+              if (_this->hasAgc) {
+                  _this->dev->setGainMode(SOAPY_SDR_RX, _this->channelId, _this->agc);
+              }
+
+              int i = 0;
+              for (auto gain : _this->gainList) {
+                  _this->dev->setGain(SOAPY_SDR_RX, _this->channelId, gain, _this->uiGains[i]);
+                  i++;
+              }
+
+              _this->dev->setFrequency(SOAPY_SDR_RX, _this->channelId, _this->freq);
+
+              _this->devStream = _this->dev->setupStream(SOAPY_SDR_RX, "CF32");
+              _this->dev->activateStream(_this->devStream);
+              _this->running = true;
+              _this->workerThread = std::thread(_worker, _this);
+              flog::info("SoapyModule '{0}': Start!", _this->name);
+          }
+
+          static void stop(void* ctx) {
+              SoapyModule* _this = (SoapyModule*)ctx;
+              if (!_this->running) { return; }
+              _this->running = false;
+              _this->dev->deactivateStream(_this->devStream);
+              _this->dev->closeStream(_this->devStream);
+              _this->stream.stopWriter();
+              _this->workerThread.join();
+              _this->stream.clearWriteStop();
+              SoapySDR::Device::unmake(_this->dev);
+
+              flog::info("SoapyModule '{0}': Stop!", _this->name);
+          }
+
+          static void tune(double freq, void* ctx) {
+              SoapyModule* _this = (SoapyModule*)ctx;
+              _this->freq = freq;
+              if (_this->running) {
+                  _this->dev->setFrequency(SOAPY_SDR_RX, _this->channelId, freq);
+              }
+              flog::info("SoapyModule '{0}': Tune: {1}!", _this->name, freq);
+          }
+
+          static void menuHandler(void* ctx) {
+              SoapyModule* _this = (SoapyModule*)ctx;
+
+              if (_this->running) { SmGui::BeginDisabled(); }
+
+              SmGui::LeftLabel("Remote");
+              SmGui::FillWidth();
+              if (SmGui::InputText(CONCAT("##_soapy_remote_", _this->name), _this->remoteHost, sizeof(_this->remoteHost) - 1)) {
+                  config.acquire();
+                  config.conf["remote"] = std::string(_this->remoteHost);
+                  config.release(true);
+              }
+
+              // If no device is selected, draw only the refresh button
+              if (_this->devId < 0) {
+                  SmGui::FillWidth();
+                  SmGui::ForceSync();
+                  if (SmGui::Button(CONCAT("Refresh##_dev_select_", _this->name))) {
+                      _this->refresh();
+                      config.acquire();
+                      std::string defDev = config.conf.contains("device") && config.conf["device"].is_string()
+                          ? std::string(config.conf["device"])
+                          : "";
+                      config.release();
+                      _this->selectDevice(defDev);
+                  }
+                  if (_this->running) { SmGui::EndDisabled(); }
+                  return;
+              }
+
+              SmGui::FillWidth();
+              SmGui::ForceSync();
+              if (SmGui::Combo(CONCAT("##_dev_select_", _this->name), &_this->devId, _this->txtDevList.c_str())) {
+                  _this->selectDevice(_this->devList[_this->devId]["label"]);
+                  config.acquire();
+                  config.conf["device"] = _this->devList[_this->devId]["label"];
+                  config.release(true);
+              }
+
+              if (SmGui::Combo(CONCAT("##_sr_select_", _this->name), &_this->srId, _this->txtSrList.c_str())) {
+                  _this->selectSampleRate(_this->sampleRates[_this->srId]);
+                  if (_this->bandwidthList.size() > 2 && _this->running && _this->bandwidthList[_this->uiBandwidthId] == -1)
+                      _this->dev->setBandwidth(SOAPY_SDR_RX, _this->channelId, _this->selectBwBySr(_this->sampleRates[_this->srId]));
+                  _this->saveCurrent();
+              }
+
+              SmGui::SameLine();
+              SmGui::FillWidth();
+              if (SmGui::Button(CONCAT("Refresh##_dev_select_", _this->name))) {
+                  _this->refresh();
+                  config.acquire();
+                  std::string defDev = config.conf.contains("device") && config.conf["device"].is_string()
+                      ? std::string(config.conf["device"])
+                      : "";
+                  config.release();
+                  _this->selectDevice(defDev);
+              }
+
+              if (_this->running) { SmGui::EndDisabled(); }
+
+              if (_this->antennaList.size() > 1) {
+                  SmGui::LeftLabel("Antenna");
+                  SmGui::FillWidth();
+                  if (SmGui::Combo(CONCAT("##_antenna_select_", _this->name), &_this->uiAntennaId, _this->txtAntennaList.c_str())) {
+                      if (_this->running)
+                          _this->dev->setAntenna(SOAPY_SDR_RX, _this->channelId, _this->antennaList[_this->uiAntennaId]);
+                      _this->saveCurrent();
+                  }
+              }
+
+              if (_this->hasAgc) {
+                  if (SmGui::Checkbox((std::string("AGC##_agc_sel_") + _this->name).c_str(), &_this->agc)) {
+                      if (_this->running) { _this->dev->setGainMode(SOAPY_SDR_RX, _this->channelId, _this->agc); }
+                      if (!_this->agc) {
+                          int i = 0;
+                          for (auto gain : _this->gainList) {
+                              _this->dev->setGain(SOAPY_SDR_RX, _this->channelId, gain, _this->uiGains[i]);
+                              i++;
+                          }
+                      }
+                      _this->saveCurrent();
+                  }
+              }
+
+              int i = 0;
+              char buf[128];
+              for (auto gain : _this->gainList) {
+                  sprintf(buf, "%s gain", gain.c_str());
+                  SmGui::LeftLabel(buf);
+                  float step = _this->gainRanges[i].step();
+                  bool res;
+                  SmGui::FillWidth();
+                  if (step == 0.0f) {
+                      res = SmGui::SliderFloat((std::string("##_gain_sel_") + _this->name + gain).c_str(), &_this->uiGains[i], _this->gainRanges[i].minimum(), _this->gainRanges[i].maximum());
+                  }
+                  else {
+                      res = SmGui::SliderFloatWithSteps((std::string("##_gain_sel_") + _this->name + gain).c_str(), &_this->uiGains[i], _this->gainRanges[i].minimum(), _this->gainRanges[i].maximum(), step);
+                  }
+                  if (res) {
+                      if (_this->running) {
+                          _this->dev->setGain(SOAPY_SDR_RX, _this->channelId, gain, _this->uiGains[i]);
+                      }
+                      _this->saveCurrent();
+                  }
+                  i++;
+              }
+              if (_this->bandwidthList.size() > 2) {
+                  SmGui::LeftLabel("Bandwidth");
+                  SmGui::FillWidth();
+                  if (SmGui::Combo(CONCAT("##_bw_select_", _this->name), &_this->uiBandwidthId, _this->txtBwList.c_str())) {
+                      if (_this->running) {
+                          if (_this->bandwidthList[_this->uiBandwidthId] == -1)
+                              _this->dev->setBandwidth(SOAPY_SDR_RX, _this->channelId, _this->selectBwBySr(_this->sampleRates[_this->srId]));
+                          else
+                              _this->dev->setBandwidth(SOAPY_SDR_RX, _this->channelId, _this->bandwidthList[_this->uiBandwidthId]);
+                      }
+                      _this->saveCurrent();
+                  }
+              }
+          }
+
+          static void _worker(SoapyModule* _this) {
+              int blockSize = _this->sampleRate / 200.0f;
+              int flags = 0;
+              long long timeMs = 0;
+
+              while (_this->running) {
+                  int res = _this->dev->readStream(_this->devStream, (void**)&_this->stream.writeBuf, blockSize, flags, timeMs);
+                  if (res < 1) {
+                      continue;
+                  }
+                  if (!_this->stream.swap(res)) { return; }
+              }
+          }
+
+          std::string name;
+          bool enabled = true;
+          dsp::stream<dsp::complex_t> stream;
+          SoapySDR::Stream* devStream;
+          SourceManager::SourceHandler handler;
+          SoapySDR::KwargsList devList;
+          SoapySDR::Kwargs devArgs;
+          SoapySDR::Device* dev;
+          std::string txtDevList;
+          std::string txtSrList;
+          std::thread workerThread;
+          int devId = -1;
+          double freq;
+          double sampleRate;
+          bool running = false;
+          bool hasAgc = false;
+          bool agc = false;
+          std::vector<double> sampleRates;
+          int srId = -1;
+          float* uiGains;
+          int channelCount = 1;
+          int channelId = 0;
+          int uiAntennaId = 0;
+          std::vector<std::string> antennaList;
+          std::string txtAntennaList;
+          std::vector<std::string> gainList;
+          std::vector<SoapySDR::Range> gainRanges;
+          int uiBandwidthId = 0;
+          std::vector<float> bandwidthList;
+          std::string txtBwList;
+          char remoteHost[1024];
+      };
+
+      MOD_EXPORT void _INIT_() {
+          config.setPath(core::args["root"].s() + "/soapy_source_config.json");
+          json defConf;
+          defConf["device"] = "";
+          defConf["remote"] = "${defaultRemoteStr}";
+          defConf["devices"] = json({});
+          config.load(defConf);
+          config.acquire();
+          if (!config.conf.contains("remote") || !config.conf["remote"].is_string()) {
+              config.conf["remote"] = "${defaultRemoteStr}";
+          }
+          config.release(true);
+          config.enableAutoSave();
+      }
+
+      MOD_EXPORT ModuleManager::Instance* _CREATE_INSTANCE_(std::string name) {
+          return new SoapyModule(name);
+      }
+
+      MOD_EXPORT void _DELETE_INSTANCE_(ModuleManager::Instance* instance) {
+          delete (SoapyModule*)instance;
+      }
+
+      MOD_EXPORT void _END_() {
+          config.disableAutoSave();
+          config.save();
+      }
+    '';
+
+    sdrppCustom = (pkgs.sdrpp.override {
+      airspy_source = cfg.devices.airspy;
+      rtl_sdr_source = cfg.devices.rtlsdr;
+      sdrplay_source = cfg.devices.sdrplay;
+      soapysdr-with-plugins = soapysdrWithPlugins;
+    }).overrideAttrs (old: {
+      nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.makeWrapper ];
+      postPatch = (old.postPatch or "") + ''
+        cp ${soapySourceMainCpp} source_modules/soapy_source/src/main.cpp
+
+        substituteInPlace core/src/core.cpp \
+          --replace-fail \
+            'defConfig["moduleInstances"]["SDR++ Server Source"]["enabled"] = true;' \
+            'defConfig["moduleInstances"]["SDR++ Server Source"]["enabled"] = true;
+        defConfig["moduleInstances"]["SoapySDR Source"]["module"] = "soapy_source";
+        defConfig["moduleInstances"]["SoapySDR Source"]["enabled"] = true;' \
+          --replace-fail \
+            '// Update to new module representation in config if needed' \
+            'if (!core::configManager.conf["moduleInstances"].contains("SoapySDR Source")) {
+            core::configManager.conf["moduleInstances"]["SoapySDR Source"] = defConfig["moduleInstances"]["SoapySDR Source"];
+        }
+        // Update to new module representation in config if needed'
+      '';
+      postFixup = (old.postFixup or "") + ''
+        wrapProgram "$out/bin/sdrpp" \
+          --set-default SOAPY_SDR_PLUGIN_PATH "${soapyPluginSearchPath}"
+      '';
+    });
   in
   {
     options.sdr = {
@@ -102,6 +817,17 @@
           default = 55132;
           description = "TCP port for SoapySDRServer";
         };
+        remotes = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default =
+            lib.filter (h: h != "${config.networking.hostName}.netbird.cloud") [
+              "tungsten.netbird.cloud"
+              "hispanas.netbird.cloud"
+              "butthead.netbird.cloud"
+              "lenovix.netbird.cloud"
+            ];
+          description = "Default remote SoapySDRServer hosts queried by SDR++ (editable in SDR++ UI for off-site hosts)";
+        };
       };
     };
 
@@ -134,14 +860,11 @@
 
       # Expose enabled SoapySDR modules (including soapysdrplay, and excluding any
       # device dedicated to ADS-B) to all local SoapySDR consumers.
-      environment.variables.SOAPY_SDR_PLUGIN_PATH =
-        lib.makeSearchPath pkgs.soapysdr.passthru.searchPath enabledSoapyPlugins;
+      environment.variables.SOAPY_SDR_PLUGIN_PATH = soapyPluginSearchPath;
+      environment.sessionVariables.SOAPY_SDR_PLUGIN_PATH = soapyPluginSearchPath;
 
       environment.systemPackages =
-        lib.optionals cfg.devices.limesdr [
-          pkgs.limesuiteWithGui   # LimeSDR: LimeUtil, LimeQuickTest, LimeSuiteGUI + MCU fw
-        ]
-        ++ lib.optionals cfg.devices.plutosdr [
+        lib.optionals cfg.devices.plutosdr [
           pkgs.libiio             # PlutoSDR: iio_info, iio_attr, iio_readdev, iio_writedev
           pkgs.libad9361          # PlutoSDR: AD9361/AD9363 baseband library
           pkgs.iio-oscilloscope   # PlutoSDR: Analog Devices IIO Oscilloscope GUI
@@ -161,12 +884,13 @@
           pkgs.soapysdrplay
         ]
         ++ [
-          # SoapySDR CLI & remote server (SoapySDRUtil, SoapySDRServer)
-          pkgs.soapysdr
-          pkgs.soapyremote
+          # SoapySDR CLI, remote server, and LimeSuite tools (SoapySDRUtil,
+          # SoapySDRServer, LimeUtil, LimeQuickTest, LimeSuiteGUI) with all
+          # enabled SoapySDR plugins baked in.
+          soapysdrWithPlugins
 
           # General SDR receivers, DSP frameworks, and signal analyzers
-          sdrppWithSdrplay        # SDR++ with native Lime/Pluto/bladeRF/Airspy/RTL/SDRplay
+          sdrppCustom             # SDR++ with SoapySDR remote host support & native sources
           pkgs.gqrx               # Gqrx SDR receiver
           pkgs.cubicsdr           # CubicSDR receiver
           pkgs.sdrangel           # SDRangel Rx/Tx workstation + channel decoders
@@ -212,8 +936,7 @@
         after = [ "network-online.target" ];
         wants = [ "network-online.target" ];
         wantedBy = [ "multi-user.target" ];
-        environment.SOAPY_SDR_PLUGIN_PATH =
-          lib.makeSearchPath pkgs.soapysdr.passthru.searchPath enabledSoapyPlugins;
+        environment.SOAPY_SDR_PLUGIN_PATH = soapyServerPluginSearchPath;
         serviceConfig = {
           ExecStart = "${pkgs.soapyremote}/bin/SoapySDRServer --bind=0.0.0.0:${toString cfg.soapyServer.port}";
           KillMode = "process";
