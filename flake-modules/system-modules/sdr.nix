@@ -1257,6 +1257,9 @@
 
         substituteInPlace core/src/server.cpp \
           --replace-fail \
+            'if (fn.find("source") == std::string::npos) { continue; }' \
+            'if (fn.find("source") == std::string::npos || fn == "audio_source.so") { continue; }' \
+          --replace-fail \
             '        // Load sourceId from config
         sourceId = 0;
         if (sourceList.keyExists(sourceName)) { sourceId = sourceList.keyId(sourceName); }
@@ -1340,14 +1343,10 @@
         flog::info("Ready, listening on {0}:{1}", host, port);
         while(1) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            if (client && !client->isOpen()) {
-                if (running) {
-                    flog::info("Client disconnected, stopping active source");
-                    sigpath::sourceManager.stop();
-                    running = false;
-                }
-                client->close();
-                client.reset();
+            if (running && (!client || !client->isOpen())) {
+                flog::info("Client disconnected, stopping active source");
+                sigpath::sourceManager.stop();
+                running = false;
             }
         }
 
@@ -1415,13 +1414,7 @@
                 return;
             }
             len += read;
-        }' \
-          --replace-fail \
-            '        // Write to network
-        if (client && client->isOpen()) { client->write(bb_pkt_hdr->size, bbuf); }' \
-            '        // Write to network
-        auto c = client;
-        if (c && c->isOpen()) { c->write(bb_pkt_hdr->size, bbuf); }'
+        }'
 
         # SDR++ Server Source (client): disconnect cleanly on deselect/exit and add fleet host presets
         substituteInPlace source_modules/sdrpp_server_source/src/main.cpp \
@@ -1439,14 +1432,14 @@
             '    static void menuDeselected(void* ctx) {
         SDRPPServerSourceModule* _this = (SDRPPServerSourceModule*)ctx;
         gui::mainWindow.playButtonLocked = false;
-        flog::info("SDRPPServerSourceModule '\''{0}'\'': Menu Deselect!", _this->name);
+        flog::info("SDRPPServerSourceModule '\'''{0}'\''': Menu Deselect!", _this->name);
     }' \
             '    static void menuDeselected(void* ctx) {
         SDRPPServerSourceModule* _this = (SDRPPServerSourceModule*)ctx;
         if (_this->running) { stop(_this); }
         if (_this->connected()) { _this->client->close(); }
         gui::mainWindow.playButtonLocked = false;
-        flog::info("SDRPPServerSourceModule '\''{0}'\'': Menu Deselect!", _this->name);
+        flog::info("SDRPPServerSourceModule '\'''{0}'\''': Menu Deselect!", _this->name);
     }' \
           --replace-fail \
             '        if (connected) { style::beginDisabled(); }
@@ -1648,7 +1641,7 @@
             '    static void menuSelected(void* ctx) {
         SDRPlaySourceModule* _this = (SDRPlaySourceModule*)ctx;
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("SDRPlaySourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("SDRPlaySourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }' \
             '    static void menuSelected(void* ctx) {
         SDRPlaySourceModule* _this = (SDRPlaySourceModule*)ctx;
@@ -1660,7 +1653,7 @@
             _this->selectByName(confSelectDev);
         }
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("SDRPlaySourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("SDRPlaySourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }' \
           --replace-fail \
             '        // First, acquire device
@@ -1787,7 +1780,7 @@
 
             devNames.push_back(buf);
             devListTxt += buf;
-            devListTxt += '\''\0'\'';
+            devListTxt += '\'''\0'\''';
         }
     }' \
             '    void refresh() {
@@ -1814,7 +1807,7 @@
 
             devNames.push_back(buf);
             devListTxt += buf;
-            devListTxt += '\''\0'\'';
+            devListTxt += '\'''\0'\''';
         }
     }' \
           --replace-fail \
@@ -1855,7 +1848,7 @@
             '    static void menuSelected(void* ctx) {
         LimeSDRSourceModule* _this = (LimeSDRSourceModule*)ctx;
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("LimeSDRSourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("LimeSDRSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }' \
             '    static void menuSelected(void* ctx) {
         LimeSDRSourceModule* _this = (LimeSDRSourceModule*)ctx;
@@ -1869,7 +1862,7 @@
             _this->selectByName(devName);
         }
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("LimeSDRSourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("LimeSDRSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }' \
           --replace-fail \
             '        // Open device
@@ -1935,7 +1928,7 @@
             '    static void menuSelected(void* ctx) {
         BladeRFSourceModule* _this = (BladeRFSourceModule*)ctx;
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("BladeRFSourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("BladeRFSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }' \
             '    static void menuSelected(void* ctx) {
         BladeRFSourceModule* _this = (BladeRFSourceModule*)ctx;
@@ -1947,7 +1940,7 @@
             _this->selectBySerial(serial);
         }
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("BladeRFSourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("BladeRFSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }'
 
         # Airspy source: defer probing to menuSelected
@@ -1970,7 +1963,7 @@
             '    static void menuSelected(void* ctx) {
         AirspySourceModule* _this = (AirspySourceModule*)ctx;
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("AirspySourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("AirspySourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }' \
             '    static void menuSelected(void* ctx) {
         AirspySourceModule* _this = (AirspySourceModule*)ctx;
@@ -1982,7 +1975,7 @@
             _this->selectByString(devSerial);
         }
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("AirspySourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("AirspySourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }'
 
         # Airspy HF+ source: defer probing to menuSelected
@@ -2001,7 +1994,7 @@
             '    static void menuSelected(void* ctx) {
         AirspyHFSourceModule* _this = (AirspyHFSourceModule*)ctx;
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("AirspyHFSourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("AirspyHFSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }' \
             '    static void menuSelected(void* ctx) {
         AirspyHFSourceModule* _this = (AirspyHFSourceModule*)ctx;
@@ -2013,7 +2006,7 @@
             _this->selectByString(devSerial);
         }
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("AirspyHFSourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("AirspyHFSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }'
 
         # RTL-SDR source: defer probing to menuSelected and set devId in selectById
@@ -2044,7 +2037,7 @@
             '    static void menuSelected(void* ctx) {
         RTLSDRSourceModule* _this = (RTLSDRSourceModule*)ctx;
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("RTLSDRSourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("RTLSDRSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }' \
             '    static void menuSelected(void* ctx) {
         RTLSDRSourceModule* _this = (RTLSDRSourceModule*)ctx;
@@ -2056,7 +2049,7 @@
             _this->selectByName(devName);
         }
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("RTLSDRSourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("RTLSDRSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }'
 
         # PlutoSDR source: defer probing to menuSelected and fix missing return in select()
@@ -2106,7 +2099,7 @@
             '    static void menuSelected(void* ctx) {
         PlutoSDRSourceModule* _this = (PlutoSDRSourceModule*)ctx;
         core::setInputSampleRate(_this->samplerate);
-        flog::info("PlutoSDRSourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("PlutoSDRSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }' \
             '    static void menuSelected(void* ctx) {
         PlutoSDRSourceModule* _this = (PlutoSDRSourceModule*)ctx;
@@ -2118,7 +2111,7 @@
             _this->select(desc);
         }
         core::setInputSampleRate(_this->samplerate);
-        flog::info("PlutoSDRSourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("PlutoSDRSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }'
 
         # HackRF source: defer probing to menuSelected
@@ -2137,7 +2130,7 @@
             '    static void menuSelected(void* ctx) {
         HackRFSourceModule* _this = (HackRFSourceModule*)ctx;
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("HackRFSourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("HackRFSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }' \
             '    static void menuSelected(void* ctx) {
         HackRFSourceModule* _this = (HackRFSourceModule*)ctx;
@@ -2149,7 +2142,7 @@
             _this->selectBySerial(confSerial);
         }
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("HackRFSourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("HackRFSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }'
 
         # Audio source: skip registering in --server mode and defer probing to menuSelected
@@ -2179,7 +2172,7 @@
             '    static void menuSelected(void* ctx) {
         AudioSourceModule* _this = (AudioSourceModule*)ctx;
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("AudioSourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("AudioSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }' \
             '    static void menuSelected(void* ctx) {
         AudioSourceModule* _this = (AudioSourceModule*)ctx;
@@ -2194,7 +2187,7 @@
             _this->select(device);
         }
         core::setInputSampleRate(_this->sampleRate);
-        flog::info("AudioSourceModule '\''{0}'\'': Menu Select!", _this->name);
+        flog::info("AudioSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }'
       '';
       postFixup = (old.postFixup or "") + ''
@@ -2405,10 +2398,14 @@
         after = [ "network-online.target" ] ++ lib.optional cfg.devices.sdrplay "sdrplayApi.service";
         wants = [ "network-online.target" ] ++ lib.optional cfg.devices.sdrplay "sdrplayApi.service";
         wantedBy = [ "multi-user.target" ];
-        environment.SOAPY_SDR_PLUGIN_PATH = soapyServerPluginSearchPath;
+        environment = {
+          HOME = "/var/lib/sdrpp-server";
+          SOAPY_SDR_PLUGIN_PATH = soapyServerPluginSearchPath;
+        };
         serviceConfig = {
           ExecStart = "${sdrppCustom}/bin/sdrpp --server --root /var/lib/sdrpp-server --addr 0.0.0.0 --port ${toString cfg.sdrppServer.port}";
           StateDirectory = "sdrpp-server";
+          KillMode = "process";
           Restart = "on-failure";
           RestartSec = "5s";
           LimitRTPRIO = 99;
