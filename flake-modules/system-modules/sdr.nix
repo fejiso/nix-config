@@ -62,6 +62,8 @@
 
     soapySourceMainCpp = pkgs.writeText "soapy_source_main.cpp" ''
       #include <SoapySDR/Constants.h>
+      #include <SoapySDR/Errors.hpp>
+      #include <SoapySDR/Formats.hpp>
       #include <imgui.h>
       #include <utils/flog.h>
       #include <module.h>
@@ -90,6 +92,11 @@
       };
 
       ConfigManager config;
+
+      static const char* REMOTE_PROTS[] = { "udp", "tcp" };
+      static const char* REMOTE_PROT_TXT = "UDP\0TCP\0";
+      static const char* REMOTE_FMTS[] = { "auto", "CS16", "CS8", "CF32" };
+      static const char* REMOTE_FMT_TXT = "Auto (Native)\0CS16 (16-bit)\0CS8 (8-bit)\0CF32 (32-bit float)\0";
 
       class SoapyModule : public ModuleManager::Instance {
       public:
@@ -151,6 +158,11 @@
           }
 
       private:
+          bool isRemoteDevice() const {
+              return (devArgs.count("driver") && devArgs.at("driver") == "remote")
+                  || devArgs.count("remote") > 0;
+          }
+
           static std::vector<std::string> splitRemotes(const std::string& str) {
               std::vector<std::string> out;
               std::string cur;
@@ -409,6 +421,18 @@
                   else {
                       agc = false;
                   }
+                  if (config.conf["devices"][name].contains("remoteProt")) {
+                      remoteProtId = std::clamp<int>(config.conf["devices"][name]["remoteProt"], 0, 1);
+                  }
+                  else {
+                      remoteProtId = 0;
+                  }
+                  if (config.conf["devices"][name].contains("remoteFmt")) {
+                      remoteFmtId = std::clamp<int>(config.conf["devices"][name]["remoteFmt"], 0, 3);
+                  }
+                  else {
+                      remoteFmtId = 1; // Default to CS16 for remote links
+                  }
                   if (config.conf["devices"][name].contains("sampleRate")) {
                       selectSampleRate(config.conf["devices"][name]["sampleRate"]);
                   }
@@ -428,6 +452,8 @@
                   if (hasAgc) {
                       agc = false;
                   }
+                  remoteProtId = 0;
+                  remoteFmtId = 1; // CS16
                   selectSampleRate(sampleRates[0]);
               }
               config.release();
@@ -447,6 +473,8 @@
               if (hasAgc) {
                   conf["agc"] = agc;
               }
+              conf["remoteProt"] = remoteProtId;
+              conf["remoteFmt"] = remoteFmtId;
               config.acquire();
               config.conf["devices"][devArgs["label"]] = conf;
               config.release(true);
@@ -507,7 +535,31 @@
 
               _this->dev->setFrequency(SOAPY_SDR_RX, _this->channelId, _this->freq);
 
-              _this->devStream = _this->dev->setupStream(SOAPY_SDR_RX, "CF32");
+              SoapySDR::Kwargs streamArgs;
+              if (_this->isRemoteDevice()) {
+                  std::string prot = REMOTE_PROTS[std::clamp<int>(_this->remoteProtId, 0, 1)];
+                  streamArgs["remote:prot"] = prot;
+                  // Keep UDP datagrams under Netbird/WireGuard 1280 MTU to avoid IP fragmentation
+                  if (prot == "udp") {
+                      streamArgs["remote:mtu"] = "1200";
+                  }
+                  if (_this->remoteFmtId > 0) {
+                      std::string reqFmt = REMOTE_FMTS[std::clamp<int>(_this->remoteFmtId, 0, 3)];
+                      auto supported = _this->dev->getStreamFormats(SOAPY_SDR_RX, _this->channelId);
+                      if (std::find(supported.begin(), supported.end(), reqFmt) != supported.end()) {
+                          streamArgs["remote:format"] = reqFmt;
+                      }
+                  }
+              }
+
+              try {
+                  _this->devStream = _this->dev->setupStream(SOAPY_SDR_RX, "CF32", std::vector<size_t>{ (size_t)_this->channelId }, streamArgs);
+              }
+              catch (const std::exception& e) {
+                  flog::warn("setupStream with custom remote args failed ({}), falling back to default", e.what());
+                  _this->devStream = _this->dev->setupStream(SOAPY_SDR_RX, "CF32");
+              }
+
               _this->dev->activateStream(_this->devStream);
               _this->running = true;
               _this->workerThread = std::thread(_worker, _this);
@@ -518,11 +570,13 @@
               SoapyModule* _this = (SoapyModule*)ctx;
               if (!_this->running) { return; }
               _this->running = false;
-              _this->dev->deactivateStream(_this->devStream);
-              _this->dev->closeStream(_this->devStream);
               _this->stream.stopWriter();
-              _this->workerThread.join();
+              _this->dev->deactivateStream(_this->devStream);
+              if (_this->workerThread.joinable()) {
+                  _this->workerThread.join();
+              }
               _this->stream.clearWriteStop();
+              _this->dev->closeStream(_this->devStream);
               SoapySDR::Device::unmake(_this->dev);
 
               flog::info("SoapyModule '{0}': Stop!", _this->name);
@@ -595,6 +649,20 @@
                   _this->selectDevice(defDev);
               }
 
+              if (_this->isRemoteDevice()) {
+                  SmGui::LeftLabel("Transport");
+                  SmGui::FillWidth();
+                  if (SmGui::Combo(CONCAT("##_remote_prot_", _this->name), &_this->remoteProtId, REMOTE_PROT_TXT)) {
+                      _this->saveCurrent();
+                  }
+
+                  SmGui::LeftLabel("Wire Format");
+                  SmGui::FillWidth();
+                  if (SmGui::Combo(CONCAT("##_remote_fmt_", _this->name), &_this->remoteFmtId, REMOTE_FMT_TXT)) {
+                      _this->saveCurrent();
+                  }
+              }
+
               if (_this->running) { SmGui::EndDisabled(); }
 
               if (_this->antennaList.size() > 1) {
@@ -659,16 +727,22 @@
           }
 
           static void _worker(SoapyModule* _this) {
-              int blockSize = _this->sampleRate / 200.0f;
+              int blockSize = std::clamp<int>((int)(_this->sampleRate / 200.0f), 1, STREAM_BUFFER_SIZE);
               int flags = 0;
-              long long timeMs = 0;
+              long long timeNs = 0;
+              int offset = 0;
 
               while (_this->running) {
-                  int res = _this->dev->readStream(_this->devStream, (void**)&_this->stream.writeBuf, blockSize, flags, timeMs);
-                  if (res < 1) {
+                  void* buffs[] = { _this->stream.writeBuf + offset };
+                  int res = _this->dev->readStream(_this->devStream, buffs, blockSize - offset, flags, timeNs, 100000);
+                  if (res <= 0) {
                       continue;
                   }
-                  if (!_this->stream.swap(res)) { return; }
+                  offset += res;
+                  if (offset >= blockSize) {
+                      if (!_this->stream.swap(offset)) { return; }
+                      offset = 0;
+                  }
               }
           }
 
@@ -703,6 +777,8 @@
           std::vector<float> bandwidthList;
           std::string txtBwList;
           char remoteHost[1024];
+          int remoteProtId = 0;
+          int remoteFmtId = 1;
       };
 
       MOD_EXPORT void _INIT_() {
@@ -734,6 +810,353 @@
       }
     '';
 
+    audioSinkMainCpp = pkgs.writeText "audio_sink_main.cpp" ''
+      #include <imgui.h>
+      #include <module.h>
+      #include <gui/gui.h>
+      #include <signal_path/signal_path.h>
+      #include <signal_path/sink.h>
+      #include <dsp/buffer/packer.h>
+      #include <dsp/convert/stereo_to_mono.h>
+      #include <utils/flog.h>
+      #include <RtAudio.h>
+      #include <config.h>
+      #include <core.h>
+      #include <cstring>
+
+      #define CONCAT(a, b) ((std::string(a) + b).c_str())
+
+      SDRPP_MOD_INFO{
+          /* Name:            */ "audio_sink",
+          /* Description:     */ "Audio sink module for SDR++",
+          /* Author:          */ "Ryzerth",
+          /* Version:         */ 0, 1, 0,
+          /* Max instances    */ 1
+      };
+
+      ConfigManager config;
+
+      class AudioSink : SinkManager::Sink {
+      public:
+          AudioSink(SinkManager::Stream* stream, std::string streamName) {
+              _stream = stream;
+              _streamName = streamName;
+              s2m.init(_stream->sinkOut);
+              monoPacker.init(&s2m.out, 512);
+              stereoPacker.init(_stream->sinkOut, 512);
+
+              playStateHandler.handler = onPlayStateChange;
+              playStateHandler.ctx = this;
+              gui::mainWindow.onPlayStateChange.bindHandler(&playStateHandler);
+
+      #if RTAUDIO_VERSION_MAJOR >= 6
+              audio.setErrorCallback(&errorCallback);
+      #endif
+
+              bool created = false;
+              std::string device = "";
+              config.acquire();
+              if (!config.conf.contains(_streamName)) {
+                  created = true;
+                  config.conf[_streamName]["device"] = "";
+                  config.conf[_streamName]["devices"] = json({});
+              }
+              device = config.conf[_streamName]["device"];
+              config.release(created);
+
+              RtAudio::DeviceInfo info;
+      #if RTAUDIO_VERSION_MAJOR >= 6
+              for (int i : audio.getDeviceIds()) {
+      #else
+              int count = audio.getDeviceCount();
+              for (int i = 0; i < count; i++) {
+      #endif
+                  try {
+                      info = audio.getDeviceInfo(i);
+      #if !defined(RTAUDIO_VERSION_MAJOR) || RTAUDIO_VERSION_MAJOR < 6
+                      if (!info.probed) { continue; }
+      #endif
+                      if (info.outputChannels == 0) { continue; }
+                      if (info.isDefaultOutput) { defaultDevId = devList.size(); }
+                      devList.push_back(info);
+                      deviceIds.push_back(i);
+                      txtDevList += info.name;
+                      txtDevList += '\0';
+                  }
+                  catch (const std::exception& e) {
+                      flog::error("AudioSinkModule Error getting audio device ({}) info: {}", i, e.what());
+                  }
+              }
+              selectByName(device);
+          }
+
+          ~AudioSink() {
+              gui::mainWindow.onPlayStateChange.unbindHandler(&playStateHandler);
+              stop();
+          }
+
+          void start() {
+              if (running) { return; }
+              running = doStart();
+          }
+
+          void stop() {
+              if (!running) { return; }
+              doStop();
+              running = false;
+          }
+
+          void selectFirst() {
+              selectById(defaultDevId);
+          }
+
+          void selectByName(std::string name) {
+              for (int i = 0; i < devList.size(); i++) {
+                  if (devList[i].name == name) {
+                      selectById(i);
+                      return;
+                  }
+              }
+              selectFirst();
+          }
+
+          void selectById(int id) {
+              devId = id;
+              bool created = false;
+              config.acquire();
+              if (!config.conf[_streamName]["devices"].contains(devList[id].name)) {
+                  created = true;
+                  config.conf[_streamName]["devices"][devList[id].name] = devList[id].preferredSampleRate;
+              }
+              sampleRate = config.conf[_streamName]["devices"][devList[id].name];
+              config.release(created);
+
+              sampleRates = devList[id].sampleRates;
+              sampleRatesTxt = "";
+              char buf[256];
+              bool found = false;
+              unsigned int defaultId = 0;
+              unsigned int defaultSr = devList[id].preferredSampleRate;
+              for (int i = 0; i < sampleRates.size(); i++) {
+                  if (sampleRates[i] == sampleRate) {
+                      found = true;
+                      srId = i;
+                  }
+                  if (sampleRates[i] == defaultSr) {
+                      defaultId = i;
+                  }
+                  sprintf(buf, "%d", sampleRates[i]);
+                  sampleRatesTxt += buf;
+                  sampleRatesTxt += '\0';
+              }
+              if (!found) {
+                  sampleRate = defaultSr;
+                  srId = defaultId;
+              }
+
+              _stream->setSampleRate(sampleRate);
+
+              if (running) { doStop(); }
+              if (running) { doStart(); }
+          }
+
+          void menuHandler() {
+              float menuWidth = ImGui::GetContentRegionAvail().x;
+
+              ImGui::SetNextItemWidth(menuWidth);
+              if (ImGui::Combo(("##_audio_sink_dev_" + _streamName).c_str(), &devId, txtDevList.c_str())) {
+                  selectById(devId);
+                  config.acquire();
+                  config.conf[_streamName]["device"] = devList[devId].name;
+                  config.release(true);
+              }
+
+              ImGui::SetNextItemWidth(menuWidth);
+              if (ImGui::Combo(("##_audio_sink_sr_" + _streamName).c_str(), &srId, sampleRatesTxt.c_str())) {
+                  sampleRate = sampleRates[srId];
+                  _stream->setSampleRate(sampleRate);
+                  if (running) {
+                      doStop();
+                      doStart();
+                  }
+                  config.acquire();
+                  config.conf[_streamName]["devices"][devList[devId].name] = sampleRate;
+                  config.release(true);
+              }
+          }
+
+      #if RTAUDIO_VERSION_MAJOR >= 6
+          static void errorCallback(RtAudioErrorType type, const std::string& errorText) {
+              switch (type) {
+              case RtAudioErrorType::RTAUDIO_NO_ERROR:
+                  return;
+              case RtAudioErrorType::RTAUDIO_WARNING:
+              case RtAudioErrorType::RTAUDIO_NO_DEVICES_FOUND:
+              case RtAudioErrorType::RTAUDIO_DEVICE_DISCONNECT:
+                  flog::warn("AudioSinkModule Warning: {} ({})", errorText, (int)type);
+                  break;
+              default:
+                  throw std::runtime_error(errorText);
+              }
+          }
+      #endif
+
+      private:
+          static void onPlayStateChange(bool newState, void* ctx) {
+              AudioSink* _this = (AudioSink*)ctx;
+              if (newState) {
+                  _this->stereoPacker.out.clearReadStop();
+              }
+              else {
+                  _this->stereoPacker.out.stopReader();
+              }
+          }
+
+          bool doStart() {
+              RtAudio::StreamParameters parameters;
+              parameters.deviceId = deviceIds[devId];
+              parameters.nChannels = 2;
+              unsigned int bufferFrames = sampleRate / 60;
+              RtAudio::StreamOptions opts;
+              opts.streamName = _streamName;
+
+              try {
+                  if (gui::mainWindow.isPlaying()) {
+                      stereoPacker.out.clearReadStop();
+                  }
+                  else {
+                      stereoPacker.out.stopReader();
+                  }
+                  audio.openStream(&parameters, NULL, RTAUDIO_FLOAT32, sampleRate, &bufferFrames, &callback, this, &opts);
+                  stereoPacker.setSampleCount(bufferFrames);
+                  audio.startStream();
+                  stereoPacker.start();
+              }
+              catch (const std::exception& e) {
+                  flog::error("Could not open audio device {0}", e.what());
+                  return false;
+              }
+
+              flog::info("RtAudio stream open");
+              return true;
+          }
+
+          void doStop() {
+              s2m.stop();
+              monoPacker.stop();
+              stereoPacker.stop();
+              monoPacker.out.stopReader();
+              stereoPacker.out.stopReader();
+              audio.stopStream();
+              audio.closeStream();
+              monoPacker.out.clearReadStop();
+              stereoPacker.out.clearReadStop();
+          }
+
+          static int callback(void* outputBuffer, void* inputBuffer, unsigned int nBufferFrames, double streamTime, RtAudioStreamStatus status, void* userData) {
+              AudioSink* _this = (AudioSink*)userData;
+              if (!gui::mainWindow.isPlaying()) {
+                  std::memset(outputBuffer, 0, nBufferFrames * sizeof(dsp::stereo_t));
+                  return 0;
+              }
+              int count = _this->stereoPacker.out.read();
+              if (count < 0) {
+                  std::memset(outputBuffer, 0, nBufferFrames * sizeof(dsp::stereo_t));
+                  return 0;
+              }
+
+              std::memcpy(outputBuffer, _this->stereoPacker.out.readBuf, nBufferFrames * sizeof(dsp::stereo_t));
+              _this->stereoPacker.out.flush();
+              return 0;
+          }
+
+          SinkManager::Stream* _stream;
+          dsp::convert::StereoToMono s2m;
+          dsp::buffer::Packer<float> monoPacker;
+          dsp::buffer::Packer<dsp::stereo_t> stereoPacker;
+          EventHandler<bool> playStateHandler;
+
+          std::string _streamName;
+
+          int srId = 0;
+          int devCount;
+          int devId = 0;
+          bool running = false;
+
+          unsigned int defaultDevId = 0;
+
+          std::vector<RtAudio::DeviceInfo> devList;
+          std::vector<unsigned int> deviceIds;
+          std::string txtDevList;
+
+          std::vector<unsigned int> sampleRates;
+          std::string sampleRatesTxt;
+          unsigned int sampleRate = 48000;
+
+          RtAudio audio;
+      };
+
+      class AudioSinkModule : public ModuleManager::Instance {
+      public:
+          AudioSinkModule(std::string name) {
+              this->name = name;
+              provider.create = create_sink;
+              provider.ctx = this;
+
+              sigpath::sinkManager.registerSinkProvider("Audio", provider);
+          }
+
+          ~AudioSinkModule() {
+              // Unregister sink, this will automatically stop and delete all instances of the audio sink
+              sigpath::sinkManager.unregisterSinkProvider("Audio");
+          }
+
+          void postInit() {}
+
+          void enable() {
+              enabled = true;
+          }
+
+          void disable() {
+              enabled = false;
+          }
+
+          bool isEnabled() {
+              return enabled;
+          }
+
+      private:
+          static SinkManager::Sink* create_sink(SinkManager::Stream* stream, std::string streamName, void* ctx) {
+              return (SinkManager::Sink*)(new AudioSink(stream, streamName));
+          }
+
+          std::string name;
+          bool enabled = true;
+          SinkManager::SinkProvider provider;
+      };
+
+      MOD_EXPORT void _INIT_() {
+          json def = json({});
+          config.setPath(core::args["root"].s() + "/audio_sink_config.json");
+          config.load(def);
+          config.enableAutoSave();
+      }
+
+      MOD_EXPORT void* _CREATE_INSTANCE_(std::string name) {
+          AudioSinkModule* instance = new AudioSinkModule(name);
+          return instance;
+      }
+
+      MOD_EXPORT void _DELETE_INSTANCE_(void* instance) {
+          delete (AudioSinkModule*)instance;
+      }
+
+      MOD_EXPORT void _END_() {
+          config.disableAutoSave();
+          config.save();
+      }
+    '';
+
     sdrppCustom = (pkgs.sdrpp.override {
       airspy_source = cfg.devices.airspy;
       rtl_sdr_source = cfg.devices.rtlsdr;
@@ -743,6 +1166,7 @@
       nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.makeWrapper ];
       postPatch = (old.postPatch or "") + ''
         cp ${soapySourceMainCpp} source_modules/soapy_source/src/main.cpp
+        cp ${audioSinkMainCpp} sink_modules/audio_sink/src/main.cpp
 
         substituteInPlace core/src/core.cpp \
           --replace-fail \

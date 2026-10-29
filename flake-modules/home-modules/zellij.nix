@@ -7,6 +7,7 @@
   
   home.file.".config/zellij/config.kdl".text = ''
     scroll_buffer_size 100000
+    support_kitty_keyboard_protocol true
 
     ui {
         pane_frames {
