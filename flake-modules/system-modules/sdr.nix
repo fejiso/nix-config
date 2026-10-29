@@ -792,14 +792,16 @@
 
       MOD_EXPORT void _INIT_() {
           config.setPath(core::args["root"].s() + "/soapy_source_config.json");
+          const char* envRemotes = getenv("SDRPP_DEFAULT_REMOTES");
+          std::string defaultRemotes = envRemotes ? envRemotes : "";
           json defConf;
           defConf["device"] = "";
-          defConf["remote"] = "${defaultRemoteStr}";
+          defConf["remote"] = defaultRemotes;
           defConf["devices"] = json({});
           config.load(defConf);
           config.acquire();
           if (!config.conf.contains("remote") || !config.conf["remote"].is_string()) {
-              config.conf["remote"] = "${defaultRemoteStr}";
+              config.conf["remote"] = defaultRemotes;
           }
           config.release(true);
           config.enableAutoSave();
@@ -1166,13 +1168,14 @@
       }
     '';
 
-    sdrppCustom = (pkgs.sdrpp.override {
-      airspy_source = cfg.devices.airspy;
-      rtl_sdr_source = cfg.devices.rtlsdr;
-      sdrplay_source = cfg.devices.sdrplay;
-      soapysdr-with-plugins = soapysdrWithPlugins;
+    # Host-independent compiled SDR++ package so C++ compilation happens once
+    # across the entire fleet instead of per-host.
+    sdrppUnwrapped = (pkgs.sdrpp.override {
+      airspy_source = true;
+      rtl_sdr_source = true;
+      sdrplay_source = true;
+      soapysdr-with-plugins = pkgs.soapysdr;
     }).overrideAttrs (old: {
-      nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ pkgs.makeWrapper ];
       postPatch = (old.postPatch or "") + ''
         cp ${soapySourceMainCpp} source_modules/soapy_source/src/main.cpp
         cp ${audioSinkMainCpp} sink_modules/audio_sink/src/main.cpp
@@ -1446,17 +1449,36 @@
         if (ImGui::InputText(CONCAT("##sdrpp_srv_srv_host_", _this->name), _this->hostname, 1023)) {' \
             '        if (connected) { style::beginDisabled(); }
         {
-            static const char* presetHosts[] = { "Custom", "localhost"${lib.concatMapStrings (h: '', "${h}"'') cfg.soapyServer.remotes} };
-            static const int presetCount = sizeof(presetHosts) / sizeof(presetHosts[0]);
+            static std::vector<std::string> presetHosts;
+            static std::string presetComboTxt;
+            if (presetHosts.empty()) {
+                presetHosts.push_back("Custom");
+                presetHosts.push_back("localhost");
+                const char* envRemotes = getenv("SDRPP_DEFAULT_REMOTES");
+                std::string remStr = envRemotes ? envRemotes : "";
+                std::string cur;
+                for (char c : remStr) {
+                    if (std::strchr(",; \t", c) != NULL) {
+                        if (!cur.empty()) { presetHosts.push_back(cur); cur.clear(); }
+                    } else {
+                        cur += c;
+                    }
+                }
+                if (!cur.empty()) { presetHosts.push_back(cur); }
+                for (const auto& h : presetHosts) {
+                    presetComboTxt += h;
+                    presetComboTxt.push_back(0);
+                }
+            }
             int curPreset = 0;
-            for (int i = 1; i < presetCount; i++) {
+            for (int i = 1; i < (int)presetHosts.size(); i++) {
                 if (std::string(_this->hostname) == presetHosts[i]) { curPreset = i; break; }
             }
             ImGui::LeftLabel("Host");
             ImGui::FillWidth();
-            if (ImGui::Combo(CONCAT("##sdrpp_srv_preset_", _this->name), &curPreset, "Custom\0localhost\0${lib.concatMapStrings (h: "${h}\\0") cfg.soapyServer.remotes}")) {
+            if (ImGui::Combo(CONCAT("##sdrpp_srv_preset_", _this->name), &curPreset, presetComboTxt.c_str())) {
                 if (curPreset > 0) {
-                    std::strncpy(_this->hostname, presetHosts[curPreset], 1023);
+                    std::strncpy(_this->hostname, presetHosts[curPreset].c_str(), 1023);
                     _this->hostname[1023] = 0;
                     config.acquire();
                     config.conf["hostname"] = _this->hostname;
@@ -1468,8 +1490,13 @@
           --replace-fail \
             '    def["hostname"] = "localhost";
     def["port"] = 5259;' \
-            '    def["hostname"] = "${if cfg.soapyServer.remotes != [ ] then lib.head cfg.soapyServer.remotes else "localhost"}";
-    def["port"] = ${toString cfg.sdrppServer.port};'
+            '    const char* envRemotes = getenv("SDRPP_DEFAULT_REMOTES");
+    std::string remStr = envRemotes ? envRemotes : "";
+    std::size_t commaPos = remStr.find(",");
+    std::string firstRemote = commaPos == std::string::npos ? remStr : remStr.substr(0, commaPos);
+    const char* envPort = getenv("SDRPP_DEFAULT_SERVER_PORT");
+    def["hostname"] = firstRemote.empty() ? "localhost" : firstRemote;
+    def["port"] = (envPort && envPort[0]) ? std::atoi(envPort) : 5259;'
 
         # SDRplay source: never hold sdrplay_api_Open or sdrplay_api_SelectDevice while idle;
         # only open API during refresh() and between start() and stop().
@@ -1506,7 +1533,9 @@
         sigpath::sourceManager.registerSource("SDRplay", &handler);
 
         initOk = true;' \
-            '        sampleRate = 2000000.0;
+            '        if (getenv("SDRPP_DISABLE_SDRPLAY")) { return; }
+
+        sampleRate = 2000000.0;
         srId = 0;
 
         bandwidth = sdrplay_api_BW_5_000;
@@ -1958,7 +1987,8 @@
         selectByString(devSerial);
 
         sigpath::sourceManager.registerSource("Airspy", &handler);' \
-            '        sigpath::sourceManager.registerSource("Airspy", &handler);' \
+            '        if (getenv("SDRPP_DISABLE_AIRSPY")) { return; }
+        sigpath::sourceManager.registerSource("Airspy", &handler);' \
           --replace-fail \
             '    static void menuSelected(void* ctx) {
         AirspySourceModule* _this = (AirspySourceModule*)ctx;
@@ -2026,7 +2056,8 @@
         selectByName(selectedDevName);
 
         sigpath::sourceManager.registerSource("RTL-SDR", &handler);' \
-            '        sigpath::sourceManager.registerSource("RTL-SDR", &handler);' \
+            '        if (getenv("SDRPP_DISABLE_RTLSDR")) { return; }
+        sigpath::sourceManager.registerSource("RTL-SDR", &handler);' \
           --replace-fail \
             '    void selectById(int id) {
         selectedDevName = devNames[id];' \
@@ -2190,11 +2221,29 @@
         flog::info("AudioSourceModule '\'''{0}'\''': Menu Select!", _this->name);
     }'
       '';
-      postFixup = (old.postFixup or "") + ''
-        wrapProgram "$out/bin/sdrpp" \
-          --set-default SOAPY_SDR_PLUGIN_PATH "${soapyPluginSearchPath}"
-      '';
     });
+
+    # Lightweight per-host wrapper around sdrppUnwrapped so C++ is compiled only once
+    # across the entire fleet while per-host remote lists, Soapy plugin paths, and
+    # ADS-B device exclusions are injected via environment variables.
+    sdrppEnvArgs =
+      [
+        "--set-default" "SOAPY_SDR_PLUGIN_PATH" soapyPluginSearchPath
+        "--set-default" "SDRPP_DEFAULT_REMOTES" defaultRemoteStr
+        "--set-default" "SDRPP_DEFAULT_SERVER_PORT" (toString cfg.sdrppServer.port)
+      ]
+      ++ lib.optionals (!cfg.devices.airspy) [ "--set" "SDRPP_DISABLE_AIRSPY" "1" ]
+      ++ lib.optionals (!cfg.devices.rtlsdr) [ "--set" "SDRPP_DISABLE_RTLSDR" "1" ]
+      ++ lib.optionals (!cfg.devices.sdrplay) [ "--set" "SDRPP_DISABLE_SDRPLAY" "1" ];
+
+    sdrppCustom = pkgs.symlinkJoin {
+      name = "sdrpp-${sdrppUnwrapped.version}";
+      paths = [ sdrppUnwrapped ];
+      nativeBuildInputs = [ pkgs.makeWrapper ];
+      postBuild = ''
+        wrapProgram "$out/bin/sdrpp" ${lib.escapeShellArgs sdrppEnvArgs}
+      '';
+    };
   in
   {
     options.sdr = {
