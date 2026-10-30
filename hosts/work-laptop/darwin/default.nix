@@ -26,6 +26,9 @@
   # nix-darwin's native Nix management so they don't conflict.
   nix.enable = false;
 
+  # Enable Touch ID for sudo (manages /etc/pam.d/sudo_local).
+  security.pam.services.sudo_local.touchIdAuth = true;
+
   # macOS system preferences
   system.defaults = {
     dock = {
