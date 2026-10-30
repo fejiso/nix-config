@@ -32,7 +32,7 @@
   # macOS system preferences
   system.defaults = {
     dock = {
-      autohide = true;
+      autohide = false;
       orientation = "bottom";
       showhidden = true;
       mineffect = "genie";
@@ -48,24 +48,6 @@
       AppleShowAllExtensions = true;
       InitialKeyRepeat = 14;
       KeyRepeat = 1;
-    };
-  };
-
-  # Homebrew integration
-  homebrew = {
-    enable = true;
-    brews = [
-      "mas" # Mac App Store CLI
-    ];
-    casks = [
-      "docker"
-      "visual-studio-code"
-      "slack"
-      "zoom"
-      "1password"
-    ];
-    masApps = {
-      "Xcode" = 497799835;
     };
   };
 
