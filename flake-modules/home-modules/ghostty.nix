@@ -7,7 +7,7 @@
     enable = true;
     settings = {
       font-family = "Fira Code";
-      theme = "Cobalt Dark Next";
+      theme = "Cobalt Next Dark";
       font-size = 8;
 /*    background-opacity = 0.8; */
       window-decoration = "none";
