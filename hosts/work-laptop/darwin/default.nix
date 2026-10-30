@@ -22,18 +22,9 @@
     outputs.overlays.go-proxy-direct
   ];
 
-  # Nix configuration
-  nix = {
-    settings = {
-      experimental-features = "nix-command flakes";
-    };
-    optimise.automatic = true;
-    gc = {
-      automatic = true;
-      interval = {Weekday = 0; Hour = 2; Minute = 0;};
-      options = "--delete-older-than 30d";
-    };
-  };
+  # Determinate Nix manages the daemon and nix.conf on this machine; disable
+  # nix-darwin's native Nix management so they don't conflict.
+  nix.enable = false;
 
   # macOS system preferences
   system.defaults = {
