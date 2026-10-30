@@ -29,6 +29,10 @@
   # Enable Touch ID for sudo (manages /etc/pam.d/sudo_local).
   security.pam.services.sudo_local.touchIdAuth = true;
 
+  # Configure /etc/fish/config.fish so nix-darwin adds /etc/profiles/per-user/$USER/bin
+  # and /run/current-system/sw/bin to fish's PATH.
+  programs.fish.enable = true;
+
   # macOS system preferences
   system.defaults = {
     dock = {

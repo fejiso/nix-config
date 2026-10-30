@@ -1,10 +1,10 @@
 { ... }: {
   flake.modules.homeManager.gpg-agent =
 {
-  pkgs, ...
+  pkgs, lib, ...
 }: {
   services.gpg-agent = {
-    enable = true;
+    enable = lib.mkDefault pkgs.stdenv.isLinux;
     # SSH is handled by the NixOS ssh-agent (programs.ssh.startAgent), not
     # gpg-agent: gpg-agent's pinentry-curses needs a controlling TTY and breaks
     # under niri/Wayland (prompt spawns on an unreachable terminal).

@@ -29,7 +29,7 @@
         source ${config.sops.secrets.work-fish.path}
       end
 
-      # Ensure DBUS and XDG variables are available (Linux only)
+      # Ensure XDG and DBUS variables are available (Linux only)
       if test (uname) = "Linux"
         if test -z "$DBUS_SESSION_BUS_ADDRESS"
           set -x DBUS_SESSION_BUS_ADDRESS "unix:path=$XDG_RUNTIME_DIR/bus"
@@ -38,9 +38,6 @@
           set -x XDG_RUNTIME_DIR "/run/user/"(id -u)
         end
       end
-
-      set -gx GPG_TTY (tty)
-      gpg-connect-agent updatestartuptty /bye >/dev/null
       bind \ct __fzf_open_file
       bind alt-backspace backward-kill-word
 
@@ -62,6 +59,8 @@
         set -U fish_user_paths $new_paths
       end
 
+      fish_add_path --path --append /etc/profiles/per-user/$USER/bin
+      fish_add_path --path --append /run/current-system/sw/bin
       fish_add_path --path --append $HOME/.nix-profile/bin
       fish_add_path --path --append $HOME/.local/bin
       fish_add_path --path --append ~/.nix-profile/bin
