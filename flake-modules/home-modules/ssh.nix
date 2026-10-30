@@ -9,6 +9,7 @@
       # sops uses the agent too, so nuci diff/deploy stops double-prompting).
       compression = true;
       serverAliveInterval = 10;
+      includes = [ "~/.ssh/config.d/*" ];
 
       matchBlocks = {
         "*" = {

@@ -12,25 +12,9 @@
   programs.fish = {
     enable = true;
     shellAbbrs = {
-      bb = "brazil-build";
-      bba = "brazil-build apollo-pkg";
-      bre = "brazil-runtime-exec";
-      brc = "brazil-recursive-cmd";
-      bws = "brazil ws";
-      bwsuse = "bws use --gitMode -p";
-      bwscreate = "bws create -n";
-      bbr = "brc brazil-build";
-      bball = "brc --allPackages";
-      bbb = "brc --allPackages brazil-build";
-      bbra = "bbr apollo-pkg";
       idea = "env _JAVA_AWT_WM_NONREPARENTING=1 XDG_SESSION_TYPE=x11 intellij-idea-ultimate";
       zz = "zi";
       rgi = "rg -i";
-      ec2-ssh = "/apollo/env/EC2SSHWrapper/bin/ec2-ssh";
-      isengard = "/apollo/bin/env -e AmazonAwsCli isengard";
-      aws = "/apollo/bin/env -e AmazonAwsCli aws";
-      sshenv = "/apollo/env/envImprovement/bin/sshenv";
-
     };
     interactiveShellInit = ''
       if not set --query fish_private_mode
@@ -38,6 +22,12 @@
       end
       zoxide init fish | source
       direnv hook fish | source
+      if test -f ~/.config/fish/config.fish.aws
+        source ~/.config/fish/config.fish.aws
+      end
+      if test -f ${config.sops.secrets.work-fish.path}
+        source ${config.sops.secrets.work-fish.path}
+      end
 
       # Ensure DBUS and XDG variables are available (Linux only)
       if test (uname) = "Linux"
@@ -114,9 +104,6 @@
           bind \ej history-token-search-forward
         '';
       };
-      mcurl = {
-        body = "/usr/bin/curl $argv -L --cookie ~/.midway/cookie --cookie-jar ~/.midway/cookie";
-      };
       bwrap-yolo = {
         description = "Run a command in a network-enabled bubblewrap sandbox with $HOME masked and only $PWD mounted RW";
         body = ''
@@ -170,7 +157,7 @@
           end
 
           # Ensure agent config/state dirs exist on host before binding
-          mkdir -p "$HOME/.kimi" "$HOME/.config/opencode" "$HOME/.local/share/opencode" "$HOME/.claude" "$HOME/.gemini"
+          mkdir -p "$HOME/.kimi" "$HOME/.config/opencode" "$HOME/.local/share/opencode" "$HOME/.claude" "$HOME/.gemini" "$HOME/.codex"
 
           set -l bwrap_args \
             # 1. Isolate mount, PID, IPC, and UTS namespaces, but KEEP network shared
@@ -209,7 +196,10 @@
             --bind-try "$HOME/.claude" "$HOME/.claude" \
             --ro-bind-try "$HOME/.claude.json" "$HOME/.claude.json" \
             --ro-bind-try "$HOME/dev" "$HOME/dev" \
+            --bind-try "$HOME/workspace" "$HOME/workspace" \
+            --bind-try /Volumes/workplace /Volumes/workplace \
             --bind-try "$HOME/.gemini" "$HOME/.gemini" \
+            --bind-try "$HOME/.codex" "$HOME/.codex" \
             # 7. Mount ONLY the current project directory as Read-Write (with .git/hooks & .git/config protected)
             --bind "$workdir" "$workdir" \
             --ro-bind-try "$workdir/.git/hooks" "$workdir/.git/hooks" \
@@ -318,6 +308,39 @@
             set i (math $i + 1)
           end
           bwrap-yolo $bwrap_flags -- agy --dangerously-skip-permissions $agent_args
+        '';
+      };
+      yolo-codex = {
+        description = "Run Codex CLI in autonomous YOLO mode inside bwrap-yolo";
+        body = ''
+          set -l bwrap_flags
+          set -l agent_args
+          set -l i 1
+          set -l argc (count $argv)
+          while test $i -le $argc
+            switch $argv[$i]
+              case --ro --rw
+                set -l flag $argv[$i]
+                set i (math $i + 1)
+                if test $i -le $argc
+                  set -l p (realpath -s -m -- $argv[$i])
+                  set -a bwrap_flags $flag $p
+                  if test -d "$p"
+                    set -a agent_args --add-dir $p
+                  end
+                end
+              case '--ro=*' '--rw=*'
+                set -a bwrap_flags $argv[$i]
+                set -l p (realpath -s -m -- (string replace -r '^--r[ow]=' "" -- $argv[$i]))
+                if test -d "$p"
+                  set -a agent_args --add-dir $p
+                end
+              case '*'
+                set -a agent_args $argv[$i]
+            end
+            set i (math $i + 1)
+          end
+          bwrap-yolo $bwrap_flags -- codex --dangerously-bypass-approvals-and-sandbox $agent_args
         '';
       };
     };

@@ -55,6 +55,18 @@
           path = "${config.home.homeDirectory}/.local/share/atuin/key";
           mode = "0600";
         };
+        work-fish = {
+          sopsFile = "${inputs.private}/secrets/work.yaml";
+          key = "fish_config";
+          path = "${config.home.homeDirectory}/.config/fish/conf.d/work-secrets.fish";
+          mode = "0600";
+        };
+        work-ssh = {
+          sopsFile = "${inputs.private}/secrets/work.yaml";
+          key = "ssh_config";
+          path = "${config.home.homeDirectory}/.ssh/config.d/work";
+          mode = "0600";
+        };
       };
     };
   };
