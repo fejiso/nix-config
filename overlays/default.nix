@@ -268,14 +268,14 @@ in {
 
   # Force every buildGo*Module vendor fetch through GOPROXY=direct / GOSUMDB=off.
   #
-  # This is applied ONLY on devdesktop (a corp machine), NOT globally: that
-  # network sinkholes proxy.golang.org and sum.golang.org (the TLS cert served
-  # is for chalupa-dns-sinkhole.corp.amazon.com), so the default GOPROXY can't
-  # fetch module zips — every `*-go-modules` fixed-output derivation fails (e.g.
-  # sops-nix's sops-install-secrets). GOPROXY=direct fetches modules straight
-  # from their VCS (github etc.), which IS reachable; GOSUMDB=off skips the
-  # equally-sinkholed checksum database. Integrity is still guaranteed by Nix's
-  # vendorHash, so disabling the sumdb is safe.
+  # This is applied ONLY on corp machines (devdesktop, gravidesktop, work-laptop),
+  # NOT globally: that network sinkholes proxy.golang.org and sum.golang.org (the
+  # TLS cert served is for chalupa-dns-sinkhole.corp.amazon.com), so the default
+  # GOPROXY can't fetch module zips — every `*-go-modules` fixed-output
+  # derivation fails (e.g. sops-nix's sops-install-secrets). GOPROXY=direct
+  # fetches modules straight from their VCS (github etc.), which IS reachable;
+  # GOSUMDB=off skips the equally-sinkholed checksum database. Integrity is still
+  # guaranteed by Nix's vendorHash, so disabling the sumdb is safe.
   #
   # We do NOT want this elsewhere: on normal networks proxy.golang.org is
   # reachable and gives module zips + binary-cache hits, whereas `direct` makes

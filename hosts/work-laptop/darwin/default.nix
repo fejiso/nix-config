@@ -13,7 +13,14 @@
 
   nixpkgs.config.allowUnfree = true;
   # Stable base with pkgs.unstable available for explicit package exceptions.
-  nixpkgs.overlays = [ outputs.overlays.unstable-packages ];
+  # Corp network sinkholes proxy.golang.org; force Go vendor fetches
+  # through GOPROXY=direct. See overlays/default.nix.
+  nixpkgs.overlays = [
+    outputs.overlays.additions
+    outputs.overlays.modifications
+    outputs.overlays.unstable-packages
+    outputs.overlays.go-proxy-direct
+  ];
 
   # Nix configuration
   nix = {

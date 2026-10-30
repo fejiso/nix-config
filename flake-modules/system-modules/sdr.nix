@@ -2399,6 +2399,8 @@
           # Digital-mode & ham audio UIs
           pkgs.fldigi             # Fldigi digital modem UI
           pkgs.wsjtx              # WSJT-X (FT8, JT65, WSPR, etc.)
+          pkgs.gridtracker        # GridTracker (v1) WSJT-X/JTDX companion & map/log tracker
+          pkgs.gridtracker2       # GridTracker2 WSJT-X/JTDX companion & map/log tracker
           pkgs.js8call            # JS8Call weak-signal messaging
           pkgs.qsstv              # QSSTV slow-scan TV / DRM
         ];
