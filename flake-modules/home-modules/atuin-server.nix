@@ -48,6 +48,7 @@ in {
         After = [ "network.target" ];
       };
       Service = {
+        ExecStartPre = "${pkgs.coreutils}/bin/mkdir -p '${config.xdg.dataHome}/atuin'";
         ExecStart = "${pkgs.unstable.atuin}/bin/atuin server start";
         Restart = "on-failure";
         RestartSec = 5;
