@@ -18,6 +18,15 @@
   hardware.bluetooth.enable = true;
   services.power-profiles-daemon.enable = lib.mkDefault true;
 
+  # Virtual camera presented as a Logitech device for camera consumers.
+  boot = {
+    kernelModules = [ "v4l2loopback" ];
+    extraModulePackages = with config.boot.kernelPackages; [ v4l2loopback ];
+    extraModprobeConfig = ''
+      options v4l2loopback devices=1 video_nr=0 card_label="Logitech" exclusive_caps=1
+    '';
+  };
+
   # DLNA audio bridge via pa-dlna (home module services.boseSoundtouch):
   #  - TCP 8092: pa-dlna HTTP server the renderer pulls the audio stream from.
   #  - UDP 1901: fixed port for SSDP M-SEARCH responses (unicast from the device;
@@ -121,6 +130,7 @@ services.desktopManager.gnome.enable = lib.mkIf config.services.xserver.enable f
     ghostty
     pciutils
     usbutils
+    v4l-utils
     pcsclite
     pcsc-tools
     spotify
