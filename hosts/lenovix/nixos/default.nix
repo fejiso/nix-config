@@ -17,12 +17,12 @@
   # Host-specific networking
   networking.hostName = "lenovix";
 
-  # Export the Airspy over Netbird with server-side VFO/decimation and compression.
+  # Export the SDRplay RSP1 over Netbird with server-side VFO/decimation and compression.
   # Lazy acquisition leaves it free for SDR++, SoapySDR, and local tools when idle.
   sdr.sdrangelServer = {
     enable = true;
-    hardwareType = "Airspy";
-    serial = "4a464c83631200b";
+    hardwareType = "SoapySDR";
+    serial = "sdrplay-0";
   };
 
   # Tdarr worker node (native NixOS service)

@@ -23,7 +23,7 @@
     kernelModules = [ "v4l2loopback" ];
     extraModulePackages = with config.boot.kernelPackages; [ v4l2loopback ];
     extraModprobeConfig = ''
-      options v4l2loopback devices=1 video_nr=0 card_label="Logitech" exclusive_caps=1
+      options v4l2loopback devices=1 video_nr=67 card_label="Logitech" exclusive_caps=1
     '';
   };
 
