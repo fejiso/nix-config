@@ -1,7 +1,7 @@
 { ... }: {
   flake.modules.nixos.sdr =
   # General SDR host configuration: drivers, udev rules, kernel module
-  # blacklists, SoapySDR plugins, SoapySDRServer, SDR++ Server, and GUI/CLI SDR tools for:
+  # blacklists, SoapySDR plugins, SoapySDRServer, SDR++/SDRangel servers, and GUI/CLI SDR tools for:
   #   - Original LimeSDR (MyriadRF LMS7002M)
   #   - Analog Devices ADALM-PLUTO (PlutoSDR)
   #   - Nuand bladeRF
@@ -11,7 +11,7 @@
   #
   # Automatically detects if an ADS-B module (`adsb-readsb`, `adsb-feeders`, or
   # `airspy-adsb`) is using `rtlsdr` or `airspy` on the host and excludes those
-  # devices so `sdr` / `SoapySDRServer` / `sdrpp-server` never conflict with ADS-B decoding.
+  # devices so `sdr` / `SoapySDRServer` / `sdrpp-server` / `sdrangel-server` never conflict with ADS-B decoding.
   { config, lib, pkgs, ... }:
   let
     cfg = config.sdr;
@@ -2223,6 +2223,184 @@
       '';
     });
 
+    # SDRangel with exact Remote TCP device selection and opt-in lazy acquisition.
+    # Upstream starts the source immediately and ignores --remote-tcp-serial;
+    # neither behavior is safe for a permanently running shared SDR host.
+    sdrangelCustom = pkgs.sdrangel.overrideAttrs (old: {
+      postPatch = (old.postPatch or "") + ''
+        # Honor --remote-tcp-serial when selecting the device to export.
+        substituteInPlace sdrbase/channel/channelwebapiutils.h \
+          --replace-fail \
+            'bool open(const QString hwType, int direction, const QStringList& settingsKeys, SWGSDRangel::SWGDeviceSettings *response, QObject *receiver, const char *slot);' \
+            'bool open(const QString hwType, int direction, const QStringList& settingsKeys, SWGSDRangel::SWGDeviceSettings *response, QObject *receiver, const char *slot, const QString& serial);' \
+          --replace-fail \
+            'static bool addDevice(const QString hwType, int direction, const QStringList& settingsKeys, SWGSDRangel::SWGDeviceSettings *response, QObject *receiver = nullptr, const char *slot = nullptr);' \
+            'static bool addDevice(const QString hwType, int direction, const QStringList& settingsKeys, SWGSDRangel::SWGDeviceSettings *response, QObject *receiver = nullptr, const char *slot = nullptr, const QString& serial = QString());'
+
+        substituteInPlace sdrbase/channel/channelwebapiutils.cpp \
+          --replace-fail \
+            'bool ChannelWebAPIUtils::addDevice(const QString hwType, int direction, const QStringList& settingsKeys, SWGSDRangel::SWGDeviceSettings *response, QObject *receiver, const char *slot)' \
+            'bool ChannelWebAPIUtils::addDevice(const QString hwType, int direction, const QStringList& settingsKeys, SWGSDRangel::SWGDeviceSettings *response, QObject *receiver, const char *slot, const QString& serial)' \
+          --replace-fail \
+            'return DeviceOpener::open(hwType, direction, settingsKeys, response, receiver, slot);' \
+            'return DeviceOpener::open(hwType, direction, settingsKeys, response, receiver, slot, serial);' \
+          --replace-fail \
+            'bool DeviceOpener::open(const QString hwType, int direction, const QStringList& settingsKeys, SWGSDRangel::SWGDeviceSettings *response, QObject *receiver, const char *slot)' \
+            'bool DeviceOpener::open(const QString hwType, int direction, const QStringList& settingsKeys, SWGSDRangel::SWGDeviceSettings *response, QObject *receiver, const char *slot, const QString& serial)' \
+          --replace-fail \
+            '        if (!hwType.isEmpty() && (hwType != samplingDevice->hardwareId)) {
+            continue;
+        }' \
+            '        if (!hwType.isEmpty() && (hwType != samplingDevice->hardwareId)) {
+            continue;
+        }
+
+        if (!serial.isEmpty() && (serial != samplingDevice->serial)) {
+            continue;
+        }'
+
+        # In lazy mode, start only the Remote TCP listener from the starter.
+        substituteInPlace sdrbase/remotetcpsinkstarter.h \
+          --replace-fail \
+            'class ChannelAPI;
+' \
+            'class ChannelAPI;
+class BasebandSampleSink;
+' \
+          --replace-fail \
+            '    DeviceSet *m_deviceSet;
+' \
+            '    DeviceSet *m_deviceSet;
+    BasebandSampleSink *m_remoteSink;
+'
+
+        substituteInPlace sdrbase/remotetcpsinkstarter.cpp \
+          --replace-fail \
+            '#include "dsp/devicesamplesource.h"' \
+            '#include "dsp/devicesamplesource.h"
+#include "dsp/basebandsamplesink.h"' \
+          --replace-fail \
+            '    m_deviceSet(nullptr)
+' \
+            '    m_deviceSet(nullptr),
+    m_remoteSink(nullptr)
+' \
+          --replace-fail \
+            'ChannelWebAPIUtils::addDevice(hwType, 0, QStringList(), response, this, SLOT(deviceOpened(int)));' \
+            'ChannelWebAPIUtils::addDevice(hwType, 0, QStringList(), response, this, SLOT(deviceOpened(int)), serial);' \
+          --replace-fail \
+            'void RemoteTCPSinkStarter::channelAdded(int deviceSetIndex, ChannelAPI *channel)
+{
+    (void) deviceSetIndex;
+' \
+            'void RemoteTCPSinkStarter::channelAdded(int deviceSetIndex, ChannelAPI *channel)
+{
+    (void) deviceSetIndex;
+    m_remoteSink = dynamic_cast<BasebandSampleSink*>(channel);
+' \
+          --replace-fail \
+            '    // Start the device
+    ChannelWebAPIUtils::run(m_deviceSet->getIndex());
+' \
+            '    if (qEnvironmentVariableIsSet("SDRANGEL_REMOTE_TCP_LAZY")) {
+        // Keep the network listener available without opening the source.
+        if (m_remoteSink) { m_remoteSink->start(); }
+    } else {
+        // Start the device
+        ChannelWebAPIUtils::run(m_deviceSet->getIndex());
+    }
+'
+
+        # Acquire on the first client, release after the last, and keep the
+        # listener alive across acquisition stops. Normal SDRangel is unchanged.
+        substituteInPlace plugins/channelrx/remotetcpsink/remotetcpsink.h \
+          --replace-fail \
+            '    QNetworkReply *m_removeRequest;
+' \
+            '    QNetworkReply *m_removeRequest;
+    bool m_lazy;
+    bool m_closing;
+'
+
+        substituteInPlace plugins/channelrx/remotetcpsink/remotetcpsink.cpp \
+          --replace-fail \
+            '        m_clients(0),
+        m_removeRequest(nullptr)
+' \
+            '        m_clients(0),
+        m_removeRequest(nullptr),
+        m_lazy(qEnvironmentVariableIsSet("SDRANGEL_REMOTE_TCP_LAZY")),
+        m_closing(false)
+' \
+          --replace-fail \
+            'RemoteTCPSink::~RemoteTCPSink()
+{
+    qDebug("RemoteTCPSink::~RemoteTCPSink");' \
+            'RemoteTCPSink::~RemoteTCPSink()
+{
+    m_closing = true;
+    qDebug("RemoteTCPSink::~RemoteTCPSink");' \
+          --replace-fail \
+            'void RemoteTCPSink::start()
+{
+    qDebug("RemoteTCPSink::start: m_basebandSampleRate: %d", m_basebandSampleRate);' \
+            'void RemoteTCPSink::start()
+{
+    if (m_thread.isRunning()) { return; }
+    qDebug("RemoteTCPSink::start: m_basebandSampleRate: %d", m_basebandSampleRate);' \
+          --replace-fail \
+            '    if (m_settings.m_public) {
+        removePublicListing(m_settings.m_publicAddress, m_settings.m_publicPort);
+    }
+}' \
+            '    if (m_settings.m_public) {
+        removePublicListing(m_settings.m_publicAddress, m_settings.m_publicPort);
+    }
+    if (m_lazy && !m_closing) {
+        // The source stopped, but future clients still need a listener.
+        start();
+    }
+}' \
+          --replace-fail \
+            '        m_clients = msg.getClients();
+        updatePublicListing();
+        return true;
+    }
+    else if (MsgReportDisconnect::match(cmd))' \
+            '        int previousClients = m_clients;
+        m_clients = msg.getClients();
+        if (m_lazy && (previousClients == 0) && (m_clients > 0)) {
+            m_deviceAPI->startDeviceEngine();
+        }
+        updatePublicListing();
+        return true;
+    }
+    else if (MsgReportDisconnect::match(cmd))' \
+          --replace-fail \
+            '        m_clients = msg.getClients();
+        updatePublicListing();
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}' \
+            '        m_clients = msg.getClients();
+        if (m_lazy && (m_clients == 0)) {
+            m_deviceAPI->stopDeviceEngine();
+        }
+        updatePublicListing();
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}'
+      '';
+    });
+
     # Lightweight per-host wrapper around sdrppUnwrapped so C++ is compiled only once
     # across the entire fleet while per-host remote lists, Soapy plugin paths, and
     # ADS-B device exclusions are injected via environment variables.
@@ -2244,6 +2422,22 @@
         wrapProgram "$out/bin/sdrpp" ${lib.escapeShellArgs sdrppEnvArgs}
       '';
     };
+
+    sdrangelServerArgs = [
+      "--scratch"
+      "--soapy"
+      "--api-address" "127.0.0.1"
+      "--api-port" (toString cfg.sdrangelServer.apiPort)
+      "--remote-tcp"
+      "--remote-tcp-address" "0.0.0.0"
+      "--remote-tcp-port" (toString cfg.sdrangelServer.port)
+    ]
+    ++ lib.optionals (cfg.sdrangelServer.hardwareType != null) [
+      "--remote-tcp-hwtype" cfg.sdrangelServer.hardwareType
+    ]
+    ++ lib.optionals (cfg.sdrangelServer.serial != null) [
+      "--remote-tcp-serial" cfg.sdrangelServer.serial
+    ];
   in
   {
     options.sdr = {
@@ -2324,9 +2518,45 @@
           description = "TCP port for SDR++ Server";
         };
       };
+
+      sdrangelServer = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable SDRangel Remote TCP server for an explicitly selected non-ADS-B SDR over wt0 (Netbird)";
+        };
+        port = lib.mkOption {
+          type = lib.types.port;
+          default = 1234;
+          description = "TCP port for SDRangel Remote TCP (SDRA) IQ/control stream";
+        };
+        apiPort = lib.mkOption {
+          type = lib.types.port;
+          default = 8091;
+          description = "Loopback-only TCP port for the SDRangel REST API";
+        };
+        hardwareType = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          example = "RTLSDR";
+          description = "SDRangel hardware type to export (required unless serial is set)";
+        };
+        serial = lib.mkOption {
+          type = lib.types.nullOr lib.types.str;
+          default = null;
+          description = "Exact SDR serial to export, to avoid claiming a readsb or other consumer's device";
+        };
+      };
     };
 
     config = lib.mkIf cfg.enable {
+      assertions = [{
+        assertion = !cfg.sdrangelServer.enable
+          || cfg.sdrangelServer.hardwareType != null
+          || cfg.sdrangelServer.serial != null;
+        message = "sdr.sdrangelServer requires an explicit non-ADS-B hardwareType or serial";
+      }];
+
       # RTL-SDR: udev rules, rtl-sdr CLI tools, plugdev group, and DVB blacklists
       # (skip if ADS-B uses RTL-SDR or `adsb-readsb` already enables RTL-SDR hardware)
       hardware.rtl-sdr.enable = lib.mkIf (cfg.devices.rtlsdr && !adsbManagesRtlsdrHw) true;
@@ -2388,7 +2618,7 @@
           sdrppCustom             # SDR++ with SoapySDR remote host support & native sources
           pkgs.gqrx               # Gqrx SDR receiver
           pkgs.cubicsdr           # CubicSDR receiver
-          pkgs.sdrangel           # SDRangel Rx/Tx workstation + channel decoders
+          sdrangelCustom          # SDRangel Rx/Tx workstation + channel decoders
           pkgs.satdump            # SatDump satellite & general SDR receiver/decoder
           pkgs.sigdigger          # SigDigger real-time blind signal analyzer
           pkgs.quisk              # Quisk ham transceiver GUI
@@ -2463,21 +2693,46 @@
         };
       };
 
+      # SDRangel Remote TCP: server-side VFO/decimation and FLAC/zlib-compressed IQ.
+      # The patched listener acquires the explicitly selected source only while
+      # at least one client is connected, leaving it available to other consumers.
+      systemd.services.sdrangel-server = lib.mkIf cfg.sdrangelServer.enable {
+        description = "SDRangel Remote TCP Server (selected non-ADS-B SDR)";
+        after = [ "network-online.target" ] ++ lib.optional cfg.devices.sdrplay "sdrplayApi.service";
+        wants = [ "network-online.target" ] ++ lib.optional cfg.devices.sdrplay "sdrplayApi.service";
+        wantedBy = [ "multi-user.target" ];
+        environment = {
+          HOME = "/var/lib/sdrangel-server";
+          SOAPY_SDR_PLUGIN_PATH = soapyServerPluginSearchPath;
+          SDRANGEL_REMOTE_TCP_LAZY = "1";
+        };
+        serviceConfig = {
+          ExecStart = "${sdrangelCustom}/bin/sdrangelsrv ${lib.escapeShellArgs sdrangelServerArgs}";
+          StateDirectory = "sdrangel-server";
+          KillMode = "process";
+          Restart = "on-failure";
+          RestartSec = "5s";
+          LimitRTPRIO = 99;
+        };
+      };
+
       # Increase socket buffer sizes for high-sample-rate IQ streaming (from soapyremote's sysctl.d)
-      boot.kernel.sysctl = lib.mkIf (cfg.soapyServer.enable || cfg.sdrppServer.enable) {
+      boot.kernel.sysctl = lib.mkIf (cfg.soapyServer.enable || cfg.sdrppServer.enable || cfg.sdrangelServer.enable) {
         "net.core.rmem_max" = lib.mkDefault 104857600;
         "net.core.wmem_max" = lib.mkDefault 104857600;
       };
 
-      # Restrict SoapySDRServer and SDR++ Server access strictly to the Netbird mesh interface (wt0):
+      # Restrict SDR network servers strictly to the Netbird mesh interface (wt0):
       #   - TCP 55132: SoapyRemote RPC control & TCP transport
       #   - TCP 5259:  SDR++ Server compressed IQ/control stream
+      #   - TCP 1234:  SDRangel Remote TCP compressed IQ/control stream
       #   - UDP 1900:  SoapyRemote SSDP service discovery
       #   - UDP 32768-60999: SoapyRemote ephemeral UDP IQ stream sockets allocated per stream
       networking.firewall.interfaces.wt0 = {
         allowedTCPPorts =
           lib.optional cfg.soapyServer.enable cfg.soapyServer.port
-          ++ lib.optional cfg.sdrppServer.enable cfg.sdrppServer.port;
+          ++ lib.optional cfg.sdrppServer.enable cfg.sdrppServer.port
+          ++ lib.optional cfg.sdrangelServer.enable cfg.sdrangelServer.port;
         allowedUDPPorts = lib.optional cfg.soapyServer.enable 1900;
         allowedUDPPortRanges = lib.optional cfg.soapyServer.enable {
           from = 32768;
