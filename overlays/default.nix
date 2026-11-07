@@ -156,6 +156,19 @@ in {
       ];
     });
 
+    # VSCode 1.144.0 moved the bundled ripgrep binary into
+    # `resources/app/node_modules.asar.unpacked/@vscode/ripgrep-universal/bin/linux-x64/rg`,
+    # but nixpkgs generic.nix still tries to remove/symlink the old path
+    # `resources/app/node_modules/@vscode/ripgrep/bin/rg`, failing with
+    # "rm: cannot remove ...: No such file or directory".
+    # Drop once fixed upstream in nixpkgs.
+    vscode = prev.vscode.overrideAttrs (old: {
+      postPatch = builtins.replaceStrings
+        [ "resources/app/node_modules/@vscode/ripgrep/bin/rg" ]
+        [ "resources/app/node_modules.asar.unpacked/@vscode/ripgrep-universal/bin/linux-x64/rg" ]
+        old.postPatch;
+    });
+
     # perl5.42.0-DBD-CSV-0.60 fails 3/73 tests (t/70_csv.t: drop table tests).
     # Runtime is unaffected. Cascades through parallel-full → system-path.
     # Drop when fixed upstream in nixpkgs.
