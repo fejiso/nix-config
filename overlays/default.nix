@@ -371,6 +371,16 @@ in {
                              'console.log("skipped models smoke test (nix sandbox)")'
           '';
         });
+
+        # opencode 2.2.5 upstream FOD hash for node_modules in nixpkgs-unstable
+        # is mismatched (specified sha256-xfOVcw1+waLVNhFDwzOtzxrUSQEogvn88YomydOlhwc=
+        # but evaluates to sha256-prx9dX7kUvs/E3zopkaPk5LXh3xJAy5sZeum/W8L7cA=).
+        # Override outputHash until upstream nixpkgs updates the package.
+        opencode = uprev.opencode.overrideAttrs (old: {
+          node_modules = old.node_modules.overrideAttrs (_: {
+            outputHash = "sha256-prx9dX7kUvs/E3zopkaPk5LXh3xJAy5sZeum/W8L7cA=";
+          });
+        });
       });
   };
 }
