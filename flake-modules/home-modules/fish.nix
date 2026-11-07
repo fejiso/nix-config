@@ -25,9 +25,10 @@
       if test -f ~/.config/fish/config.fish.aws
         source ~/.config/fish/config.fish.aws
       end
+      ${lib.optionalString (config.sops.secrets ? work-fish) ''
       if test -f ${config.sops.secrets.work-fish.path}
         source ${config.sops.secrets.work-fish.path}
-      end
+      end''}
 
       # Ensure XDG and DBUS variables are available (Linux only)
       if test (uname) = "Linux"

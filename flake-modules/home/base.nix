@@ -55,6 +55,7 @@
           path = "${config.home.homeDirectory}/.local/share/atuin/key";
           mode = "0600";
         };
+      } // lib.optionalAttrs (builtins.elem hostname [ "devdesktop" "gravidesktop" "work-laptop" ]) {
         work-fish = {
           sopsFile = "${inputs.private}/secrets/work.yaml";
           key = "fish_config";

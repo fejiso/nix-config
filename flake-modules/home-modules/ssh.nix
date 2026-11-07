@@ -1,7 +1,7 @@
 { ... }: {
   # Declarative ~/.ssh/config (replaces the hand-maintained file — move it
   # aside first: `mv ~/.ssh/config ~/.ssh/config.pre-nix`).
-  flake.modules.homeManager.ssh = { ... }: {
+  flake.modules.homeManager.ssh = { lib, hostname ? "", ... }: {
     programs.ssh = {
       enable = true;
 
@@ -9,7 +9,7 @@
       # sops uses the agent too, so nuci diff/deploy stops double-prompting).
       compression = true;
       serverAliveInterval = 10;
-      includes = [ "~/.ssh/config.d/*" ];
+      includes = lib.optional (builtins.elem hostname [ "devdesktop" "gravidesktop" "work-laptop" ]) "~/.ssh/config.d/*";
 
       matchBlocks = {
         "*" = {
