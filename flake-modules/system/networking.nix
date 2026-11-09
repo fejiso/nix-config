@@ -62,18 +62,23 @@
 
       os.makedirs("/var/lib/iwd", mode=0o700, exist_ok=True)
 
+      no_autoconnect = {"InterPooper"}
+
       psk_networks = data.get("psk", {})
       for ssid, passphrase in psk_networks.items():
           target = f"/var/lib/iwd/{ssid}.psk"
           expected_line = f"Passphrase={passphrase}"
+          auto_connect = ssid not in no_autoconnect
           expected_content = f"[Security]\nPassphrase={passphrase}\n"
+          if not auto_connect:
+              expected_content += "\n[Settings]\nAutoConnect=false\n"
 
           should_write = True
           if os.path.exists(target):
               try:
                   with open(target, "r") as f:
                       lines = [line.strip() for line in f]
-                  if expected_line in lines:
+                  if expected_line in lines and (auto_connect or "AutoConnect=false" in lines):
                       should_write = False
               except Exception:
                   should_write = True
