@@ -164,7 +164,7 @@
     {
       enable = true;
       allowedCompanions = privateMeshcore.allowedCompanions or [ ];
-      extraChannels = privateMeshcore.extraChannels or [ "#ioi" ];
+      extraChannels = privateMeshcore.extraChannels or privateMeshcore.channels or [ "#ioi" ];
     } // lib.optionalAttrs (privateMeshcore ? allowlistFile) {
       inherit (privateMeshcore) allowlistFile;
     };

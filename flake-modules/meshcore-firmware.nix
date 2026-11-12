@@ -93,33 +93,44 @@
               fi
               echo "Flashing local board on $port ..."
               if [ "$erase" -eq 1 ]; then
-                ${pkgs.esptool}/bin/esptool.py --chip esp32 --port "$port" erase_flash
+                ${pkgs.esptool}/bin/esptool --chip esp32 --port "$port" erase-flash
               fi
-              if [ -n "$merged_bin" ]; then
-                ${pkgs.esptool}/bin/esptool.py --chip esp32 --port "$port" --baud 460800 write_flash -z 0x0 "$merged_bin"
+              if [ -f "$merged_bin" ]; then
+                ${pkgs.esptool}/bin/esptool --chip esp32 --port "$port" --baud 460800 write-flash -z 0x0 "$merged_bin"
               else
                 ${pkgs.platformio-core}/bin/pio run -e ${envName} -t upload --upload-port "$port"
               fi
               exit 0
             fi
 
-            target="root@$host"
-            if [[ "$host" != *.* ]]; then
-              target="root@$host.netbird.cloud"
+            if [[ "$host" == *@* ]]; then
+              user_part="''${host%%@*}"
+              host_part="''${host#*@}"
+            else
+              user_part="root"
+              host_part="$host"
             fi
+            if [[ "$host_part" != *.* ]]; then
+              host_part="$host_part.netbird.cloud"
+            fi
+            target="$user_part@$host_part"
 
             echo "Uploading firmware artefacts to $target ..."
             remote_dir="/tmp/kiss-modem-flash"
-            ssh "$target" "mkdir -p $remote_dir"
+            ssh "$target" mkdir -p "$remote_dir"
             scp "$build_dir/bootloader.bin" "$build_dir/partitions.bin" "$build_dir/firmware.bin" "$target:$remote_dir/"
-            if [ -n "$merged_bin" ]; then
+            if [ -f "$merged_bin" ]; then
               scp "$merged_bin" "$target:$remote_dir/merged.bin"
             fi
 
-            ssh "$target" '
+            port_arg="''${port:-auto}"
+            ssh "$target" /usr/bin/env bash -s -- "$port_arg" "$erase" <<'REMOTE_EOF'
+            main() {
               set -euo pipefail
-              port="'"$port"'"
-              if [ -z "$port" ]; then
+              port="$1"
+              erase="$2"
+
+              if [ "$port" = "auto" ] || [ -z "$port" ]; then
                 if [ -e /dev/kiss-modem ]; then
                   port=/dev/kiss-modem
                 elif [ -e /dev/ttyUSB0 ]; then
@@ -148,35 +159,44 @@
               }
               trap restore_svc EXIT
 
-              flash_cmd="nix-shell -p esptool --run"
-              if command -v esptool.py >/dev/null 2>&1; then
-                esptool_bin="esptool.py"
-              else
-                esptool_bin=""
-              fi
-
-              run_esptool() {
-                if [ -n "$esptool_bin" ]; then
-                  "$esptool_bin" "$@"
+              run_esptool_v5() {
+                if command -v esptool >/dev/null 2>&1; then
+                  esptool "$@" </dev/null
                 else
-                  nix --extra-experimental-features "nix-command flakes" shell nixpkgs#esptool -c esptool.py "$@"
+                  nix --extra-experimental-features "nix-command flakes" shell nixpkgs#esptool -c esptool "$@" </dev/null
                 fi
               }
 
-              if [ "'"$erase"'" -eq 1 ]; then
-                run_esptool --chip esp32 --port "$port" erase_flash
+              if command -v esptool >/dev/null 2>&1 || ! command -v esptool.py >/dev/null 2>&1; then
+                if [ "$erase" -eq 1 ]; then
+                  run_esptool_v5 --chip esp32 --port "$port" erase-flash
+                fi
+                if [ -f /tmp/kiss-modem-flash/merged.bin ]; then
+                  run_esptool_v5 --chip esp32 --port "$port" --baud 460800 write-flash -z 0x0 /tmp/kiss-modem-flash/merged.bin
+                else
+                  run_esptool_v5 --chip esp32 --port "$port" --baud 460800 write-flash -z \
+                    0x1000 /tmp/kiss-modem-flash/bootloader.bin \
+                    0x8000 /tmp/kiss-modem-flash/partitions.bin \
+                    0x10000 /tmp/kiss-modem-flash/firmware.bin
+                fi
+              else
+                if [ "$erase" -eq 1 ]; then
+                  esptool.py --chip esp32 --port "$port" erase_flash </dev/null
+                fi
+                if [ -f /tmp/kiss-modem-flash/merged.bin ]; then
+                  esptool.py --chip esp32 --port "$port" --baud 460800 write_flash -z 0x0 /tmp/kiss-modem-flash/merged.bin </dev/null
+                else
+                  esptool.py --chip esp32 --port "$port" --baud 460800 write_flash -z \
+                    0x1000 /tmp/kiss-modem-flash/bootloader.bin \
+                    0x8000 /tmp/kiss-modem-flash/partitions.bin \
+                    0x10000 /tmp/kiss-modem-flash/firmware.bin </dev/null
+                fi
               fi
 
-              if [ -f /tmp/kiss-modem-flash/merged.bin ]; then
-                run_esptool --chip esp32 --port "$port" --baud 460800 write_flash -z 0x0 /tmp/kiss-modem-flash/merged.bin
-              else
-                run_esptool --chip esp32 --port "$port" --baud 460800 write_flash -z \
-                  0x1000 /tmp/kiss-modem-flash/bootloader.bin \
-                  0x8000 /tmp/kiss-modem-flash/partitions.bin \
-                  0x10000 /tmp/kiss-modem-flash/firmware.bin
-              fi
               rm -rf /tmp/kiss-modem-flash
-            '
+            }
+            main "$@"
+            REMOTE_EOF
             echo "Remote flash on $target complete!"
           '');
         };
