@@ -66,6 +66,10 @@
           static_configs = [{ targets = [ "127.0.0.1:8080" ]; }];
         }
         {
+          job_name = "owlstack-bridge";
+          static_configs = [{ targets = [ "127.0.0.1:9620" ]; }];
+        }
+        {
           # nginx VTS per-vhost stats (module: flake-modules/system-modules/ingress.nix)
           job_name = "nginx-vts";
           metrics_path = "/status/format/prometheus";

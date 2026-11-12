@@ -152,6 +152,23 @@
     modelUrl = "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf";
   };
 
+  # MeshCore OwlShack + Pinto(hispanas, *) <-> Dublin(lenovix, #ioi) selective bridge.
+  # Allowlisted companion pubkeys and extra channels live in nix-config-private/meshcore.nix.
+  services.owlstack =
+    let
+      privateMeshcore =
+        if builtins.pathExists "${inputs.private}/meshcore.nix"
+        then import "${inputs.private}/meshcore.nix"
+        else { };
+    in
+    {
+      enable = true;
+      allowedCompanions = privateMeshcore.allowedCompanions or [ ];
+      extraChannels = privateMeshcore.extraChannels or [ "#ioi" ];
+    } // lib.optionalAttrs (privateMeshcore ? allowlistFile) {
+      inherit (privateMeshcore) allowlistFile;
+    };
+
   # System state version
   system.stateVersion = "25.05";
 }

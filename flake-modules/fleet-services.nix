@@ -87,6 +87,10 @@
     # would route it through butthead's home ingress.
     n8n   = { host = "hierro"; port = 5678; group = "Infra"; description = "Workflow automation"; healthPath = "/healthz"; };
 
+    owlshack-pinto  = { host = "hierro"; port = 8620; group = "Radio"; description = "MeshCore Pinto (OwlShack)"; };
+    owlshack-dublin = { host = "hierro"; port = 8621; group = "Radio"; description = "MeshCore Dublin #ioi (OwlShack)"; };
+    owlstack-bridge = { host = "hierro"; port = 9620; group = "Radio"; description = "MeshCore Pinto<->Dublin bridge"; healthPath = "/healthz"; };
+
     # ── snuffles ────────────────────────────────────────────────────────────
     # Public label is the legacy "adsb.pinto" (subdomains map, ingress.yaml).
     # sso = false: the live ADS-B map is meant to be shareable.

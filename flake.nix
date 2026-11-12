@@ -44,6 +44,14 @@
       flake = false;
     };
 
+    # MeshCore LoRa mesh firmware (github.com/meshcore-dev/MeshCore): source-only
+    # input overlaid with firmware/meshcore-tlora-v1 for pre-1.0 TTGO LoRa32
+    # kiss_modem builds; see flake-modules/meshcore-firmware.nix.
+    meshcore = {
+      url = "github:meshcore-dev/MeshCore/main";
+      flake = false;
+    };
+
     # Colmena for deployment (NixOS hosts)
     colmena.url = "github:zhaofengli/colmena";
 

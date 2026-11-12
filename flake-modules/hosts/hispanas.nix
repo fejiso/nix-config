@@ -8,6 +8,7 @@ import ../../lib/mk-host.nix {
     config.flake.modules.nixos.pentest
     config.flake.modules.nixos.sdr
     config.flake.modules.nixos.bcachefs
+    config.flake.modules.nixos.kiss-modem
   ];
   homeModules = [
     config.flake.modules.homeManager.linux-default

@@ -25,6 +25,9 @@
     serial = "sdrplay-0";
   };
 
+  # Export attached pre-1.0 TTGO LoRa32 MeshCore kiss_modem over NetBird (:7620 on wt0)
+  services.kiss-modem.enable = true;
+
   # System state version
   system.stateVersion = "25.05";
 }
