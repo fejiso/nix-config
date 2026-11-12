@@ -3,11 +3,30 @@
 #include <Arduino.h>
 #include <helpers/ESP32Board.h>
 
+extern const char* tlora_get_diag_name();
+
 // LILYGO T-LoRa pre-1.0 / V1.0 board with SX1276/SX1278
 class LilyGoTLoraV1Board : public ESP32Board {
 public:
+  void begin() {
+    // Meshtastic tlora_v1 defines VEXT_ENABLE = 21 (active LOW, powers OLED & RF front-end).
+    pinMode(21, OUTPUT);
+    digitalWrite(21, LOW);
+    delay(10);
+
+    ESP32Board::begin();
+#if defined(PIN_OLED_RESET) && (PIN_OLED_RESET >= 0)
+    pinMode(PIN_OLED_RESET, OUTPUT);
+    digitalWrite(PIN_OLED_RESET, HIGH);
+    delay(1);
+    digitalWrite(PIN_OLED_RESET, LOW);
+    delay(10);
+    digitalWrite(PIN_OLED_RESET, HIGH);
+#endif
+  }
+
   const char* getManufacturerName() const override {
-    return "LILYGO T-LoRa V1.0";
+    return tlora_get_diag_name();
   }
 
   uint16_t getBattMilliVolts() override {

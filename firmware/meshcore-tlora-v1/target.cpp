@@ -4,13 +4,7 @@
 LilyGoTLoraV1Board board;
 
 static SPIClass spi;
-#ifdef LORA_DIO1_BRIDGED
 RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_0, P_LORA_RESET, P_LORA_DIO_1, spi);
-#else
-// Pre-1.0 / V1.0 TTGO LoRa32 leaves DIO1 unwired on the PCB; pass RADIOLIB_NC
-// so GPIO 33 is not configured as a floating interrupt input.
-RADIO_CLASS radio = new Module(P_LORA_NSS, P_LORA_DIO_0, P_LORA_RESET, RADIOLIB_NC, spi);
-#endif
 
 WRAPPER_CLASS radio_driver(radio, board);
 
@@ -27,11 +21,24 @@ bool radio_init() {
   fallback_clock.begin();
   rtc_clock.begin(Wire);
 
+#ifdef DISPLAY_CLASS
+  if (display.begin()) {
+    display.clear();
+    display.turnOff();
+  }
+#endif
+
 #if defined(P_LORA_SCLK)
   return radio.std_init(&spi);
 #else
   return radio.std_init();
 #endif
+}
+
+const char* tlora_get_diag_name() {
+  static char diag_buf[140];
+  radio_driver.formatDiag(diag_buf, sizeof(diag_buf));
+  return diag_buf;
 }
 
 mesh::LocalIdentity radio_new_identity() {

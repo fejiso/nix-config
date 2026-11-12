@@ -15,7 +15,73 @@
           enable: on
           options:
             kickolduser: true
-          connector: serialdev,${cfg.device},${toString cfg.baudRate}n81,local,nobreak,hangup-when-done=false,rts=off,dtr=off
+          connector: serialdev,${cfg.device},${toString cfg.baudRate}n81,local,nobreak,hangup-when-done=false
+      '';
+
+      ensureDeviceScript = pkgs.writeShellScript "ensure-kiss-modem-device" ''
+        set -euo pipefail
+        export PATH="${lib.makeBinPath [ pkgs.coreutils pkgs.psmisc pkgs.systemd ]}:$PATH"
+        dev=${lib.escapeShellArg cfg.device}
+        has_serial_pin=${if cfg.usbSerial != null then "1" else "0"}
+
+        probe_kiss_ping() {
+          local cand="$1"
+          stty -F "$cand" ${toString cfg.baudRate} raw -echo -echoe -echok -hupcl min 0 time 2 2>/dev/null || return 1
+          exec 3<>"$cand" || return 1
+          dd <&3 bs=256 count=4 status=none >/dev/null 2>&1 || true
+          printf '\xc0\x06\x17\xc0' >&3 2>/dev/null || { exec 3>&-; return 1; }
+          sleep 0.2
+          local hex
+          hex=$(dd <&3 bs=64 count=1 status=none 2>/dev/null | od -An -tx1 | tr -d ' \n' || true)
+          exec 3>&-
+          [[ "$hex" == *"c00697c0"* ]]
+        }
+
+        if [ "$dev" = "/dev/kiss-modem" ]; then
+          udevadm trigger --subsystem-match=tty --action=change || true
+          udevadm settle --timeout=3 || true
+
+          if [ "$has_serial_pin" = "0" ]; then
+            shopt -s nullglob
+            cands=(/dev/ttyUSB* /dev/ttyACM*)
+            free_cands=()
+            for cand in "''${cands[@]}"; do
+              if ! fuser -s "$cand" 2>/dev/null; then
+                free_cands+=("$cand")
+              fi
+            done
+
+            matched=""
+            # Probe free serial ports for MeshCore KISS HW_CMD_PING -> HW_RESP_PING
+            # so hosts with multiple CP210x boards (e.g. ESP32-S3 + ESP32 TTGO) pick
+            # the actual KISS modem automatically.
+            for attempt in 1 2; do
+              for cand in "''${free_cands[@]}"; do
+                if probe_kiss_ping "$cand"; then
+                  matched="$cand"
+                  break 2
+                fi
+              done
+              [ "''${#free_cands[@]}" -gt 0 ] && [ "$attempt" -eq 1 ] && sleep 0.5 || true
+            done
+
+            if [ -n "$matched" ]; then
+              echo "Selected KISS modem on $matched (verified via HW_CMD_PING)"
+              ln -sfn "$matched" "$dev"
+            elif [ ! -e "$dev" ] && [ "''${#free_cands[@]}" -eq 1 ]; then
+              ln -sfn "''${free_cands[0]}" "$dev"
+            fi
+          fi
+        fi
+
+        if [ -e "$dev" ]; then
+          real_dev=$(readlink -f "$dev")
+          chgrp dialout "$real_dev" || true
+          chmod 0660 "$real_dev" || true
+          stty -F "$real_dev" -hupcl || true
+        else
+          echo "WARNING: $dev not present yet; check USB cable / lsusb" >&2
+        fi
       '';
 
       udevRules =
@@ -23,14 +89,17 @@
           SUBSYSTEM=="tty", ATTRS{serial}=="${cfg.usbSerial}", MODE="0660", GROUP="dialout", ENV{ID_MM_DEVICE_IGNORE}="1", SYMLINK+="kiss-modem"
         ''
         else if (cfg.usbVendor != null && cfg.usbProduct != null) then ''
-          SUBSYSTEM=="tty", ATTRS{idVendor}=="${cfg.usbVendor}", ATTRS{idProduct}=="${cfg.usbProduct}", MODE="0660", GROUP="dialout", ENV{ID_MM_DEVICE_IGNORE}="1", SYMLINK+="kiss-modem"
+          SUBSYSTEM=="tty", ATTRS{idVendor}=="${cfg.usbVendor}", ATTRS{idProduct}=="${cfg.usbProduct}", MODE="0660", GROUP="dialout", ENV{ID_MM_DEVICE_IGNORE}="1"
         ''
         else ''
-          # Silicon Labs CP210x (standard TTGO LoRa32 pre-1.0 / V1.0 USB-UART)
-          SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE="0660", GROUP="dialout", ENV{ID_MM_DEVICE_IGNORE}="1", SYMLINK+="kiss-modem"
-          # WCH CH9102 / CH340 variants
-          SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d4", MODE="0660", GROUP="dialout", ENV{ID_MM_DEVICE_IGNORE}="1", SYMLINK+="kiss-modem"
-          SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", MODE="0660", GROUP="dialout", ENV{ID_MM_DEVICE_IGNORE}="1", SYMLINK+="kiss-modem"
+          # Set permissions & ModemManager ignore on candidate USB-UART bridges;
+          # ensureDeviceScript selects the responding KISS modem when multiple TTYs exist.
+          SUBSYSTEM=="tty", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE="0660", GROUP="dialout", ENV{ID_MM_DEVICE_IGNORE}="1"
+          SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d4", MODE="0660", GROUP="dialout", ENV{ID_MM_DEVICE_IGNORE}="1"
+          SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="55d3", MODE="0660", GROUP="dialout", ENV{ID_MM_DEVICE_IGNORE}="1"
+          SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="7523", MODE="0660", GROUP="dialout", ENV{ID_MM_DEVICE_IGNORE}="1"
+          SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6001", MODE="0660", GROUP="dialout", ENV{ID_MM_DEVICE_IGNORE}="1"
+          SUBSYSTEM=="tty", ATTRS{idVendor}=="0403", ATTRS{idProduct}=="6015", MODE="0660", GROUP="dialout", ENV{ID_MM_DEVICE_IGNORE}="1"
         '';
     in
     {
@@ -90,6 +159,7 @@
           wants = [ "network-online.target" ];
           wantedBy = [ "multi-user.target" ];
           serviceConfig = {
+            ExecStartPre = "+${ensureDeviceScript}";
             ExecStart = "${pkgs.ser2net}/bin/ser2net -n -u -c ${ser2netConfig}";
             Restart = "always";
             RestartSec = 2;

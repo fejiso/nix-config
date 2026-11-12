@@ -13,12 +13,20 @@
       envName = "LilyGo_TLora_V1_0_kiss_modem";
 
       prepareTree = ''
-        work=$(mktemp -d /tmp/meshcore-kiss.XXXXXX)
-        cp -r ${inputs.meshcore}/. "$work"/
-        chmod -R u+w "$work"
+        work="''${XDG_CACHE_HOME:-$HOME/.cache}/meshcore-kiss-build"
+        if [ ! -f "$work/platformio.ini" ]; then
+          mkdir -p "$work"
+          cp -r ${inputs.meshcore}/. "$work"/
+          chmod -R u+w "$work"
+        fi
         mkdir -p "$work/variants/lilygo_tlora_v1"
-        cp -f ${variantSrc}/* "$work/variants/lilygo_tlora_v1/"
-        chmod -R u+w "$work/variants/lilygo_tlora_v1"
+        for src_file in ${variantSrc}/*; do
+          dst_file="$work/variants/lilygo_tlora_v1/$(basename "$src_file")"
+          if ! cmp -s "$src_file" "$dst_file" 2>/dev/null; then
+            cp -f "$src_file" "$dst_file"
+            chmod u+w "$dst_file"
+          fi
+        done
         cd "$work"
       '';
     in
@@ -130,19 +138,6 @@
               port="$1"
               erase="$2"
 
-              if [ "$port" = "auto" ] || [ -z "$port" ]; then
-                if [ -e /dev/kiss-modem ]; then
-                  port=/dev/kiss-modem
-                elif [ -e /dev/ttyUSB0 ]; then
-                  port=/dev/ttyUSB0
-                elif [ -e /dev/ttyACM0 ]; then
-                  port=/dev/ttyACM0
-                else
-                  echo "No serial port found (/dev/kiss-modem, /dev/ttyUSB0, /dev/ttyACM0)" >&2
-                  exit 1
-                fi
-              fi
-
               was_active=0
               if systemctl is-active --quiet kiss-modem-tcp.service 2>/dev/null; then
                 was_active=1
@@ -166,6 +161,44 @@
                   nix --extra-experimental-features "nix-command flakes" shell nixpkgs#esptool -c esptool "$@" </dev/null
                 fi
               }
+
+              is_esp32_port() {
+                local cand="$1"
+                if command -v fuser >/dev/null 2>&1 && fuser -s "$cand" 2>/dev/null; then
+                  echo "Skipping busy serial port $cand" >&2
+                  return 1
+                fi
+                if command -v esptool >/dev/null 2>&1 || ! command -v esptool.py >/dev/null 2>&1; then
+                  run_esptool_v5 --chip esp32 --port "$cand" chip-id >/dev/null 2>&1
+                else
+                  esptool.py --chip esp32 --port "$cand" chip_id </dev/null >/dev/null 2>&1
+                fi
+              }
+
+              if [ "$port" = "auto" ] || [ -z "$port" ]; then
+                shopt -s nullglob
+                cands=(/dev/ttyUSB* /dev/ttyACM*)
+                if [ "''${#cands[@]}" -eq 0 ]; then
+                  echo "No serial port found (/dev/ttyUSB*, /dev/ttyACM*)" >&2
+                  exit 1
+                fi
+                matched=""
+                for cand in "''${cands[@]}"; do
+                  echo "Probing $cand for ESP32 (TTGO LoRa32)..."
+                  if is_esp32_port "$cand"; then
+                    matched="$cand"
+                    echo "Confirmed ESP32 on $matched"
+                    break
+                  else
+                    echo "  $cand is not a plain ESP32 (or is busy), skipping."
+                  fi
+                done
+                if [ -z "$matched" ]; then
+                  echo "ERROR: No plain ESP32 board found among: ''${cands[*]}" >&2
+                  exit 1
+                fi
+                port="$matched"
+              fi
 
               if command -v esptool >/dev/null 2>&1 || ! command -v esptool.py >/dev/null 2>&1; then
                 if [ "$erase" -eq 1 ]; then
@@ -192,6 +225,11 @@
                     0x10000 /tmp/kiss-modem-flash/firmware.bin </dev/null
                 fi
               fi
+
+              if [ -L /dev/kiss-modem ] || [ ! -e /dev/kiss-modem ]; then
+                ln -sfn "$port" /dev/kiss-modem
+              fi
+              sleep 1.5
 
               rm -rf /tmp/kiss-modem-flash
             }

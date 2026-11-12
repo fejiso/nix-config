@@ -78,7 +78,7 @@ in
         };
       });
 
-      siteSubmodule = { defaultName, defaultRemote, defaultKissPort, defaultWebPort, defaultScope }:
+      siteSubmodule = { defaultName, defaultRemote, defaultKissPort, defaultWebPort, defaultScope, defaultPathHashSize, defaultFreqMHz }:
         lib.types.submodule {
           options = {
             name = lib.mkOption {
@@ -105,9 +105,14 @@ in
               default = defaultScope;
               description = "'*' for unscoped flood, or '#region' (e.g. '#ioi').";
             };
+            pathHashSize = lib.mkOption {
+              type = lib.types.int;
+              default = defaultPathHashSize;
+              description = "Default MeshCore path hash size in bytes (1, 2, or 3).";
+            };
             freqMHz = lib.mkOption {
               type = lib.types.float;
-              default = 869.618;
+              default = defaultFreqMHz;
             };
             bwKHz = lib.mkOption {
               type = lib.types.float;
@@ -155,35 +160,79 @@ in
         allowlistFile = cfg.allowlistFile;
       }));
 
-      mkOwlshackSeed = s:
-        let
-          bareScope = lib.removePrefix "#" s.defaultScope;
-          isScoped = bareScope != "" && bareScope != "*";
-        in
-        pkgs.writeText "owlshack-${s.name}-seed.json" (builtins.toJSON ({
-          connection = "tcp://127.0.0.1:${toString s.virtualKissPort}";
-          freq = s.freqMHz;
-          bw = s.bwKHz;
-          inherit (s) sf cr;
-          tx = s.txPower;
-          floodScope = if isScoped then "region:${bareScope}" else "everywhere";
-          floodRegions = lib.optional isScoped { name = bareScope; };
-          listenAddr = "0.0.0.0:${toString s.webPort}";
-          setupComplete = true;
-          companions = [ ];
-        }));
-
       mkOwlshackService = s:
         let
           stateDirName = "owlshack-${s.name}";
-          seedFile = mkOwlshackSeed s;
+          bareScope = lib.removePrefix "#" s.defaultScope;
+          isScoped = bareScope != "" && bareScope != "*";
+          floodScopeStr = if isScoped then "region:${bareScope}" else "everywhere";
+          regionsList = lib.optional isScoped { name = bareScope; parent = "*"; };
+          regionsSqlJson = builtins.toJSON regionsList;
+          kissUrl = "tcp://127.0.0.1:${toString s.virtualKissPort}";
+
+          regionsPayload = pkgs.writeText "owlshack-${s.name}-regions.json" (builtins.toJSON {
+            regions = regionsList;
+            floodScope = floodScopeStr;
+          });
+
+          settingsPayload = pkgs.writeText "owlshack-${s.name}-settings.json" (builtins.toJSON {
+            connectionType = "kiss";
+            connection = kissUrl;
+            baudRate = 115200;
+            freq = s.freqMHz;
+            bw = s.bwKHz;
+            inherit (s) sf cr pathHashSize;
+            tx = s.txPower;
+            listenAddr = "0.0.0.0:${toString s.webPort}";
+            packetRetentionDays = 7;
+            setupComplete = true;
+          });
+
           startScript = pkgs.writeShellScript "start-${stateDirName}" ''
             set -euo pipefail
-            if [ ! -f /var/lib/${stateDirName}/meshcore.db ]; then
-              exec ${owlshackPkg}/bin/owlshack -c ${seedFile}
-            else
-              exec ${owlshackPkg}/bin/owlshack
+            db="/var/lib/${stateDirName}/meshcore.db"
+            if [ -f "$db" ]; then
+              ${pkgs.sqlite}/bin/sqlite3 "$db" ${lib.escapeShellArg ''
+                UPDATE settings SET
+                  connection_type = 'kiss',
+                  connection = '${kissUrl}',
+                  baud_rate = 115200,
+                  freq = ${toString s.freqMHz},
+                  bw = ${toString s.bwKHz},
+                  sf = ${toString s.sf},
+                  cr = ${toString s.cr},
+                  tx = ${toString s.txPower},
+                  listen_addr = '0.0.0.0:${toString s.webPort}',
+                  setup_complete = 1,
+                  flood_regions = '${regionsSqlJson}',
+                  flood_scope = '${floodScopeStr}'
+                WHERE id = 1;
+                UPDATE companions SET path_hash_size = ${toString s.pathHashSize};
+              ''}
             fi
+            exec ${owlshackPkg}/bin/owlshack
+          '';
+
+          postStartScript = pkgs.writeShellScript "configure-${stateDirName}" ''
+            set -euo pipefail
+            api="http://127.0.0.1:${toString s.webPort}"
+            for _ in $(seq 1 50); do
+              if cur=$(${pkgs.curl}/bin/curl -fsS "$api/api/config/settings" 2>/dev/null); then
+                conn=$(printf '%s' "$cur" | ${pkgs.jq}/bin/jq -r '.connection // ""')
+                ready=$(printf '%s' "$cur" | ${pkgs.jq}/bin/jq -r '.setupComplete // false')
+                phs=$(printf '%s' "$cur" | ${pkgs.jq}/bin/jq -r '.pathHashSize // 0')
+                if [ "$conn" != "${kissUrl}" ] || [ "$ready" != "true" ] || [ "$phs" != "${toString s.pathHashSize}" ]; then
+                  ${pkgs.curl}/bin/curl -fsS -X PUT -H 'Content-Type: application/json' \
+                    --data @"${regionsPayload}" "$api/api/config/regions" >/dev/null
+                  ${pkgs.curl}/bin/curl -fsS -X PUT -H 'Content-Type: application/json' \
+                    --data @"${settingsPayload}" "$api/api/config/settings" >/dev/null
+                fi
+                exit 0
+              fi
+              sleep 0.2
+            done
+            echo "Timed out waiting for OwlShack HTTP API on $api" >&2
+            exit 1
           '';
         in
         {
@@ -197,6 +246,7 @@ in
           };
           serviceConfig = {
             ExecStart = startScript;
+            ExecStartPost = postStartScript;
             StateDirectory = stateDirName;
             WorkingDirectory = "/var/lib/${stateDirName}";
             Restart = "always";
@@ -254,6 +304,9 @@ in
             defaultKissPort = 17620;
             defaultWebPort = 8620;
             defaultScope = "*";
+            defaultPathHashSize = 3;
+            # XTAL calibration (-10.1 kHz / +11.6 ppm on hispanas TTGO LoRa32) for 869.618 MHz on-air
+            defaultFreqMHz = 869.608;
           };
           default = { };
         };
@@ -265,6 +318,9 @@ in
             defaultKissPort = 17621;
             defaultWebPort = 8621;
             defaultScope = "#ioi";
+            defaultPathHashSize = 3;
+            # XTAL calibration (-16.2 kHz / +18.6 ppm on lenovix TTGO LoRa32) for 869.618 MHz on-air
+            defaultFreqMHz = 869.602;
           };
           default = { };
         };

@@ -223,7 +223,7 @@ func (s *SiteModem) runModemSession(ctx context.Context) error {
 
 			case reqKindTx:
 				res, err := s.execTx(sessionCtx, conn, txDoneCh, req.payload)
-				if err != nil {
+				if err != nil || res == 0 {
 					s.txErrors.Add(1)
 				} else {
 					s.txPackets.Add(1)
@@ -237,6 +237,13 @@ func (s *SiteModem) runModemSession(ctx context.Context) error {
 }
 
 func (s *SiteModem) initModemHardware(ctx context.Context, conn net.Conn, cmdRespCh <-chan hwFrame) error {
+	// Wait for the ESP32 KISS firmware to become responsive while keeping the TCP
+	// connection open (opening the tty on first connect may reset the ESP32 or
+	// catch it during a first-boot SPIFFS format / identity generation).
+	if err := s.waitModemReady(ctx, conn, cmdRespCh); err != nil {
+		return err
+	}
+
 	// Always keep signal reports enabled on the physical modem; virtual KISS translates per-client preference.
 	if _, err := s.execHwCmd(ctx, conn, cmdRespCh, hardware.HW_CMD_SET_SIGNAL_REPORT, []byte{0x01}); err != nil {
 		return fmt.Errorf("SET_SIGNAL_REPORT: %w", err)
@@ -255,6 +262,43 @@ func (s *SiteModem) initModemHardware(ctx context.Context, conn net.Conn, cmdRes
 		return fmt.Errorf("SET_TX_POWER: %w", err)
 	}
 	return nil
+}
+
+func (s *SiteModem) waitModemReady(ctx context.Context, conn net.Conn, cmdRespCh <-chan hwFrame) error {
+	readyCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+	defer cancel()
+
+	pingFrame := hardware.EncodeHardwareFrame(0, hardware.HW_CMD_PING, nil)
+	wantPong := hardware.HwResp(hardware.HW_CMD_PING)
+
+	for {
+		drainHwChan(cmdRespCh)
+		_ = conn.SetWriteDeadline(time.Now().Add(modemCmdTimeout))
+		_, writeErr := conn.Write(pingFrame)
+		_ = conn.SetWriteDeadline(time.Time{})
+		if writeErr != nil {
+			return fmt.Errorf("PING write: %w", writeErr)
+		}
+
+		attemptTimer := time.NewTimer(500 * time.Millisecond)
+		select {
+		case <-readyCtx.Done():
+			attemptTimer.Stop()
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+			return errors.New("modem PING readiness timeout (check /dev/kiss-modem and firmware)")
+		case resp := <-cmdRespCh:
+			attemptTimer.Stop()
+			if resp.subCmd == wantPong {
+				// Settle any duplicate pong from an earlier probe before issuing config commands.
+				time.Sleep(40 * time.Millisecond)
+				drainHwChan(cmdRespCh)
+				return nil
+			}
+		case <-attemptTimer.C:
+		}
+	}
 }
 
 func drainHwChan(ch <-chan hwFrame) {
