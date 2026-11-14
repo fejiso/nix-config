@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"net"
 	"testing"
@@ -22,11 +23,19 @@ func newTestConfig(t *testing.T, allowedHex string) *Config {
 		AllowedCompanions: []CompanionEntry{
 			{PubKey: allowedHex},
 		},
+		BridgedChannels: []ChannelConfig{
+			{Name: "#maddub"},
+		},
+		ZeroHopChannels: []ChannelConfig{
+			{Name: "#ireland"},
+			{Name: "#dublin"},
+			{Name: "#madrid"},
+		},
 		SiteA: SiteConfig{
 			Name:         "pinto",
 			RemoteAddr:   "127.0.0.1:19001",
 			DefaultScope: "*",
-			FreqMHz:      869.618,
+			FreqMHz:      869.608,
 			BwKHz:        62.5,
 			SF:           8,
 			CR:           8,
@@ -36,7 +45,7 @@ func newTestConfig(t *testing.T, allowedHex string) *Config {
 			Name:         "dublin",
 			RemoteAddr:   "127.0.0.1:19002",
 			DefaultScope: "#ioi",
-			FreqMHz:      869.618,
+			FreqMHz:      869.602,
 			BwKHz:        62.5,
 			SF:           8,
 			CR:           8,
@@ -45,15 +54,19 @@ func newTestConfig(t *testing.T, allowedHex string) *Config {
 	}
 }
 
-func makeIdentityWithPrefix(t *testing.T, avoid byte) meshcore.LocalIdentity {
+func makeIdentityWithPrefix(t *testing.T, avoid ...byte) meshcore.LocalIdentity {
 	t.Helper()
-	for range 256 {
+	avoidSet := map[byte]bool{0x00: true, 0xFF: true}
+	for _, b := range avoid {
+		avoidSet[b] = true
+	}
+	for range 512 {
 		id, err := meshcore.GenerateLocalIdentity(rand.Reader)
 		if err != nil {
 			t.Fatal(err)
 		}
 		pk := id.PublicKey()
-		if pk[0] != 0x00 && pk[0] != 0xFF && pk[0] != avoid {
+		if !avoidSet[pk[0]] {
 			return id
 		}
 	}
@@ -61,12 +74,23 @@ func makeIdentityWithPrefix(t *testing.T, avoid byte) meshcore.LocalIdentity {
 	return meshcore.LocalIdentity{}
 }
 
-func TestAdvertAllowlistAndScopeTranslation(t *testing.T) {
-	allowedID := makeIdentityWithPrefix(t, 0x00)
+func TestCleanSplitIdentityAndChannelPolicy(t *testing.T) {
+	allowedID := makeIdentityWithPrefix(t)
 	strangerID := makeIdentityWithPrefix(t, allowedID.PublicKey()[0])
+	otherStrangerID := makeIdentityWithPrefix(t, allowedID.PublicKey()[0], strangerID.PublicKey()[0])
+
+	var privPSK [16]byte
+	if _, err := rand.Read(privPSK[:]); err != nil {
+		t.Fatal(err)
+	}
+	privPSKB64 := base64.StdEncoding.EncodeToString(privPSK[:])
 
 	allowedPK := allowedID.PublicKey()
 	cfg := newTestConfig(t, hex.EncodeToString(allowedPK[:]))
+	cfg.BridgedChannels = append(cfg.BridgedChannels, ChannelConfig{
+		Name:      "secret-ops",
+		PSKBase64: privPSKB64,
+	})
 	eng, err := NewBridgeEngine(cfg, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +99,7 @@ func TestAdvertAllowlistAndScopeTranslation(t *testing.T) {
 	now := time.Now()
 	ioi := meshcore.NewRegion("#ioi")
 
-	// 1. Allowlisted companion sends unscoped ADVERT in Pinto -> must flood into Dublin with #ioi scope!
+	// 1. Allowlisted companion sends unscoped ADVERT in Pinto -> floods into Dublin with #ioi scope.
 	advAllowed, err := meshcore.NewAdvert(allowedID, meshcore.AdvertAppData{
 		Type: "CHAT",
 		Name: "FerMobile",
@@ -89,8 +113,8 @@ func TestAdvertAllowlistAndScopeTranslation(t *testing.T) {
 	}
 	pktIn := &meshcore.Packet{
 		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeAdvert, 0),
-		PathLength: meshcore.MakePathLen(1, 1),
-		Path:       []byte{0x42},
+		PathLength: meshcore.MakePathLen(3, 1),
+		Path:       []byte{0x42, 0x43, 0x44},
 		Payload:    advBytes,
 	}
 	rawIn, err := pktIn.ToBytes()
@@ -102,8 +126,8 @@ func TestAdvertAllowlistAndScopeTranslation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if action != ActionFloodBridged {
-		t.Fatalf("expected ActionFloodBridged, got %s", action)
+	if action != ActionIdentityBridged {
+		t.Fatalf("expected ActionIdentityBridged, got %s", action)
 	}
 
 	pktOut, err := meshcore.PacketFromBytes(rawOut)
@@ -116,12 +140,11 @@ func TestAdvertAllowlistAndScopeTranslation(t *testing.T) {
 	if !ioi.MatchesPacket(pktOut) {
 		t.Fatalf("expected #ioi transport code on Dublin egress, got 0x%04x", pktOut.TransportCode1)
 	}
-	// Original 1 hop + 2 bridge hops = 3 hops.
-	if pktOut.PathHashCount() != 3 {
-		t.Fatalf("expected 3 path hops (1 + 2 bridge), got %d", pktOut.PathHashCount())
+	if pktOut.PathHashCount() != 3 || pktOut.PathHashSize() != 3 {
+		t.Fatalf("expected 3 path hops of 3 bytes (1 + 2 bridge), got count=%d size=%d", pktOut.PathHashCount(), pktOut.PathHashSize())
 	}
 
-	// 2. Echo of the bridged packet heard back on Dublin RF -> must be dedup-dropped!
+	// 2. Echo of the bridged packet heard back on Dublin RF -> dedup-dropped.
 	echoOut, echoAction, err := eng.RoutePacket(rawOut, SiteB, now)
 	if err != nil {
 		t.Fatal(err)
@@ -130,7 +153,7 @@ func TestAdvertAllowlistAndScopeTranslation(t *testing.T) {
 		t.Fatalf("expected echo to be dedup-dropped, got %s", echoAction)
 	}
 
-	// 3. Non-allowlisted stranger ADVERT in Dublin (#ioi scoped) -> must be clamped to 0-hop DIRECT in Pinto!
+	// 3. Non-allowlisted stranger ADVERT in Dublin (#ioi) -> strictly dropped (NO 0-hop bleed).
 	advStranger, err := meshcore.NewAdvert(strangerID, meshcore.AdvertAppData{
 		Type: "CHAT",
 		Name: "RandomDublinNode",
@@ -141,64 +164,279 @@ func TestAdvertAllowlistAndScopeTranslation(t *testing.T) {
 	strangerBytes, _ := advStranger.ToBytes()
 	strangerPkt := &meshcore.Packet{
 		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeAdvert, 0),
-		PathLength: meshcore.MakePathLen(1, 2),
-		Path:       []byte{0xAA, 0xBB},
+		PathLength: meshcore.MakePathLen(3, 1),
+		Path:       []byte{0xAA, 0xBB, 0xCC},
 		Payload:    strangerBytes,
 	}
 	strangerPkt.SetScope(ioi)
 	strangerRaw, _ := strangerPkt.ToBytes()
 
-	clampedRaw, clampedAct, err := eng.RoutePacket(strangerRaw, SiteB, now)
+	droppedRaw, droppedAct, err := eng.RoutePacket(strangerRaw, SiteB, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if clampedAct != ActionClampedZeroHop {
-		t.Fatalf("expected ActionClampedZeroHop for stranger, got %s", clampedAct)
-	}
-	clampedPkt, err := meshcore.PacketFromBytes(clampedRaw)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if clampedPkt.RouteType() != meshcore.RouteTypeDirect || clampedPkt.PathHashCount() != 0 || len(clampedPkt.Path) != 0 {
-		t.Fatalf("expected 0-hop DIRECT, got route=%s hops=%d", clampedPkt.RouteTypeString(), clampedPkt.PathHashCount())
+	if droppedRaw != nil || droppedAct != ActionFilteredDrop {
+		t.Fatalf("expected stranger ADVERT to be filtered_drop with nil out, got act=%s len=%d", droppedAct, len(droppedRaw))
 	}
 
-	// 4. GRP_TXT on Public channel from "FerMobile" (learned from verified ADVERT) in Dublin (#ioi) -> floods unscoped in Pinto!
+	// 4. GRP_TXT on Public (even from allowlisted "FerMobile"!) -> strictly dropped.
 	pubCh := meshcore.PublicChannel()
-	gtPayload := &meshcore.GroupTextPayload{
+	pubPayload := &meshcore.GroupTextPayload{
 		Timestamp: uint32(now.Unix()) + 2,
 		Sender:    "FerMobile",
-		Text:      "hello from dublin",
+		Text:      "local public chat stays local",
 	}
-	gtEnc, err := gtPayload.Encrypt(pubCh.Hash, pubCh.PSK)
+	pubEnc, err := pubPayload.Encrypt(pubCh.Hash, pubCh.PSK)
 	if err != nil {
 		t.Fatal(err)
 	}
-	gtBytes, _ := gtEnc.ToBytes()
-	gtPkt := &meshcore.Packet{
+	pubBytes, _ := pubEnc.ToBytes()
+	pubPkt := &meshcore.Packet{
 		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeGrpTxt, 0),
-		PathLength: meshcore.MakePathLen(1, 0),
-		Payload:    gtBytes,
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    pubBytes,
 	}
-	gtPkt.SetScope(ioi)
-	gtRaw, _ := gtPkt.ToBytes()
+	pubPkt.SetScope(ioi)
+	pubRaw, _ := pubPkt.ToBytes()
 
-	gtOutRaw, gtAct, err := eng.RoutePacket(gtRaw, SiteB, now)
+	pubOut, pubAct, err := eng.RoutePacket(pubRaw, SiteB, now)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if gtAct != ActionFloodBridged {
-		t.Fatalf("expected GRP_TXT from verified companion name to flood, got %s", gtAct)
+	if pubOut != nil || pubAct != ActionFilteredDrop {
+		t.Fatalf("expected Public GRP_TXT to be filtered_drop, got act=%s", pubAct)
 	}
-	gtOutPkt, _ := meshcore.PacketFromBytes(gtOutRaw)
-	if gtOutPkt.RouteType() != meshcore.RouteTypeFlood || gtOutPkt.IsTransport() {
-		t.Fatalf("expected Dublin #ioi -> Pinto unscoped RouteTypeFlood, got %s", gtOutPkt.RouteTypeString())
+
+	// 5. GRP_TXT on #maddub from ANY sender (unknown stranger, no prior ADVERT) -> full-mesh bridged!
+	maddubCh := meshcore.NewChannelFromHashtag("#maddub")
+	madPayload := &meshcore.GroupTextPayload{
+		Timestamp: uint32(now.Unix()) + 3,
+		Sender:    "AnyoneInDublin",
+		Text:      "hello madrid from #maddub",
+	}
+	madEnc, err := madPayload.Encrypt(maddubCh.Hash, maddubCh.PSK)
+	if err != nil {
+		t.Fatal(err)
+	}
+	madBytes, _ := madEnc.ToBytes()
+	madPkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeGrpTxt, 0),
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    madBytes,
+	}
+	madPkt.SetScope(ioi)
+	madRaw, _ := madPkt.ToBytes()
+
+	madOutRaw, madAct, err := eng.RoutePacket(madRaw, SiteB, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if madAct != ActionChannelBridged {
+		t.Fatalf("expected #maddub GRP_TXT to be ActionChannelBridged, got %s", madAct)
+	}
+	madOutPkt, _ := meshcore.PacketFromBytes(madOutRaw)
+	if madOutPkt.RouteType() != meshcore.RouteTypeFlood || madOutPkt.IsTransport() {
+		t.Fatalf("expected Dublin #ioi -> Pinto unscoped RouteTypeFlood, got %s", madOutPkt.RouteTypeString())
+	}
+
+	// 6. GRP_TXT on custom PSK private channel ("secret-ops") Pinto -> Dublin -> full-mesh bridged with #ioi scope!
+	privCh, err := meshcore.NewChannelFromBase64("secret-ops", privPSKB64)
+	if err != nil {
+		t.Fatal(err)
+	}
+	privPayload := &meshcore.GroupTextPayload{
+		Timestamp: uint32(now.Unix()) + 4,
+		Sender:    "punctumatic",
+		Text:      "private bridged message",
+	}
+	privEnc, err := privPayload.Encrypt(privCh.Hash, privCh.PSK)
+	if err != nil {
+		t.Fatal(err)
+	}
+	privBytes, _ := privEnc.ToBytes()
+	privPkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeGrpTxt, 0),
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    privBytes,
+	}
+	privRaw, _ := privPkt.ToBytes()
+
+	privOutRaw, privAct, err := eng.RoutePacket(privRaw, SiteA, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if privAct != ActionChannelBridged {
+		t.Fatalf("expected private channel GRP_TXT to be ActionChannelBridged, got %s", privAct)
+	}
+	privOutPkt, _ := meshcore.PacketFromBytes(privOutRaw)
+	if !ioi.MatchesPacket(privOutPkt) {
+		t.Fatalf("expected Pinto -> Dublin private channel flood to receive #ioi scope")
+	}
+
+	// 7. DM ("whenever either side": src || dst):
+	// 7a. Stranger -> Stranger DM is dropped.
+	s2sPkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeTxtMsg, 0),
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    []byte{strangerID.PublicKey()[0], otherStrangerID.PublicKey()[0], 1, 2, 3, 4},
+	}
+	s2sRaw, _ := s2sPkt.ToBytes()
+	if out, act, _ := eng.RoutePacket(s2sRaw, SiteA, now); out != nil || act != ActionFilteredDrop {
+		t.Fatalf("expected stranger->stranger DM to be dropped, got %s", act)
+	}
+
+	// 7b. Allowed -> Stranger DM is bridged AND opens ACK window.
+	a2sPkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeTxtMsg, 0),
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    []byte{strangerID.PublicKey()[0], allowedPK[0], 5, 6, 7, 8},
+	}
+	a2sRaw, _ := a2sPkt.ToBytes()
+	if out, act, _ := eng.RoutePacket(a2sRaw, SiteA, now); out == nil || act != ActionIdentityBridged {
+		t.Fatalf("expected allowed->stranger DM to bridge, got %s", act)
+	}
+
+	// 7c. Stranger -> Allowed DM is ALSO bridged ("whenever either side").
+	s2aPkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeTxtMsg, 0),
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    []byte{allowedPK[0], strangerID.PublicKey()[0], 9, 10, 11, 12},
+	}
+	s2aPkt.SetScope(ioi)
+	s2aRaw, _ := s2aPkt.ToBytes()
+	if out, act, _ := eng.RoutePacket(s2aRaw, SiteB, now); out == nil || act != ActionIdentityBridged {
+		t.Fatalf("expected stranger->allowed DM to bridge, got %s", act)
+	}
+
+	// 7d. Flood ACK within opened ACK window is bridged.
+	ackPkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeAck, 0),
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    []byte{0xDE, 0xAD, 0xBE, 0xEF},
+	}
+	ackRaw, _ := ackPkt.ToBytes()
+	if out, act, _ := eng.RoutePacket(ackRaw, SiteB, now.Add(5*time.Second)); out == nil || act != ActionIdentityBridged {
+		t.Fatalf("expected flood ACK inside window to bridge, got %s", act)
+	}
+}
+
+func TestZeroHopChannelsReadAndWrite(t *testing.T) {
+	allowedID := makeIdentityWithPrefix(t)
+	allowedPK := allowedID.PublicKey()
+
+	cfg := newTestConfig(t, hex.EncodeToString(allowedPK[:]))
+	eng, err := NewBridgeEngine(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now()
+	ioi := meshcore.NewRegion("#ioi")
+	irelandCh := meshcore.NewChannelFromHashtag("#ireland")
+	madridCh := meshcore.NewChannelFromHashtag("#madrid")
+
+	// 1. READ #ireland while near Pinto: mesh flood in Dublin (1 repeater hop) -> clamped to 0-hop DIRECT in Pinto!
+	inMsg := &meshcore.GroupTextPayload{
+		Timestamp: uint32(now.Unix()) + 10,
+		Sender:    "DublinLocal",
+		Text:      "anybody in #ireland?",
+	}
+	inEnc, err := inMsg.Encrypt(irelandCh.Hash, irelandCh.PSK)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inBytes, _ := inEnc.ToBytes()
+	inPkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeGrpTxt, 0),
+		PathLength: meshcore.MakePathLen(3, 1),
+		Path:       []byte{0x24, 0x41, 0xf6}, // 1 repeater hop in Dublin
+		Payload:    inBytes,
+	}
+	inPkt.SetScope(ioi)
+	inRaw, _ := inPkt.ToBytes()
+
+	readOutRaw, readAct, err := eng.RoutePacket(inRaw, SiteB, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if readAct != ActionZeroHopClamped {
+		t.Fatalf("expected ActionZeroHopClamped for mesh #ireland flood, got %s", readAct)
+	}
+	readOutPkt, err := meshcore.PacketFromBytes(readOutRaw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if readOutPkt.RouteType() != meshcore.RouteTypeDirect || readOutPkt.PathHashCount() != 0 || len(readOutPkt.Path) != 0 || readOutPkt.IsTransport() {
+		t.Fatalf("expected 0-hop DIRECT unscoped on Pinto, got route=%s hops=%d transport=%v", readOutPkt.RouteTypeString(), readOutPkt.PathHashCount(), readOutPkt.IsTransport())
+	}
+
+	// 2. WRITE to #ireland while near Pinto (0-hop flood from handheld / OwlShack) -> floods into Dublin with #ioi scope!
+	wrMsg := &meshcore.GroupTextPayload{
+		Timestamp: uint32(now.Unix()) + 11,
+		Sender:    "fer",
+		Text:      "hello #ireland from pinto!",
+	}
+	wrEnc, _ := wrMsg.Encrypt(irelandCh.Hash, irelandCh.PSK)
+	wrBytes, _ := wrEnc.ToBytes()
+	wrPkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeGrpTxt, 0),
+		PathLength: meshcore.MakePathLen(3, 0), // 0 hops: near hispanas
+		Payload:    wrBytes,
+	}
+	wrRaw, _ := wrPkt.ToBytes()
+
+	wrOutRaw, wrAct, err := eng.RoutePacket(wrRaw, SiteA, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wrAct != ActionZeroHopFlood {
+		t.Fatalf("expected ActionZeroHopFlood when writing 0-hop near Pinto, got %s", wrAct)
+	}
+	wrOutPkt, _ := meshcore.PacketFromBytes(wrOutRaw)
+	if !ioi.MatchesPacket(wrOutPkt) || wrOutPkt.PathHashCount() != 2 {
+		t.Fatalf("expected #ioi scoped flood with 2 bridge hops in Dublin, got route=%s hops=%d", wrOutPkt.RouteTypeString(), wrOutPkt.PathHashCount())
+	}
+
+	// Local Pinto repeater echo of that same packet (1 hop) -> dedup-dropped!
+	echoPkt := wrPkt.Clone()
+	echoPkt.AppendPathHash([]byte{0xa8, 0xba, 0xc6})
+	echoRaw, _ := echoPkt.ToBytes()
+	if out, eAct, _ := eng.RoutePacket(echoRaw, SiteA, now); out != nil || eAct != ActionDedupDrop {
+		t.Fatalf("expected repeater echo to be dedup-dropped, got %s", eAct)
+	}
+
+	// 3. WRITE to #madrid while near Dublin using explicit 0-hop DIRECT -> upgrades to unscoped flood in Pinto!
+	madMsg := &meshcore.GroupTextPayload{
+		Timestamp: uint32(now.Unix()) + 12,
+		Sender:    "fer",
+		Text:      "hola #madrid desde dublin!",
+	}
+	madEnc, _ := madMsg.Encrypt(madridCh.Hash, madridCh.PSK)
+	madBytes, _ := madEnc.ToBytes()
+	madDirect0 := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeDirect, meshcore.PayloadTypeGrpTxt, 0),
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    madBytes,
+	}
+	madDirectRaw, _ := madDirect0.ToBytes()
+
+	madOutRaw, madAct, err := eng.RoutePacket(madDirectRaw, SiteB, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if madAct != ActionZeroHopFlood {
+		t.Fatalf("expected 0-hop DIRECT write on #madrid to upgrade to ActionZeroHopFlood, got %s", madAct)
+	}
+	madOutPkt, _ := meshcore.PacketFromBytes(madOutRaw)
+	if madOutPkt.RouteType() != meshcore.RouteTypeFlood || madOutPkt.IsTransport() || madOutPkt.PathHashCount() != 2 {
+		t.Fatalf("expected unscoped RouteTypeFlood with 2 bridge hops in Pinto, got route=%s hops=%d", madOutPkt.RouteTypeString(), madOutPkt.PathHashCount())
 	}
 }
 
 func TestDirectWormholeReturnRouting(t *testing.T) {
-	allowedID := makeIdentityWithPrefix(t, 0x00)
+	allowedID := makeIdentityWithPrefix(t)
 	peerID := makeIdentityWithPrefix(t, allowedID.PublicKey()[0])
+	otherID := makeIdentityWithPrefix(t, allowedID.PublicKey()[0], peerID.PublicKey()[0])
 	allowedPK := allowedID.PublicKey()
 
 	cfg := newTestConfig(t, hex.EncodeToString(allowedPK[:]))
@@ -210,13 +448,18 @@ func TestDirectWormholeReturnRouting(t *testing.T) {
 	pintoBridge := eng.SiteBridgePubKey(SiteA)
 	dublinBridge := eng.SiteBridgePubKey(SiteB)
 
-	// Peer in Dublin replies via ROUTE_TYPE_DIRECT along reverse path: [dublinBridge, pintoBridge, 0x77]
-	// targeting allowedID.PublicKey()[0].
+	// 1. Peer in Dublin replies via ROUTE_TYPE_DIRECT (3-byte hashes) along reverse path:
+	// [dublinBridge[:3], pintoBridge[:3], 0x77, 0x88, 0x99] targeting allowedPK[0].
+	var pathBytes []byte
+	pathBytes = append(pathBytes, dublinBridge[:3]...)
+	pathBytes = append(pathBytes, pintoBridge[:3]...)
+	pathBytes = append(pathBytes, 0x77, 0x88, 0x99)
+
 	dmPayload := []byte{allowedPK[0], peerID.PublicKey()[0], 0x11, 0x22, 0x33, 0x44, 0x55}
 	directIn := &meshcore.Packet{
 		Header:     meshcore.MakeHeader(meshcore.RouteTypeDirect, meshcore.PayloadTypeTxtMsg, 0),
-		PathLength: meshcore.MakePathLen(1, 3),
-		Path:       []byte{dublinBridge[0], pintoBridge[0], 0x77},
+		PathLength: meshcore.MakePathLen(3, 3),
+		Path:       pathBytes,
 		Payload:    dmPayload,
 	}
 	rawIn, _ := directIn.ToBytes()
@@ -229,8 +472,36 @@ func TestDirectWormholeReturnRouting(t *testing.T) {
 		t.Fatalf("expected ActionDirectWormhole, got %s", act)
 	}
 	pktOut, _ := meshcore.PacketFromBytes(rawOut)
-	if pktOut.RouteType() != meshcore.RouteTypeDirect || pktOut.PathHashCount() != 1 || !bytes.Equal(pktOut.Path, []byte{0x77}) {
-		t.Fatalf("expected remaining path [0x77], got hops=%d path=%x", pktOut.PathHashCount(), pktOut.Path)
+	if pktOut.RouteType() != meshcore.RouteTypeDirect || pktOut.PathHashCount() != 1 || !bytes.Equal(pktOut.Path, []byte{0x77, 0x88, 0x99}) {
+		t.Fatalf("expected remaining 3-byte hop [778899], got hops=%d path=%x", pktOut.PathHashCount(), pktOut.Path)
+	}
+
+	// 2. Direct ACK routed back through [pintoBridge[:3], dublinBridge[:3]] (even outside flood ackWindow) succeeds.
+	var ackPath []byte
+	ackPath = append(ackPath, pintoBridge[:3]...)
+	ackPath = append(ackPath, dublinBridge[:3]...)
+	directAck := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeDirect, meshcore.PayloadTypeAck, 0),
+		PathLength: meshcore.MakePathLen(3, 2),
+		Path:       ackPath,
+		Payload:    []byte{0x01, 0x02, 0x03, 0x04},
+	}
+	ackRaw, _ := directAck.ToBytes()
+	ackOut, ackAct, err := eng.RoutePacket(ackRaw, SiteA, time.Now().Add(10*time.Minute))
+	if err != nil || ackOut == nil || ackAct != ActionDirectWormhole {
+		t.Fatalf("expected direct ACK through wormhole to succeed, got act=%s err=%v", ackAct, err)
+	}
+
+	// 3. Unauthorized direct TXT_MSG between two non-allowlisted nodes is dropped even if addressing the wormhole.
+	unauthIn := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeDirect, meshcore.PayloadTypeTxtMsg, 0),
+		PathLength: meshcore.MakePathLen(3, 2),
+		Path:       ackPath,
+		Payload:    []byte{peerID.PublicKey()[0], otherID.PublicKey()[0], 1, 2, 3, 4},
+	}
+	unauthRaw, _ := unauthIn.ToBytes()
+	if out, uAct, _ := eng.RoutePacket(unauthRaw, SiteA, time.Now()); out != nil || uAct != ActionFilteredDrop {
+		t.Fatalf("expected unauthorized direct wormhole packet to be dropped, got %s", uAct)
 	}
 }
 

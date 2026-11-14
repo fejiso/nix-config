@@ -66,6 +66,9 @@
     KbdInteractiveAuthentication = lib.mkForce true;
   };
   
+  # Mount hispanas bcachefs pool at /mnt/hispanas over NetBird
+  services.nfs-mounts.hispanas.enable = true;
+
   # Tdarr worker node (native NixOS service)
   services.tdarr-worker = {
     enable = true;
@@ -153,7 +156,7 @@
   };
 
   # MeshCore OwlShack + Pinto(hispanas, *) <-> Dublin(lenovix, #ioi) selective bridge.
-  # Allowlisted companion pubkeys and extra channels live in nix-config-private/meshcore.nix.
+  # Allowlisted companion pubkeys, bridgedChannels, and local channels live in nix-config-private/meshcore.nix.
   services.owlstack =
     let
       privateMeshcore =
@@ -164,6 +167,8 @@
     {
       enable = true;
       allowedCompanions = privateMeshcore.allowedCompanions or [ ];
+      bridgedChannels = privateMeshcore.bridgedChannels or [ "#maddub" ];
+      zeroHopChannels = privateMeshcore.zeroHopChannels or [ "#ireland" "#dublin" "#madrid" ];
       extraChannels = privateMeshcore.extraChannels or privateMeshcore.channels or [ "#ioi" ];
     } // lib.optionalAttrs (privateMeshcore ? allowlistFile) {
       inherit (privateMeshcore) allowlistFile;

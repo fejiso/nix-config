@@ -131,6 +131,11 @@ in
               default = 20;
               description = "LoRa TX power in dBm (max 20 dBm on SX1276 PA_BOOST).";
             };
+            channels = lib.mkOption {
+              type = lib.types.listOf channelType;
+              default = cfg.bridgedChannels ++ cfg.zeroHopChannels ++ cfg.extraChannels;
+              description = "Channels declaratively ensured on every OwlShack companion at this site.";
+            };
           };
         };
 
@@ -138,9 +143,18 @@ in
         if builtins.isString c then { pubKey = c; }
         else { inherit (c) pubKey; } // lib.optionalAttrs (c.name != "") { inherit (c) name; };
 
+      normalizeHashtagName = name:
+        if name == "Public" || lib.hasPrefix "#" name then name else "#${name}";
+
       normalizeChannel = ch:
-        if builtins.isString ch then { name = ch; }
-        else { inherit (ch) name; } // lib.optionalAttrs (ch.pskBase64 != "") { inherit (ch) pskBase64; };
+        if builtins.isString ch then { name = normalizeHashtagName ch; }
+        else if ch.pskBase64 != "" then { inherit (ch) name pskBase64; }
+        else { name = normalizeHashtagName ch.name; };
+
+      dedupChannels = chs:
+        lib.foldl' (acc: ch:
+          if builtins.any (x: x.name == ch.name) acc then acc else acc ++ [ ch ]
+        ) [ ] (map normalizeChannel chs);
 
       mkSiteBridgeJson = s: {
         inherit (s) name remoteAddr defaultScope freqMHz bwKHz sf cr txPower;
@@ -151,7 +165,8 @@ in
         stateDir = "/var/lib/owlstack-bridge";
         metricsAddr = "0.0.0.0:${toString cfg.metricsPort}";
         allowedCompanions = map normalizeCompanion cfg.allowedCompanions;
-        extraChannels = map normalizeChannel cfg.extraChannels;
+        bridgedChannels = dedupChannels cfg.bridgedChannels;
+        zeroHopChannels = dedupChannels cfg.zeroHopChannels;
         ackWindowSecs = cfg.ackWindowSecs;
         maxFloodHops = cfg.maxFloodHops;
         siteA = mkSiteBridgeJson cfg.pinto;
@@ -167,15 +182,17 @@ in
           isScoped = bareScope != "" && bareScope != "*";
           floodScopeStr = if isScoped then "region:${bareScope}" else "everywhere";
           regionsList = lib.optional isScoped { name = bareScope; parent = "*"; };
-          regionsSqlJson = builtins.toJSON regionsList;
           kissUrl = "tcp://127.0.0.1:${toString s.virtualKissPort}";
+          siteChannelsJson = pkgs.writeText "owlshack-${s.name}-channels.json" (
+            builtins.toJSON (dedupChannels s.channels)
+          );
 
           regionsPayload = pkgs.writeText "owlshack-${s.name}-regions.json" (builtins.toJSON {
             regions = regionsList;
             floodScope = floodScopeStr;
           });
 
-          settingsPayload = pkgs.writeText "owlshack-${s.name}-settings.json" (builtins.toJSON {
+          settingsOverride = pkgs.writeText "owlshack-${s.name}-settings.json" (builtins.toJSON {
             connectionType = "kiss";
             connection = kissUrl;
             baudRate = 115200;
@@ -184,55 +201,75 @@ in
             inherit (s) sf cr pathHashSize;
             tx = s.txPower;
             listenAddr = "0.0.0.0:${toString s.webPort}";
-            packetRetentionDays = 7;
             setupComplete = true;
           });
-
-          startScript = pkgs.writeShellScript "start-${stateDirName}" ''
-            set -euo pipefail
-            db="/var/lib/${stateDirName}/meshcore.db"
-            if [ -f "$db" ]; then
-              ${pkgs.sqlite}/bin/sqlite3 "$db" ${lib.escapeShellArg ''
-                UPDATE settings SET
-                  connection_type = 'kiss',
-                  connection = '${kissUrl}',
-                  baud_rate = 115200,
-                  freq = ${toString s.freqMHz},
-                  bw = ${toString s.bwKHz},
-                  sf = ${toString s.sf},
-                  cr = ${toString s.cr},
-                  tx = ${toString s.txPower},
-                  listen_addr = '0.0.0.0:${toString s.webPort}',
-                  setup_complete = 1,
-                  flood_regions = '${regionsSqlJson}',
-                  flood_scope = '${floodScopeStr}'
-                WHERE id = 1;
-                UPDATE companions SET path_hash_size = ${toString s.pathHashSize};
-              ''}
-            fi
-            exec ${owlshackPkg}/bin/owlshack
-          '';
 
           postStartScript = pkgs.writeShellScript "configure-${stateDirName}" ''
             set -euo pipefail
             api="http://127.0.0.1:${toString s.webPort}"
+            jq_bin="${pkgs.jq}/bin/jq"
+            curl_bin="${pkgs.curl}/bin/curl"
+
+            cur=""
             for _ in $(seq 1 50); do
-              if cur=$(${pkgs.curl}/bin/curl -fsS "$api/api/config/settings" 2>/dev/null); then
-                conn=$(printf '%s' "$cur" | ${pkgs.jq}/bin/jq -r '.connection // ""')
-                ready=$(printf '%s' "$cur" | ${pkgs.jq}/bin/jq -r '.setupComplete // false')
-                phs=$(printf '%s' "$cur" | ${pkgs.jq}/bin/jq -r '.pathHashSize // 0')
-                if [ "$conn" != "${kissUrl}" ] || [ "$ready" != "true" ] || [ "$phs" != "${toString s.pathHashSize}" ]; then
-                  ${pkgs.curl}/bin/curl -fsS -X PUT -H 'Content-Type: application/json' \
-                    --data @"${regionsPayload}" "$api/api/config/regions" >/dev/null
-                  ${pkgs.curl}/bin/curl -fsS -X PUT -H 'Content-Type: application/json' \
-                    --data @"${settingsPayload}" "$api/api/config/settings" >/dev/null
-                fi
-                exit 0
+              if cur=$($curl_bin -fsS "$api/api/config/settings" 2>/dev/null); then
+                break
               fi
               sleep 0.2
             done
-            echo "Timed out waiting for OwlShack HTTP API on $api" >&2
-            exit 1
+            if [ -z "$cur" ]; then
+              echo "Timed out waiting for OwlShack HTTP API on $api" >&2
+              exit 1
+            fi
+
+            needs_update=$(printf '%s' "$cur" | $jq_bin -r --slurpfile want "${settingsOverride}" --arg scope "${floodScopeStr}" '
+              ($want[0]) as $w |
+              if (.connection != $w.connection)
+                 or (.setupComplete != true)
+                 or (((.freq // 0) - $w.freq) | fabs > 0.0001)
+                 or (((.bw // 0) - $w.bw) | fabs > 0.01)
+                 or (.sf != $w.sf)
+                 or (.cr != $w.cr)
+                 or (.tx != $w.tx)
+                 or (.pathHashSize != $w.pathHashSize)
+                 or (.floodScope != $scope)
+              then "yes" else "no" end
+            ')
+
+            if [ "$needs_update" = "yes" ]; then
+              $curl_bin -fsS -X PUT -H 'Content-Type: application/json' \
+                --data @"${regionsPayload}" "$api/api/config/regions" >/dev/null
+              merged=$(printf '%s' "$cur" | $jq_bin -c --slurpfile want "${settingsOverride}" '
+                . * $want[0] | .packetRetentionDays = (.packetRetentionDays // 7)
+              ')
+              $curl_bin -fsS -X PUT -H 'Content-Type: application/json' \
+                --data "$merged" "$api/api/config/settings" >/dev/null
+            fi
+
+            # Declaratively ensure configured channels exist on every companion (via OwlShack's
+            # config API so app_config + companion_channels stay in sync across restarts).
+            comps=$($curl_bin -fsS "$api/api/config/companions" 2>/dev/null || echo "[]")
+            existing_ch=$($curl_bin -fsS "$api/api/config/channels" 2>/dev/null || echo "[]")
+
+            for cid in $(printf '%s' "$comps" | $jq_bin -r '.[].id'); do
+              $jq_bin -c '.[]' "${siteChannelsJson}" | while IFS= read -r ch_obj; do
+                ch_name=$(printf '%s' "$ch_obj" | $jq_bin -r '.name')
+                has_ch=$(printf '%s' "$existing_ch" | $jq_bin -r --argjson cid "$cid" --arg name "$ch_name" '
+                  any(.[]; .companionId == $cid and .name == $name)
+                ')
+                if [ "$has_ch" != "true" ]; then
+                  psk_b64=$(printf '%s' "$ch_obj" | $jq_bin -r '.pskBase64 // ""')
+                  if [ -n "$psk_b64" ]; then
+                    psk_hex=$(printf '%s' "$psk_b64" | ${pkgs.coreutils}/bin/base64 -d | ${pkgs.coreutils}/bin/od -An -tx1 | ${pkgs.coreutils}/bin/tr -d ' \n')
+                    body=$($jq_bin -nc --arg name "$ch_name" --arg pk "$psk_hex" '{name: $name, privateKey: $pk, floodScope: "inherit"}')
+                  else
+                    body=$($jq_bin -nc --arg name "$ch_name" '{name: $name, floodScope: "inherit"}')
+                  fi
+                  $curl_bin -fsS -X POST -H 'Content-Type: application/json' \
+                    --data "$body" "$api/api/config/companions/$cid/channels" >/dev/null || true
+                fi
+              done
+            done
           '';
         in
         {
@@ -245,7 +282,7 @@ in
             PORT = toString s.webPort;
           };
           serviceConfig = {
-            ExecStart = startScript;
+            ExecStart = "${owlshackPkg}/bin/owlshack";
             ExecStartPost = postStartScript;
             StateDirectory = stateDirName;
             WorkingDirectory = "/var/lib/${stateDirName}";
@@ -264,13 +301,25 @@ in
         allowedCompanions = lib.mkOption {
           type = lib.types.listOf companionType;
           default = [ ];
-          description = "Companions allowed to flood across the Pinto<->Dublin link (all others are clamped to 0-hop DIRECT).";
+          description = "Companions whose signed ADVERTs and private messages/path discovery (whenever either src or dst matches) are bridged across Pinto<->Dublin.";
+        };
+
+        bridgedChannels = lib.mkOption {
+          type = lib.types.listOf channelType;
+          default = [ "#maddub" ];
+          description = "Channels bridged full-mesh across Pinto<->Dublin (all participants, hashtag or custom base64 PSK) and declaratively joined on OwlShack companions.";
+        };
+
+        zeroHopChannels = lib.mkOption {
+          type = lib.types.listOf channelType;
+          default = [ "#ireland" "#dublin" "#madrid" ];
+          description = "Non-overlapping city channels bridged asymmetrically: 0-hop transmissions near a site flood onto the remote mesh (write), while remote mesh floods are clamped to 0-hop DIRECT at the peer site (read without repeater re-broadcast).";
         };
 
         extraChannels = lib.mkOption {
           type = lib.types.listOf channelType;
           default = [ "#ioi" ];
-          description = "Channels (in addition to Public) decrypted to match verified companion names on GRP_TXT.";
+          description = "Additional local channels declaratively joined on OwlShack companions without cross-site bridging.";
         };
 
         allowlistFile = lib.mkOption {

@@ -241,6 +241,9 @@
     GPU_MAX_HW_QUEUES = "1";
   };
 
+  # Mount hispanas bcachefs pool at /mnt/hispanas over NetBird
+  services.nfs-mounts.hispanas.enable = true;
+
   # Tdarr requires identical /mnt/* paths on the server and every node.
   # butthead owns the NFS exports, so expose the local mergerfs directories via
   # bind mounts instead of NFS-mounting butthead's own Netbird address.

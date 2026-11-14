@@ -101,6 +101,27 @@
   # Open firewall for webcam stream
   networking.firewall.allowedTCPPorts = [ 8080 ];
 
+  # Export local bcachefs drive (/mnt/user) via NFS over NetBird (wt0 only)
+  services.nfs.server = {
+    enable = true;
+    mountdPort = 20048;
+    statdPort = 4000;
+    lockdPort = 4001;
+    exports = ''
+      /mnt/user 100.107.0.0/16(rw,sync,no_subtree_check,no_root_squash,fsid=1)
+    '';
+  };
+
+  systemd.services.nfs-server = {
+    after = [ "mnt-user.mount" ];
+    wants = [ "mnt-user.mount" ];
+  };
+
+  networking.firewall.interfaces.wt0 = {
+    allowedTCPPorts = [ 2049 111 20048 4000 4001 ];
+    allowedUDPPorts = [ 2049 111 20048 4000 4001 ];
+  };
+
   # Export attached pre-1.0 TTGO LoRa32 MeshCore kiss_modem over NetBird (:7620 on wt0)
   services.kiss-modem.enable = true;
 

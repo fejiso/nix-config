@@ -32,7 +32,9 @@ type ChannelConfig struct {
 
 type AllowlistData struct {
 	AllowedCompanions []CompanionEntry `json:"allowedCompanions"`
-	ExtraChannels     []ChannelConfig  `json:"extraChannels,omitempty"`
+	BridgedChannels   []ChannelConfig  `json:"bridgedChannels,omitempty"`
+	ZeroHopChannels   []ChannelConfig  `json:"zeroHopChannels,omitempty"`
+	ExtraChannels     []ChannelConfig  `json:"extraChannels,omitempty"` // deprecated: local-only OwlShack channels, ignored by bridge
 }
 
 type Config struct {
@@ -40,7 +42,9 @@ type Config struct {
 	MetricsAddr       string           `json:"metricsAddr"`
 	AllowlistFile     string           `json:"allowlistFile,omitempty"`
 	AllowedCompanions []CompanionEntry `json:"allowedCompanions"`
-	ExtraChannels     []ChannelConfig  `json:"extraChannels,omitempty"`
+	BridgedChannels   []ChannelConfig  `json:"bridgedChannels,omitempty"`
+	ZeroHopChannels   []ChannelConfig  `json:"zeroHopChannels,omitempty"`
+	ExtraChannels     []ChannelConfig  `json:"extraChannels,omitempty"` // deprecated: local-only OwlShack channels, ignored by bridge
 	AckWindowSecs     int              `json:"ackWindowSecs"`
 	MaxFloodHops      int              `json:"maxFloodHops"`
 	SiteA             SiteConfig       `json:"siteA"`
