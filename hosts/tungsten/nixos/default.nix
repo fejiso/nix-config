@@ -97,6 +97,9 @@
   # Host-specific networking
   networking.hostName = "tungsten";
 
+  # Mount hispanas bcachefs pool at /mnt/hispanas over NetBird
+  services.nfs-mounts.hispanas.enable = true;
+
   # Tdarr worker node (native NixOS service)
   services.tdarr-worker = {
     enable = true;
