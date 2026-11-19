@@ -31,16 +31,15 @@
         set -euo pipefail
 
         # Update fleet ccache L2 reachability flag for sandboxed ccache wrappers.
-        if [ -d /run/ccache ]; then
-          if ${pkgs.netcat-openbsd}/bin/nc -z -w1 ${lib.escapeShellArg cfg.schedulerAddr} ${toString cfg.ccachePort} >/dev/null 2>&1; then
-            : > /run/ccache/online
-            chmod 0644 /run/ccache/online
-          else
-            rm -f /run/ccache/online
-          fi
+        mkdir -p /run/ccache
+        if ${pkgs.netcat-openbsd}/bin/nc -z -w1 ${lib.escapeShellArg cfg.schedulerAddr} ${toString cfg.ccachePort} >/dev/null 2>&1; then
+          : > /run/ccache/online
+          chmod 0644 /run/ccache/online
+        else
+          rm -f /run/ccache/online
         fi
 
-        [ -d /run/icecc ] || exit 0
+        mkdir -p /run/icecc
 
         mem_gib=$(${pkgs.gawk}/bin/awk '/^MemTotal:/ { printf "%d", ($2 + 1048575) / 1048576 }' /proc/meminfo)
         local_jobs=${toString cfg.jobs}
@@ -83,6 +82,7 @@
           fi
         fi
 
+        mkdir -p /run/icecc
         printf '%s\n' "$total" > /run/icecc/.online-cores.tmp
         chmod 0644 /run/icecc/.online-cores.tmp
         mv -f /run/icecc/.online-cores.tmp /run/icecc/online-cores
@@ -221,6 +221,7 @@
           systemd.tmpfiles.rules = [
             "d /var/cache/ccache 2775 root nixbld -"
             "d /run/ccache 0755 root root -"
+            "d /run/icecc 0755 root root -"
           ];
 
           # Socket-activated Unix-to-wt0 bridge so strict Nix sandboxes (CLONE_NEWNET)
@@ -264,11 +265,14 @@
                 set -euo pipefail
                 mem_gib=$(${pkgs.gawk}/bin/awk '/^MemTotal:/ { printf "%d", ($2 + 1048575) / 1048576 }' /proc/meminfo)
                 ram_slots=$(( mem_gib / 3 ))
-                [ "$ram_slots" -lt 1 ] && ram_slots=1
+                if [ "$ram_slots" -lt 1 ]; then
+                  ram_slots=1
+                fi
                 slots=${toString cfg.jobs}
                 if [ "$ram_slots" -lt "$slots" ]; then
                   slots="$ram_slots"
                 fi
+                mkdir -p /run/icecc
                 printf '%s\n' "$slots" > /run/icecc/local-slots
                 chmod 0644 /run/icecc/local-slots
                 exec ${lib.escapeShellArgs (
@@ -289,6 +293,7 @@
               '';
               RuntimeDirectory = "icecc";
               RuntimeDirectoryMode = "0755";
+              RuntimeDirectoryPreserve = "yes";
               CacheDirectory = "icecc";
               Slice = "builders.slice";
               OOMScoreAdjust = 500;
@@ -338,7 +343,9 @@
                 set -euo pipefail
                 mem_gib=$(${pkgs.gawk}/bin/awk '/^MemTotal:/ { printf "%d", ($2 + 1048575) / 1048576 }' /proc/meminfo)
                 ram_slots=$(( mem_gib / 3 ))
-                [ "$ram_slots" -lt 1 ] && ram_slots=1
+                if [ "$ram_slots" -lt 1 ]; then
+                  ram_slots=1
+                fi
                 slots=${toString cfg.jobs}
                 if [ "$ram_slots" -lt "$slots" ]; then
                   slots="$ram_slots"
