@@ -148,8 +148,8 @@ in
     max-jobs = lib.mkDefault 1;
     # Cores per build job (logicalCores / 2 on each host).
     cores = halfLogicalCores;
-    # Expose optional Icecream daemon socket into strict Nix sandboxes (`?` = skip if absent).
-    extra-sandbox-paths = [ "/run/icecc?" ];
+    # Expose optional Icecream & two-tier ccache sockets/dirs into strict Nix sandboxes (`?` = skip if absent).
+    extra-sandbox-paths = [ "/run/icecc?" "/run/ccache?" "/var/cache/ccache?" ];
     # Allow z-247 user to be a trusted user for remote builds. `nix-ssh` (the
     # locked role account remote builders connect as) must also be trusted so
     # it can receive *unsigned* build-input pushes over `nix-store --serve`.
@@ -166,15 +166,19 @@ in
     trusted-public-keys = trustedPublicKeys;
   };
 
-  # Shared memory-bounded cgroup slice for all local & distributed build daemons
-  # (nix-daemon, icecc-daemon, sccache-dist-server):
+  # Shared CPU- and memory-bounded cgroup slice for all local & distributed build
+  # daemons (nix-daemon, icecc-daemon, sccache-dist-server):
+  #   - CPUQuota = (logicalCores / 2) * 100%: caps combined CPU across all three
+  #     daemons so the other half of the machine's threads stays completely free.
   #   - MemoryHigh = 65%: kernel throttles compiler allocations & reclaims into
   #     zswap/swap gracefully instead of OOM-killing cc1plus/rustc.
   #   - MemoryMax  = 80%: hard ceiling so runaway builds never starve user.slice,
   #     desktop sessions, SSH, or host services.
   systemd.slices.builders = {
-    description = "Memory-bounded slice for Nix and distributed compiler daemons";
+    description = "CPU- and memory-bounded slice for Nix and distributed compiler daemons";
     sliceConfig = {
+      CPUQuota = "${toString (halfLogicalCores * 100)}%";
+      CPUWeight = 20;
       MemoryHigh = "65%";
       MemoryMax = "80%";
     };
@@ -185,8 +189,58 @@ in
     OOMScoreAdjust = 500;
   };
 
-  # Configure remote builders
+  # Configure remote builders: NixOS renders the static roster to /etc/nix/machines,
+  # while nix-builders-probe filters it every 60s into /run/nix-builders/machines
+  # containing only peers currently reachable on TCP :22 over NetBird.
   nix.buildMachines = buildMachines;
+  nix.settings.builders = lib.mkForce "@/run/nix-builders/machines";
+
+  systemd.tmpfiles.rules = [
+    "d /run/nix-builders 0755 root root -"
+    "f /run/nix-builders/machines 0644 root root -"
+  ];
+
+  systemd.services.nix-builders-probe = {
+    description = "Filter /etc/nix/machines to currently online SSH builders";
+    after = [ "network-online.target" "netbird.service" ];
+    wants = [ "network-online.target" ];
+    wantedBy = [ "multi-user.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = pkgs.writeShellScript "nix-builders-probe" ''
+        set -euo pipefail
+        mkdir -p /run/nix-builders
+        tmp=/run/nix-builders/.machines.tmp
+        : > "$tmp"
+        if [ -r /etc/nix/machines ]; then
+          while IFS= read -r line || [ -n "$line" ]; do
+            case "$line" in
+              ""|\#*) continue ;;
+            esac
+            uri=''${line%%[[:space:]]*}
+            host=''${uri#*://}
+            host=''${host#*@}
+            host=''${host%%:*}
+            if [ -n "$host" ] && ${pkgs.netcat-openbsd}/bin/nc -z -w1 "$host" 22 >/dev/null 2>&1; then
+              printf '%s\n' "$line" >> "$tmp"
+            fi
+          done < /etc/nix/machines
+        fi
+        chmod 0644 "$tmp"
+        mv -f "$tmp" /run/nix-builders/machines
+      '';
+    };
+  };
+
+  systemd.timers.nix-builders-probe = {
+    description = "Refresh online Nix remote builders every minute";
+    wantedBy = [ "timers.target" ];
+    timerConfig = {
+      OnBootSec = "15s";
+      OnUnitActiveSec = "60s";
+      AccuracySec = "10s";
+    };
+  };
 
   # Every host distributes its OWN builds to any peer. The mutual-builder
   # deadlock is prevented on the *inbound* side instead (see nix-ssh below):

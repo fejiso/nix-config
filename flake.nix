@@ -26,6 +26,12 @@
     sops-nix.url = "github:Mic92/sops-nix";
     sops-nix.inputs.nixpkgs.follows = "nixpkgs";
 
+    # Declarative disk partitioning, LUKS, and Btrfs subvolumes
+    disko = {
+      url = "github:nix-community/disko";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+
     # Private companion repo (github.com/fejiso/nix-config-private): sops
     # secrets (<input>/secrets/*.yaml, referenced via sopsFile) and the
     # eval-time ingress domain registry (<input>/ingress-domains.nix).

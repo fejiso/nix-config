@@ -136,6 +136,23 @@ services.desktopManager.gnome.enable = lib.mkIf config.services.xserver.enable f
     spotify
     poppler-utils
 
+    # icemon: Icecream Qt cluster monitor pre-pointed at our NetBird scheduler
+    # so both `icemon` in a terminal and its .desktop launcher work with zero args.
+    (symlinkJoin {
+      name = "icemon-fleet";
+      paths = [ icemon ];
+      nativeBuildInputs = [ makeWrapper ];
+      postBuild = lib.optionalString config.services.distributed-compile.enable ''
+        wrapProgram $out/bin/icemon \
+          --add-flags ${lib.escapeShellArg "-n"} \
+          --add-flags ${lib.escapeShellArg config.services.distributed-compile.netName} \
+          --add-flags ${lib.escapeShellArg "-s"} \
+          --add-flags ${lib.escapeShellArg config.services.distributed-compile.schedulerAddr} \
+          --add-flags ${lib.escapeShellArg "-p"} \
+          --add-flags ${lib.escapeShellArg (toString config.services.distributed-compile.iceccSchedulerPort)}
+      '';
+    })
+
     # meshchatx: open the MeshChatX web UI (served by the container above).
     (writeShellScriptBin "meshchatx" ''
       exec ${xdg-utils}/bin/xdg-open "http://localhost:48000"

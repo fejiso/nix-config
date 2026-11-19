@@ -37,25 +37,20 @@
     };
   };
 
-  # Boot configuration
+  # Boot & declarative disk layout (LUKS2 + Btrfs @/@home/@nix/@log/@swap via disko)
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.initrd.systemd.enable = true;
   boot.initrd.compressor = "xz";
-  boot.initrd.luks.devices."cryptroot" = {
-    device = "/dev/disk/by-uuid/7f1bd4db-58b3-40aa-be5c-d38ba434cfcb";
-  };
-  boot.loader.systemd-boot.configurationLimit = 1;
-  boot.resumeDevice = "/dev/disk/by-uuid/54cc1038-6f3b-49c0-925b-81ad8127d045";
-  boot.kernelParams = [ "resume_offset=533760" ];
+  boot.loader.systemd-boot.configurationLimit = 3;
 
-  # Swap configuration
-  swapDevices = [
-    {
-      device = "/swapfile";
-      size = 18432; # 18GB in MB
-    }
-  ];
+  diskoLayout = {
+    device = "/dev/nvme0n1";
+    swapSize = "18G";
+    # After formatting, set resumeOffset for hibernation via:
+    #   sudo btrfs inspect-internal map-swapfile -r /.swapvol/swapfile
+    # resumeOffset = ...;
+  };
 
   # Host-specific networking
   networking.hostName = "blacktop";

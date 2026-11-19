@@ -23,6 +23,71 @@
         let n = logicalCoresByHost.${hostname} or 4;
         in lib.max 1 (builtins.div n 2);
 
+      workerSlotsByHost = lib.genAttrs workerPoolHosts (h:
+        lib.max 1 (builtins.div (logicalCoresByHost.${h} or 4) 2)
+      );
+
+      probeOnlineCoresScript = pkgs.writeShellScript "distributed-compile-probe" ''
+        set -euo pipefail
+
+        # Update fleet ccache L2 reachability flag for sandboxed ccache wrappers.
+        if [ -d /run/ccache ]; then
+          if ${pkgs.netcat-openbsd}/bin/nc -z -w1 ${lib.escapeShellArg cfg.schedulerAddr} ${toString cfg.ccachePort} >/dev/null 2>&1; then
+            : > /run/ccache/online
+            chmod 0644 /run/ccache/online
+          else
+            rm -f /run/ccache/online
+          fi
+        fi
+
+        [ -d /run/icecc ] || exit 0
+
+        mem_gib=$(${pkgs.gawk}/bin/awk '/^MemTotal:/ { printf "%d", ($2 + 1048575) / 1048576 }' /proc/meminfo)
+        local_jobs=${toString cfg.jobs}
+        if [ -r /run/icecc/local-slots ]; then
+          read -r _ls < /run/icecc/local-slots || true
+          if [[ "''${_ls:-}" =~ ^[0-9]+$ ]] && [ "$_ls" -gt 0 ]; then
+            local_jobs="$_ls"
+          fi
+        fi
+        total="$local_jobs"
+
+        if ${pkgs.netcat-openbsd}/bin/nc -z -w1 ${lib.escapeShellArg cfg.schedulerAddr} ${toString cfg.iceccSchedulerPort} >/dev/null 2>&1; then
+          online_sum=0
+          ${lib.concatMapStringsSep "\n" (peer:
+            let slots = toString workerSlotsByHost.${peer}; in
+            if peer == hostname then
+              (if cfg.clientOnly then "" else ''
+                if [ -S /run/icecc/iceccd.socket ]; then
+                  online_sum=$((online_sum + local_jobs))
+                fi
+              '')
+            else ''
+              if ${pkgs.netcat-openbsd}/bin/nc -z -w1 "${peer}.netbird.cloud" ${toString cfg.iceccDaemonPort} >/dev/null 2>&1; then
+                online_sum=$((online_sum + ${slots}))
+              fi
+            ''
+          ) workerPoolHosts}
+
+          if [ "$online_sum" -gt 0 ]; then
+            clamped="$online_sum"
+            # Local g++ -E preprocessing still runs on the submitting host (~0.5-1 GiB
+            # peak per heavy C++ TU), so never fan out wider than 1 job per GiB of RAM.
+            if [ "$clamped" -gt "$mem_gib" ]; then
+              clamped="$mem_gib"
+            fi
+            if [ "$clamped" -lt "$local_jobs" ]; then
+              clamped="$local_jobs"
+            fi
+            total="$clamped"
+          fi
+        fi
+
+        printf '%s\n' "$total" > /run/icecc/.online-cores.tmp
+        chmod 0644 /run/icecc/.online-cores.tmp
+        mv -f /run/icecc/.online-cores.tmp /run/icecc/online-cores
+      '';
+
       isNativeX86_64 =
         pkgs.stdenv.buildPlatform == pkgs.stdenv.hostPlatform
         && pkgs.stdenv.hostPlatform.isx86_64;
@@ -121,10 +186,22 @@
           type = lib.types.port;
           default = 10501;
         };
+
+        ccachePort = lib.mkOption {
+          type = lib.types.port;
+          default = 6380;
+          description = "NetBird TCP port for the central Valkey ccache L2 server on hierro.";
+        };
+
+        ccacheL2MaxMemory = lib.mkOption {
+          type = lib.types.str;
+          default = "4gb";
+          description = "LRU memory cap for hierro's central Valkey ccache L2 (~12-15 GB raw .o capacity with zstd).";
+        };
       };
 
       config = lib.mkIf cfg.enable (lib.mkMerge [
-        # --- Common client + Icecream local daemon (mounted into Nix sandboxes via /run/icecc?) ---
+        # --- Common client + Icecream local daemon + two-tier ccache ---
         {
           users.users.icecc = {
             isSystemUser = true;
@@ -134,15 +211,47 @@
           users.groups.icecc = { };
 
           environment.systemPackages = [
+            pkgs.ccache
             pkgs.icecream
             sccachePkg
           ];
+
+          # Local L1 ccache directory shared across nixbld* sandbox users (setgid + 002 umask)
+          # and /run/ccache runtime dir for the socket-activated wt0 L2 bridge.
+          systemd.tmpfiles.rules = [
+            "d /var/cache/ccache 2775 root nixbld -"
+            "d /run/ccache 0755 root root -"
+          ];
+
+          # Socket-activated Unix-to-wt0 bridge so strict Nix sandboxes (CLONE_NEWNET)
+          # can read/write the shared Valkey ccache L2 on hierro via /run/ccache/l2.sock.
+          systemd.sockets.ccache-l2-proxy = {
+            description = "Unix socket bridge to NetBird ccache L2 cache";
+            wantedBy = [ "sockets.target" ];
+            listenStreams = [ "/run/ccache/l2.sock" ];
+            socketConfig = {
+              DirectoryMode = "0755";
+              SocketMode = "0666";
+            };
+          };
+
+          systemd.services.ccache-l2-proxy = {
+            description = "Proxy /run/ccache/l2.sock to NetBird ccache L2 (${cfg.schedulerAddr}:${toString cfg.ccachePort})";
+            requires = [ "ccache-l2-proxy.socket" ];
+            after = [ "ccache-l2-proxy.socket" ];
+            serviceConfig = {
+              ExecStart = "${pkgs.systemd}/lib/systemd/systemd-socket-proxyd --exit-idle-time=5min ${cfg.schedulerAddr}:${toString cfg.ccachePort}";
+              DynamicUser = true;
+            };
+          };
 
           environment.etc."sccache/config".source = sccacheClientConf;
           environment.variables.SCCACHE_CONF = "/etc/sccache/config";
 
           # iceccd starts as root so it can retain its privileged chroot helper for
           # remote Nix compiler tarballs, then immediately drops to `-u icecc`.
+          # Worker slots are clamped by min(logicalCores / 2, MemTotal_GiB / 3) so
+          # simultaneous nixbld + iceccd + sccache-dist jobs always fit in builders.slice.
           systemd.services.icecc-daemon = {
             description = "Icecream distributed C/C++ daemon (NetBird ${cfg.interface})";
             after = [ "network-online.target" "netbird.service" ]
@@ -151,22 +260,33 @@
             wantedBy = [ "multi-user.target" ];
             serviceConfig = {
               ExecStartPre = waitForWt0Script;
-              ExecStart = lib.escapeShellArgs (
-                [
-                  "${pkgs.icecream}/bin/iceccd"
-                  "-i" cfg.interface
-                  "-p" (toString cfg.iceccDaemonPort)
-                  "-s" "${cfg.schedulerAddr}:${toString cfg.iceccSchedulerPort}"
-                  "-n" cfg.netName
-                  "-m" (toString cfg.jobs)
-                  "--nice" "5"
-                  "-u" "icecc"
-                  "-b" "/var/cache/icecc"
-                  "--cache-limit" "2048"
-                  "-N" hostname
-                ]
-                ++ lib.optional cfg.clientOnly "--no-remote"
-              );
+              ExecStart = pkgs.writeShellScript "start-icecc-daemon" ''
+                set -euo pipefail
+                mem_gib=$(${pkgs.gawk}/bin/awk '/^MemTotal:/ { printf "%d", ($2 + 1048575) / 1048576 }' /proc/meminfo)
+                ram_slots=$(( mem_gib / 3 ))
+                [ "$ram_slots" -lt 1 ] && ram_slots=1
+                slots=${toString cfg.jobs}
+                if [ "$ram_slots" -lt "$slots" ]; then
+                  slots="$ram_slots"
+                fi
+                printf '%s\n' "$slots" > /run/icecc/local-slots
+                chmod 0644 /run/icecc/local-slots
+                exec ${lib.escapeShellArgs (
+                  [
+                    "${pkgs.icecream}/bin/iceccd"
+                    "-i" cfg.interface
+                    "-p" (toString cfg.iceccDaemonPort)
+                    "-s" "${cfg.schedulerAddr}:${toString cfg.iceccSchedulerPort}"
+                    "-n" cfg.netName
+                    "--nice" "5"
+                    "-u" "icecc"
+                    "-b" "/var/cache/icecc"
+                    "--cache-limit" "2048"
+                    "-N" hostname
+                  ]
+                  ++ lib.optional cfg.clientOnly "--no-remote"
+                )} -m "$slots"
+              '';
               RuntimeDirectory = "icecc";
               RuntimeDirectoryMode = "0755";
               CacheDirectory = "icecc";
@@ -174,6 +294,28 @@
               OOMScoreAdjust = 500;
               Restart = "always";
               RestartSec = 5;
+            };
+          };
+
+          # Periodically probe currently online wt0 Icecream workers + ccache L2 and
+          # publish the aggregate slot count (clamped by local RAM) to /run/icecc/online-cores.
+          systemd.services.distributed-compile-probe = {
+            description = "Probe online NetBird Icecream workers & ccache L2";
+            after = [ "icecc-daemon.service" "ccache-l2-proxy.socket" ];
+            wantedBy = [ "multi-user.target" "icecc-daemon.service" ];
+            serviceConfig = {
+              Type = "oneshot";
+              ExecStart = probeOnlineCoresScript;
+            };
+          };
+
+          systemd.timers.distributed-compile-probe = {
+            description = "Refresh online NetBird Icecream slot count every minute";
+            wantedBy = [ "timers.target" ];
+            timerConfig = {
+              OnBootSec = "15s";
+              OnUnitActiveSec = "60s";
+              AccuracySec = "10s";
             };
           };
         }
@@ -194,6 +336,17 @@
               ExecStartPre = waitForWt0Script;
               ExecStart = pkgs.writeShellScript "start-sccache-dist-server" ''
                 set -euo pipefail
+                mem_gib=$(${pkgs.gawk}/bin/awk '/^MemTotal:/ { printf "%d", ($2 + 1048575) / 1048576 }' /proc/meminfo)
+                ram_slots=$(( mem_gib / 3 ))
+                [ "$ram_slots" -lt 1 ] && ram_slots=1
+                slots=${toString cfg.jobs}
+                if [ "$ram_slots" -lt "$slots" ]; then
+                  slots="$ram_slots"
+                fi
+                cg="/sys/fs/cgroup$(${pkgs.gawk}/bin/awk -F: '$1=="0"{print $3}' /proc/self/cgroup)"
+                if [ -w "$cg/cpu.max" ]; then
+                  printf '%s 100000\n' "$(( slots * 100000 ))" > "$cg/cpu.max" || true
+                fi
                 wt0_ip=$(${pkgs.iproute2}/bin/ip -4 -o addr show dev ${lib.escapeShellArg cfg.interface} \
                   | ${pkgs.gawk}/bin/awk '{split($4, a, "/"); print a[1]; exit}')
                 mkdir -p /var/cache/sccache-dist/toolchains /var/cache/sccache-dist/build
@@ -217,10 +370,11 @@
               RuntimeDirectory = "sccache-dist-server";
               RuntimeDirectoryMode = "0700";
               CacheDirectory = "sccache-dist";
-              # Cap sccache-dist worker CPU to logicalCores / 2 (Rust's
-              # available_parallelism() reads cgroup v2 CPUQuota and reports
-              # `cfg.jobs` slots directly to the sccache-dist scheduler).
+              # Cap sccache-dist worker CPU to min(logicalCores / 2, MemTotal_GiB / 3)
+              # (Rust's available_parallelism() reads cgroup v2 cpu.max and reports
+              # the clamped slot count directly to the sccache-dist scheduler).
               CPUQuota = "${toString (cfg.jobs * 100)}%";
+              Delegate = [ "cpu" ];
               Nice = 5;
               Slice = "builders.slice";
               OOMScoreAdjust = 500;
@@ -291,9 +445,44 @@
             };
           };
 
+          systemd.services.ccache-l2-server = {
+            description = "Central Valkey ccache L2 server (NetBird ${cfg.interface})";
+            after = [ "network-online.target" "netbird.service" ];
+            wants = [ "network-online.target" ];
+            wantedBy = [ "multi-user.target" ];
+            serviceConfig = {
+              ExecStartPre = waitForWt0Script;
+              ExecStart = pkgs.writeShellScript "start-ccache-l2-server" ''
+                set -euo pipefail
+                wt0_ip=$(${pkgs.iproute2}/bin/ip -4 -o addr show dev ${lib.escapeShellArg cfg.interface} \
+                  | ${pkgs.gawk}/bin/awk '{split($4, a, "/"); print a[1]; exit}')
+                cat > /run/ccache-l2-server/valkey.conf <<EOF
+                bind ''${wt0_ip}
+                port ${toString cfg.ccachePort}
+                protected-mode no
+                tcp-keepalive 60
+                maxmemory ${cfg.ccacheL2MaxMemory}
+                maxmemory-policy allkeys-lru
+                dir /var/lib/ccache-l2
+                save 3600 100
+                appendonly no
+                EOF
+                exec ${pkgs.valkey}/bin/valkey-server /run/ccache-l2-server/valkey.conf
+              '';
+              RuntimeDirectory = "ccache-l2-server";
+              RuntimeDirectoryMode = "0700";
+              StateDirectory = "ccache-l2";
+              StateDirectoryMode = "0700";
+              DynamicUser = true;
+              Restart = "always";
+              RestartSec = 5;
+            };
+          };
+
           networking.firewall.interfaces.${cfg.interface}.allowedTCPPorts = [
             cfg.iceccSchedulerPort
             cfg.sccacheSchedulerPort
+            cfg.ccachePort
           ];
         })
       ]);

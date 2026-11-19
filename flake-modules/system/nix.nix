@@ -89,6 +89,17 @@
     };
   };
 
+  # Live build tree & Nix helper (`nh os switch`, `nom`) on native hosts.
+  # Guarded off cross-compiled targets (e.g. armv7l z-turn) so GHC isn't pulled.
+  programs.nh = lib.mkIf (pkgs.stdenv.buildPlatform == pkgs.stdenv.hostPlatform) {
+    enable = true;
+    flake = "/home/z-247/dev/nix-config";
+  };
+
+  environment.systemPackages = lib.optionals (pkgs.stdenv.buildPlatform == pkgs.stdenv.hostPlatform) [
+    pkgs.nix-output-monitor
+  ];
+
   # Allow unfree packages
   nixpkgs.config.allowUnfree = true;
 }

@@ -3,6 +3,7 @@ import ../../lib/mk-host.nix {
   inherit inputs config;
   name = "blacktop";
   modules = [
+    config.flake.modules.nixos.disko-btrfs-luks
     config.flake.modules.nixos.desktop
     config.flake.modules.nixos.desktop-services
     config.flake.modules.nixos.pentest

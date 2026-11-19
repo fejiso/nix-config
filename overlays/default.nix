@@ -49,6 +49,7 @@ let
         else "v1";
 
       icecreamPkg = rootPkgs.icecream;
+      ccachePkg = rootPkgs.ccache;
       unwrappedGCC = pkgs.stdenv.cc.cc;
 
       # Pure Nix-built Icecream compiler environment archive (<md5>.tar.zst) for
@@ -65,8 +66,11 @@ let
 
       # Mirror nixpkgs' ccache.links / ccacheStdenv pattern: stdenv.cc (cc-wrapper)
       # expands all /nix/store header/lib paths + -march flags first, then invokes
-      # our inner wrapper, which dispatches over /run/icecc/iceccd.socket when the
-      # host's icecc-daemon is running and falls back to local GCC otherwise.
+      # our inner wrapper:
+      #   1. Two-tier ccache (local /var/cache/ccache L1 + fleet wt0 Valkey L2 via
+      #      /run/ccache/l2.sock when /run/ccache/online is present).
+      #   2. On ccache miss, CCACHE_PREFIX dispatches over /run/icecc/iceccd.socket
+      #      when local icecc-daemon is up, or falls back to unwrapped GCC.
       iceccLinks = pkgs.stdenv.mkDerivation {
         pname = "icecc-links";
         inherit (unwrappedGCC) version;
@@ -88,7 +92,24 @@ let
               ) "${unwrappedGCC.targetConfig}-";
           in
           ''
-            mkdir -p "$out/bin"
+            mkdir -p "$out/bin" "$out/libexec"
+
+            for mode in gcc g++; do
+              cat > "$out/libexec/icecc-prefix-$mode" <<EOF
+            #!${pkgs.runtimeShell}
+            real_cc="\$1"
+            shift
+            if [ -S /run/icecc/iceccd.socket ]; then
+              export ICECC_VERSION="${iceccEnv}/env.tar.zst"
+              export ICECC_TEST_SOCKET="/run/icecc/iceccd.socket"
+              export ICECC_CC="\$real_cc"
+              export ICECC_CXX="\$real_cc"
+              exec "${icecreamPkg}/bin/icecc" "$mode" "\$@"
+            fi
+            exec "\$real_cc" "\$@"
+            EOF
+              chmod +x "$out/libexec/icecc-prefix-$mode"
+            done
 
             wrapCompiler() {
               local short="$1"
@@ -97,14 +118,23 @@ let
               if [ -x "${unwrappedGCC}/bin/$cname" ]; then
                 cat > "$out/bin/$cname" <<EOF
             #!${pkgs.runtimeShell}
-            if [ -S /run/icecc/iceccd.socket ]; then
-              export ICECC_VERSION="${iceccEnv}/env.tar.zst"
-              export ICECC_TEST_SOCKET="/run/icecc/iceccd.socket"
-              export ICECC_CC="${unwrappedGCC}/bin/$cname"
-              export ICECC_CXX="${unwrappedGCC}/bin/$cname"
-              exec "${icecreamPkg}/bin/icecc" "$mode" "\$@"
+            if [ -d /var/cache/ccache ] && [ -w /var/cache/ccache ]; then
+              export CCACHE_DIR="/var/cache/ccache"
+              export CCACHE_UMASK="002"
+              export CCACHE_BASEDIR="/build"
+              export CCACHE_NOHASHDIR="1"
+              export CCACHE_SLOPPINESS="include_file_mtime,include_file_ctime,random_seed"
+              export CCACHE_COMPILERCHECK="string:${unwrappedGCC.outPath}"
+              export CCACHE_MAXSIZE="20G"
+              export CCACHE_COMPRESS="1"
+              export CCACHE_PREFIX="$out/libexec/icecc-prefix-$mode"
+              if [ -S /run/ccache/l2.sock ] && [ -e /run/ccache/online ]; then
+                export CCACHE_REMOTE_STORAGE="redis+unix:///run/ccache/l2.sock request-timeout=2s data-timeout=3s"
+                export CCACHE_RESHARE="1"
+              fi
+              exec "${ccachePkg}/bin/ccache" "${unwrappedGCC}/bin/$cname" "\$@"
             fi
-            exec "${unwrappedGCC}/bin/$cname" "\$@"
+            exec "$out/libexec/icecc-prefix-$mode" "${unwrappedGCC}/bin/$cname" "\$@"
             EOF
                 chmod +x "$out/bin/$cname"
               fi
@@ -179,18 +209,50 @@ let
                 cranePatch = lib.optionalAttrs (old ? cargoArtifacts && lib.isDerivation old.cargoArtifacts) {
                   cargoArtifacts = tunePkg old.cargoArtifacts;
                 };
-                # Throttle parallel CMake/Ninja link steps (`ld`) to 2 concurrent
-                # linkers while allowing `.c`/`.cpp` compilation across all `cores`.
-                linkPoolPatch = {
+                # Dynamic online-host compile scaling + local link/load throttling:
+                #   1. CMake + Ninja: size `compile` to `/run/icecc/online-cores` (when
+                #      using `iceccStdenv` and local `iceccd` is up) while keeping `link=2`
+                #      so concurrent `ld` invocations never blow up RAM.
+                #   2. Icecream-capable builds (`canUseIceccStdenv`): scale `NIX_BUILD_CORES`
+                #      at runtime to `/run/icecc/online-cores` (clamped to local GiB RAM by
+                #      `distributed-compile-probe`), and pass `-l <localCores>` to GNU Make
+                #      builds so local link/preprocess load stays bounded.
+                #   3. Non-icecc builds (e.g. Rust, CUDA): keep `NIX_BUILD_CORES` at local `cores`.
+                parallelPoolPatch = {
                   preConfigure = ''
                     if [ -z "''${dontUseCmakeConfigure:-}" ] && command -v ninja >/dev/null 2>&1 && [ -z "''${dontUseNinjaBuild:-}" ]; then
-                      prependToVar cmakeFlags "-DCMAKE_JOB_POOLS:STRING=link=2"
+                      ${lib.optionalString canUseIceccStdenv ''
+                        _icecc_cores="''${NIX_BUILD_CORES:-2}"
+                        if [ -S /run/icecc/iceccd.socket ] && [ -r /run/icecc/online-cores ]; then
+                          read -r _online < /run/icecc/online-cores || true
+                          if [[ "''${_online:-}" =~ ^[0-9]+$ ]] && [ "$_online" -gt "$_icecc_cores" ]; then
+                            _icecc_cores="$_online"
+                          fi
+                        fi
+                        prependToVar cmakeFlags "-DCMAKE_JOB_POOLS:STRING=compile=''${_icecc_cores};link=2"
+                        prependToVar cmakeFlags "-DCMAKE_JOB_POOL_COMPILE:STRING=compile"
+                      ''}${lib.optionalString (!canUseIceccStdenv) ''
+                        prependToVar cmakeFlags "-DCMAKE_JOB_POOLS:STRING=link=2"
+                      ''}
                       prependToVar cmakeFlags "-DCMAKE_JOB_POOL_LINK:STRING=link"
                     fi
                   '' + (old.preConfigure or "");
+                } // lib.optionalAttrs canUseIceccStdenv {
+                  preBuild = ''
+                    if [ -S /run/icecc/iceccd.socket ] && [ -r /run/icecc/online-cores ] && [ "''${enableParallelBuilding:-1}" = "1" ]; then
+                      _local_cores="''${NIX_BUILD_CORES:-2}"
+                      read -r _online_cores < /run/icecc/online-cores || true
+                      if [[ "''${_online_cores:-}" =~ ^[0-9]+$ ]] && [ "$_online_cores" -gt "$_local_cores" ]; then
+                        export NIX_BUILD_CORES="$_online_cores"
+                        if ! [ -f build.ninja ] || [ -n "''${dontUseNinjaBuild:-}" ]; then
+                          prependToVar makeFlags "-l ''${_local_cores}"
+                        fi
+                      fi
+                    fi
+                  '' + (old.preBuild or "");
                 };
               in
-              envPatch // cranePatch // linkPoolPatch
+              envPatch // cranePatch // parallelPoolPatch
             );
           in
           if pkg ? override then
