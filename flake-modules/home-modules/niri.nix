@@ -147,37 +147,50 @@ with lib;
       }
 
       ${if hostname == "butthead" then ''
-      // Butthead: Desktop with AOC monitors only
-      output "PNP(AOC) 24B2W1G5 UOWN41A000261" {
-          position x=1920 y=0
-          mode "1920x1080@74.973"
-      }
-
+      // Butthead: Desktop with two side-by-side AOC monitors
       output "PNP(AOC) 27G2G4 GYGM7HA433965" {
           position x=0 y=0
           mode "1920x1080@144.000"
       }
+
+      output "PNP(AOC) 24B2W1G5 UOWN41A000261" {
+          position x=1920 y=0
+          mode "1920x1080@74.973"
+      }
       '' else ''
-      // Blacktop: Laptop with panel + external monitors
+      // Laptops (blacktop / tungsten): Niri positions use logical pixels (post-scale).
+      // Both built-in panels are 1920 logical px wide (blacktop: 1920x1080 @ 1.0x;
+      // tungsten: 3840x2400 @ 2.0x = 1920x1200) and sit on the bottom row (y=1080),
+      // so external monitor coordinates are identical for both laptops:
+      //   - Ancor VE248 above laptop:  (1920, 0)
+      //   - AOC 27" left of laptop:    (0, 1080)
+      //   - Built-in laptop center:    (1920, 1080)
+      //   - AOC 24" right of laptop:   (3840, 1080)
       output "Ancor Communications Inc VE248 H3LMQS153004" {
-          position x=0 y=0
+          position x=1920 y=0
           mode "1920x1080@60.000"
       }
 
       output "AU Optronics 0xA48F Unknown" {
-          position x=1920 y=0
+          position x=1920 y=1080
           scale 1.0
           mode "1920x1080@60.049"
       }
 
-      output "PNP(AOC) 24B2W1G5 UOWN41A000261" {
-          position x=3840 y=0
-          mode "1920x1080@74.973"
+      output "Samsung Display Corp. 0x4165 Unknown" {
+          position x=1920 y=1080
+          scale 2.0
+          mode "3840x2400@60.000"
       }
 
       output "PNP(AOC) 27G2G4 GYGM7HA433965" {
-          position x=0 y=0
+          position x=0 y=1080
           mode "1920x1080@144.000"
+      }
+
+      output "PNP(AOC) 24B2W1G5 UOWN41A000261" {
+          position x=3840 y=1080
+          mode "1920x1080@74.973"
       }
       ''}
 
@@ -263,17 +276,41 @@ with lib;
           Mod+Ctrl+Next { move-column-to-workspace-down; }
           Mod+Ctrl+Prior { move-column-to-workspace-up; }
 
-          // Focus monitor (horizontal only)
-          Mod+Shift+Left { focus-monitor-left; }
+          // Focus monitor (2D directional + layout-agnostic cycle)
+          Mod+Shift+Left  { focus-monitor-left; }
           Mod+Shift+Right { focus-monitor-right; }
-          Mod+Shift+H { focus-monitor-left; }
-          Mod+Shift+L { focus-monitor-right; }
+          Mod+Shift+Up    { focus-monitor-up; }
+          Mod+Shift+Down  { focus-monitor-down; }
+          Mod+Shift+H     { focus-monitor-left; }
+          Mod+Shift+L     { focus-monitor-right; }
+          Mod+Shift+K     { focus-monitor-up; }
+          Mod+Shift+J     { focus-monitor-down; }
+          Mod+Grave       { focus-monitor-next; }
+          Mod+Shift+Grave { focus-monitor-previous; }
 
-          // Move to monitor (horizontal only)
-          Mod+Shift+Ctrl+Left { move-column-to-monitor-left; }
+          // Move column to monitor (2D directional + layout-agnostic cycle)
+          Mod+Shift+Ctrl+Left  { move-column-to-monitor-left; }
           Mod+Shift+Ctrl+Right { move-column-to-monitor-right; }
-          Mod+Shift+Ctrl+H { move-column-to-monitor-left; }
-          Mod+Shift+Ctrl+L { move-column-to-monitor-right; }
+          Mod+Shift+Ctrl+Up    { move-column-to-monitor-up; }
+          Mod+Shift+Ctrl+Down  { move-column-to-monitor-down; }
+          Mod+Shift+Ctrl+H     { move-column-to-monitor-left; }
+          Mod+Shift+Ctrl+L     { move-column-to-monitor-right; }
+          Mod+Shift+Ctrl+K     { move-column-to-monitor-up; }
+          Mod+Shift+Ctrl+J     { move-column-to-monitor-down; }
+          Mod+Ctrl+Grave       { move-column-to-monitor-next; }
+          Mod+Shift+Ctrl+Grave { move-column-to-monitor-previous; }
+
+          // Move workspace to monitor (2D directional + layout-agnostic cycle)
+          Mod+Alt+Left       { move-workspace-to-monitor-left; }
+          Mod+Alt+Right      { move-workspace-to-monitor-right; }
+          Mod+Alt+Up         { move-workspace-to-monitor-up; }
+          Mod+Alt+Down       { move-workspace-to-monitor-down; }
+          Mod+Alt+H          { move-workspace-to-monitor-left; }
+          Mod+Alt+L          { move-workspace-to-monitor-right; }
+          Mod+Alt+K          { move-workspace-to-monitor-up; }
+          Mod+Alt+J          { move-workspace-to-monitor-down; }
+          Mod+Alt+Grave      { move-workspace-to-monitor-next; }
+          Mod+Alt+Shift+Grave { move-workspace-to-monitor-previous; }
 
           // Focus workspace (by number)
           Mod+1 { focus-workspace 1; }
@@ -359,8 +396,6 @@ with lib;
       spawn-at-startup "${pkgs.telegram-desktop}/bin/Telegram"
       spawn-at-startup "${pkgs.spotify}/bin/spotify"
       spawn-at-startup "steam"
-      spawn-at-startup "sleep 1 && ${pkgs.niri}/bin/niri msg output \"Ancor Communications Inc VE248 H3LMQS153004\" position set 0 0"
-      spawn-at-startup "sleep 1 && ${pkgs.niri}/bin/niri msg output \"AU Optronics 0xA48F Unknown\" position set 1920 0"
     '';
   };
 }

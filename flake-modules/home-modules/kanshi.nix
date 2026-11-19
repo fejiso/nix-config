@@ -1,10 +1,11 @@
 { ... }: {
   flake.modules.homeManager.kanshi =
-{ config, pkgs, ... }:
+{ config, pkgs, lib, ... }:
 
 {
   services.kanshi = {
-    enable = true;
+    enable = lib.mkDefault config.wayland.windowManager.sway.enable;
+    systemdTarget = "sway-session.target";
     settings = [
       {
         profile = {
