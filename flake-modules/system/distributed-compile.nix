@@ -23,10 +23,6 @@
         let n = logicalCoresByHost.${hostname} or 4;
         in lib.max 1 (builtins.div n 2);
 
-      workerSlotsByHost = lib.genAttrs workerPoolHosts (h:
-        lib.max 1 (builtins.div (logicalCoresByHost.${h} or 4) 2)
-      );
-
       probeOnlineCoresScript = pkgs.writeShellScript "distributed-compile-probe" ''
         set -euo pipefail
 
@@ -51,23 +47,18 @@
         fi
         total="$local_jobs"
 
-        if ${pkgs.netcat-openbsd}/bin/nc -z -w1 ${lib.escapeShellArg cfg.schedulerAddr} ${toString cfg.iceccSchedulerPort} >/dev/null 2>&1; then
-          online_sum=0
-          ${lib.concatMapStringsSep "\n" (peer:
-            let slots = toString workerSlotsByHost.${peer}; in
-            if peer == hostname then
-              (if cfg.clientOnly then "" else ''
-                if [ -S /run/icecc/iceccd.socket ]; then
-                  online_sum=$((online_sum + local_jobs))
-                fi
-              '')
-            else ''
-              if ${pkgs.netcat-openbsd}/bin/nc -z -w1 "${peer}.netbird.cloud" ${toString cfg.iceccDaemonPort} >/dev/null 2>&1; then
-                online_sum=$((online_sum + ${slots}))
-              fi
-            ''
-          ) workerPoolHosts}
-
+        # Query icecc-scheduler's text control port (schedulerPort + 1, default 8766)
+        # via `listcs` for the live sum of `maxJobs` across all connected remote workers.
+        listcs_out=$(printf 'listcs\nquit\n' | ${pkgs.netcat-openbsd}/bin/nc -w1 ${lib.escapeShellArg cfg.schedulerAddr} ${toString (cfg.iceccSchedulerPort + 1)} 2>/dev/null || true)
+        if [ -n "$listcs_out" ]; then
+          online_sum=$(printf '%s\n' "$listcs_out" | ${pkgs.gawk}/bin/awk '
+            /\([0-9.]+:[1-9][0-9]*\)/ && match($0, /jobs=[0-9]+\/[0-9]+/) {
+              s = substr($0, RSTART, RLENGTH)
+              sub(/^jobs=[0-9]+\//, "", s)
+              sum += s + 0
+            }
+            END { print sum + 0 }
+          ')
           if [ "$online_sum" -gt 0 ]; then
             clamped="$online_sum"
             # Local g++ -E preprocessing still runs on the submitting host (~0.5-1 GiB
@@ -221,7 +212,8 @@
           systemd.tmpfiles.rules = [
             "d /var/cache/ccache 2775 root nixbld -"
             "d /run/ccache 0755 root root -"
-            "d /run/icecc 0755 root root -"
+            "d /run/icecc 0755 icecc icecc -"
+            "d /var/cache/icecc 0775 icecc icecc -"
           ];
 
           # Socket-activated Unix-to-wt0 bridge so strict Nix sandboxes (CLONE_NEWNET)
@@ -259,6 +251,7 @@
               ++ lib.optional cfg.scheduler "icecc-scheduler.service";
             wants = [ "network-online.target" ];
             wantedBy = [ "multi-user.target" ];
+            environment.ICECC_TEST_SOCKET = "/run/icecc/iceccd.socket";
             serviceConfig = {
               ExecStartPre = waitForWt0Script;
               ExecStart = pkgs.writeShellScript "start-icecc-daemon" ''
@@ -272,7 +265,14 @@
                 if [ "$ram_slots" -lt "$slots" ]; then
                   slots="$ram_slots"
                 fi
-                mkdir -p /run/icecc
+                # iceccd drops UID/GID to `icecc` via capng_change_id (keeping only
+                # CAP_SYS_CHROOT) BEFORE calling cleanup_cache(/var/cache/icecc) and
+                # binding /run/icecc/iceccd.socket, so both dirs must be owned by icecc.
+                mkdir -p /var/cache/icecc /run/icecc
+                chown -R icecc:icecc /var/cache/icecc
+                chmod 0775 /var/cache/icecc
+                chown icecc:icecc /run/icecc
+                chmod 0755 /run/icecc
                 printf '%s\n' "$slots" > /run/icecc/local-slots
                 chmod 0644 /run/icecc/local-slots
                 exec ${lib.escapeShellArgs (
@@ -280,8 +280,8 @@
                     "${pkgs.icecream}/bin/iceccd"
                     "-i" cfg.interface
                     "-p" (toString cfg.iceccDaemonPort)
-                    "-s" "${cfg.schedulerAddr}:${toString cfg.iceccSchedulerPort}"
                     "-n" cfg.netName
+                    "-s" "${cfg.schedulerAddr}:${toString cfg.iceccSchedulerPort}"
                     "--nice" "5"
                     "-u" "icecc"
                     "-b" "/var/cache/icecc"
@@ -294,7 +294,6 @@
               RuntimeDirectory = "icecc";
               RuntimeDirectoryMode = "0755";
               RuntimeDirectoryPreserve = "yes";
-              CacheDirectory = "icecc";
               Slice = "builders.slice";
               OOMScoreAdjust = 500;
               Restart = "always";
@@ -488,6 +487,7 @@
 
           networking.firewall.interfaces.${cfg.interface}.allowedTCPPorts = [
             cfg.iceccSchedulerPort
+            (cfg.iceccSchedulerPort + 1) # text status port (`listcs`)
             cfg.sccacheSchedulerPort
             cfg.ccachePort
           ];

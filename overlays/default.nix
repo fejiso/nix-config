@@ -538,6 +538,14 @@ in {
     # with an empty MD5 prefix. Patch in coreutils + runtime tool PATH.
     icecream = prev.icecream.overrideAttrs (old: {
       nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ prev.makeWrapper ];
+      postPatch = (old.postPatch or "") + ''
+        # Upstream bug: after accept() sets `next_listen = time(nullptr) + 1`, if
+        # a connection closes within the same second, listen_fd is omitted from
+        # pollfds while `timeout` can be 3600s, wedging accept() for up to an hour.
+        substituteInPlace scheduler/scheduler.cpp \
+          --replace-fail 'if (time(nullptr) >= next_listen) {' \
+            'if (time(nullptr) < next_listen && timeout > 1) timeout = 1; if (time(nullptr) >= next_listen) {'
+      '';
       postFixup = (old.postFixup or "") + ''
         substituteInPlace "$out/bin/icecc-create-env" \
           --replace-fail 'for file in /usr/bin/md5sum' 'for file in ${prev.coreutils}/bin/md5sum /usr/bin/md5sum' \
