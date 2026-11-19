@@ -179,18 +179,18 @@ let
                 cranePatch = lib.optionalAttrs (old ? cargoArtifacts && lib.isDerivation old.cargoArtifacts) {
                   cargoArtifacts = tunePkg old.cargoArtifacts;
                 };
-                # When Icecream's socket is mounted inside the sandbox, fan make/ninja
-                # out across the fleet's aggregate compile slots (~48); otherwise keep
-                # the host's local NIX_BUILD_CORES (logicalCores / 2).
-                iceccParallelPatch = lib.optionalAttrs canUseIceccStdenv {
-                  preBuild = ''
-                    if [ -S /run/icecc/iceccd.socket ] && [ "''${enableParallelBuilding:-1}" = "1" ]; then
-                      export NIX_BUILD_CORES=48
+                # Throttle parallel CMake/Ninja link steps (`ld`) to 2 concurrent
+                # linkers while allowing `.c`/`.cpp` compilation across all `cores`.
+                linkPoolPatch = {
+                  preConfigure = ''
+                    if [ -z "''${dontUseCmakeConfigure:-}" ] && command -v ninja >/dev/null 2>&1 && [ -z "''${dontUseNinjaBuild:-}" ]; then
+                      prependToVar cmakeFlags "-DCMAKE_JOB_POOLS:STRING=link=2"
+                      prependToVar cmakeFlags "-DCMAKE_JOB_POOL_LINK:STRING=link"
                     fi
-                  '' + (old.preBuild or "");
+                  '' + (old.preConfigure or "");
                 };
               in
-              envPatch // cranePatch // iceccParallelPatch
+              envPatch // cranePatch // linkPoolPatch
             );
           in
           if pkg ? override then

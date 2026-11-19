@@ -170,6 +170,8 @@
               RuntimeDirectory = "icecc";
               RuntimeDirectoryMode = "0755";
               CacheDirectory = "icecc";
+              Slice = "builders.slice";
+              OOMScoreAdjust = 500;
               Restart = "always";
               RestartSec = 5;
             };
@@ -220,6 +222,8 @@
               # `cfg.jobs` slots directly to the sccache-dist scheduler).
               CPUQuota = "${toString (cfg.jobs * 100)}%";
               Nice = 5;
+              Slice = "builders.slice";
+              OOMScoreAdjust = 500;
               Restart = "always";
               RestartSec = 5;
             };

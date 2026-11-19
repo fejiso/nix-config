@@ -28,10 +28,12 @@ let
     else 2;
 
   # Define all build machines with their capabilities
+  # maxJobs = 1 on every host so `maxJobs * cores` never multiplies compiler
+  # memory footprints (each single package gets `logicalCores / 2` threads).
   buildHosts = {
     butthead = {
       system = "x86_64-linux";
-      maxJobs = 4;
+      maxJobs = 1;
       speedFactor = 4;  # Ryzen 9 5950X (32T)
       supportedFeatures = [ "kvm" "big-parallel" ];
       alwaysOn = true;  # Always available for cache
@@ -40,7 +42,7 @@ let
     };
     hierro = {
       system = "x86_64-linux";
-      maxJobs = 4;
+      maxJobs = 1;
       speedFactor = 3;  # Ryzen 9 3900 (24T)
       supportedFeatures = [ "kvm" "big-parallel" ];
       alwaysOn = true;
@@ -50,28 +52,28 @@ let
     };
     tungsten = {
       system = "x86_64-linux";
-      maxJobs = 4;
+      maxJobs = 1;
       speedFactor = 3;  # Core i7-13850HX (28T)
       supportedFeatures = [ "kvm" "big-parallel" ];
       alwaysOn = false;  # Laptop, not always on
     };
     blacktop = {
       system = "x86_64-linux";
-      maxJobs = 4;
+      maxJobs = 1;
       speedFactor = 1;  # Laptop
       supportedFeatures = [ "kvm" ];
       alwaysOn = false;  # Laptop, not always on
     };
     elitedex = {
       system = "x86_64-linux";
-      maxJobs = 4;
+      maxJobs = 1;
       speedFactor = 1;
       supportedFeatures = [ "kvm" ];
       alwaysOn = false;  # Not always on
     };
     lenovix = {
       system = "x86_64-linux";
-      maxJobs = 4;
+      maxJobs = 1;
       speedFactor = 1;
       supportedFeatures = [ "kvm" ];
       alwaysOn = false;  # Not always on
@@ -141,10 +143,10 @@ in
     fallback = true;
     narinfo-cache-negative-ttl = 10;
     warn-dirty = false;
-    # Limit local builds to encourage distribution
-    max-jobs = lib.mkDefault (if buildHosts?${hostname} then buildHosts.${hostname}.maxJobs else 2);
-    # Cores per build job (logicalCores / 2 on each host; mkTunedScope expands
-    # NIX_BUILD_CORES further across the fleet when /run/icecc/iceccd.socket is up).
+    # Keep 1 derivation per host at a time (`1 * logicalCores/2` threads) so
+    # multiple C++/Rust builds never multiply RAM usage and trigger OOM.
+    max-jobs = lib.mkDefault 1;
+    # Cores per build job (logicalCores / 2 on each host).
     cores = halfLogicalCores;
     # Expose optional Icecream daemon socket into strict Nix sandboxes (`?` = skip if absent).
     extra-sandbox-paths = [ "/run/icecc?" ];
@@ -162,6 +164,25 @@ in
     extra-substituters = substituters;
     trusted-substituters = substituters;
     trusted-public-keys = trustedPublicKeys;
+  };
+
+  # Shared memory-bounded cgroup slice for all local & distributed build daemons
+  # (nix-daemon, icecc-daemon, sccache-dist-server):
+  #   - MemoryHigh = 65%: kernel throttles compiler allocations & reclaims into
+  #     zswap/swap gracefully instead of OOM-killing cc1plus/rustc.
+  #   - MemoryMax  = 80%: hard ceiling so runaway builds never starve user.slice,
+  #     desktop sessions, SSH, or host services.
+  systemd.slices.builders = {
+    description = "Memory-bounded slice for Nix and distributed compiler daemons";
+    sliceConfig = {
+      MemoryHigh = "65%";
+      MemoryMax = "80%";
+    };
+  };
+
+  systemd.services.nix-daemon.serviceConfig = {
+    Slice = "builders.slice";
+    OOMScoreAdjust = 500;
   };
 
   # Configure remote builders
