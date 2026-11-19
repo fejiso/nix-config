@@ -1,5 +1,11 @@
-{ config, ... }: {
-  flake.modules.nixos.cli = { inputs, outputs, hostname, pkgs, lib, ... }: {
+{ ... }: {
+  flake.modules.nixos.cli = { inputs, outputs, config, hostname, pkgs, lib, ... }:
+    let
+      tuneCfg = config.hardware.cpu.tune;
+      effectiveCpu = if tuneCfg.cpu != null then tuneCfg.cpu else tuneCfg.group;
+      hasTuning = tuneCfg.cpu != null || tuneCfg.group != null;
+    in
+    {
     home-manager = {
       useGlobalPkgs = false;
       useUserPackages = true;
@@ -45,6 +51,11 @@
               # own systemd (26.05) is untouched.
               (_final: prev: {
                 systemd = prev.systemd.override { withLibBPF = false; };
+              })
+            ++ lib.optional hasTuning
+              (final: _prev: {
+                groupTune = final.mkTunedScope tuneCfg.group;
+                cpuTune = final.mkTunedScope effectiveCpu;
               });
           }
           // (

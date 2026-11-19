@@ -31,6 +31,12 @@
   # Network configuration
   networking.hostName = "hierro";
 
+  # AMD Ryzen 9 3900 (Zen 2)
+  hardware.cpu.tune = {
+    cpu = "znver2";
+    group = "x86-64-v3";
+  };
+
   # Static IPv6 — Hetzner doesn't do SLAAC/DHCPv6; address lives in
   # secrets/network.yaml (sops) and is applied to enp41s0 after sops-nix runs.
   networking.interfaces.enp41s0.useDHCP = true; # Keep IPv4 DHCP working (interface exits NetworkManager)

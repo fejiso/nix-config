@@ -97,6 +97,12 @@
   # Host-specific networking
   networking.hostName = "tungsten";
 
+  # Intel Core i7-13850HX (Raptor Lake — AVX2 + AVX-VNNI)
+  hardware.cpu.tune = {
+    cpu = "raptorlake";
+    group = "x86-64-v3";
+  };
+
   # Mount hispanas bcachefs pool at /mnt/hispanas over NetBird
   services.nfs-mounts.hispanas.enable = true;
 

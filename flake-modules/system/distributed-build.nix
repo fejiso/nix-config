@@ -8,12 +8,31 @@ let
   buildKeys = import "${inputs.self}/lib/build-keys.nix" { inherit lib; };
   keys = buildKeys.keys;
 
+  # Logical thread counts across the fleet; Nix `cores` and distributed compile
+  # worker slots (icecream / sccache-dist) both use logicalCores / 2.
+  logicalCoresByHost = {
+    butthead = 32; # Ryzen 9 5950X (16C/32T) -> 16
+    tungsten = 28; # Core i7-13850HX (8P+12E, 28T) -> 14
+    hierro   = 24; # Ryzen 9 3900 (12C/24T) -> 12
+    blacktop = 8;  # Ryzen 7 4700U (8C/8T) -> 4
+    elitedex = 8;  # Ryzen 5 2400G (4C/8T) -> 4
+    lenovix  = 4;  # Core i5-6500T (4C/4T) -> 2
+    hispanas = 4;  # Core i3-3220 (2C/4T) -> 2
+    a8       = 4;  # AMD A8-7410 (4C/4T) -> 2
+    snuffles = 2;  # Celeron N3060 (2C/2T) -> 1
+  };
+
+  halfLogicalCores =
+    if logicalCoresByHost ? ${hostname}
+    then builtins.div logicalCoresByHost.${hostname} 2
+    else 2;
+
   # Define all build machines with their capabilities
   buildHosts = {
     butthead = {
       system = "x86_64-linux";
       maxJobs = 4;
-      speedFactor = 4;  # Desktop with good CPU
+      speedFactor = 4;  # Ryzen 9 5950X (32T)
       supportedFeatures = [ "kvm" "big-parallel" ];
       alwaysOn = true;  # Always available for cache
       # butthead is currently offline; prevent peers from stalling queries to it
@@ -21,8 +40,8 @@ let
     };
     hierro = {
       system = "x86_64-linux";
-      maxJobs = 2;
-      speedFactor = 3;  # Server with good CPU
+      maxJobs = 4;
+      speedFactor = 3;  # Ryzen 9 3900 (24T)
       supportedFeatures = [ "kvm" "big-parallel" ];
       alwaysOn = true;
       # nix-serve currently accepts connections but stalls responses. Keep
@@ -32,8 +51,8 @@ let
     tungsten = {
       system = "x86_64-linux";
       maxJobs = 4;
-      speedFactor = 1;  # Laptop
-      supportedFeatures = [ "kvm" ];
+      speedFactor = 3;  # Core i7-13850HX (28T)
+      supportedFeatures = [ "kvm" "big-parallel" ];
       alwaysOn = false;  # Laptop, not always on
     };
     blacktop = {
@@ -124,9 +143,11 @@ in
     warn-dirty = false;
     # Limit local builds to encourage distribution
     max-jobs = lib.mkDefault (if buildHosts?${hostname} then buildHosts.${hostname}.maxJobs else 2);
-    # Cores per build job (slot). hierro builds locally (distributedBuilds
-    # off), so give it 24; every other host caps each slot at 4.
-    cores = if hostname == "hierro" then 24 else 4;
+    # Cores per build job (logicalCores / 2 on each host; mkTunedScope expands
+    # NIX_BUILD_CORES further across the fleet when /run/icecc/iceccd.socket is up).
+    cores = halfLogicalCores;
+    # Expose optional Icecream daemon socket into strict Nix sandboxes (`?` = skip if absent).
+    extra-sandbox-paths = [ "/run/icecc?" ];
     # Allow z-247 user to be a trusted user for remote builds. `nix-ssh` (the
     # locked role account remote builders connect as) must also be trusted so
     # it can receive *unsigned* build-input pushes over `nix-store --serve`.

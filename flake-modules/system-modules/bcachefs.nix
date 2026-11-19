@@ -22,7 +22,7 @@ in
     boot.supportedFilesystems = [ "bcachefs" ];
     boot.initrd.supportedFilesystems = mkIf cfg.initrd [ "bcachefs" ];
 
-    environment.systemPackages = [ pkgs.bcachefs-tools ];
+    environment.systemPackages = [ pkgs.groupTune.bcachefs-tools ];
 
     # Keep the *booted* generation alive so its kernel modules stay loadable
     # for the running kernel after a switch to a newer kernel. NixOS kmod

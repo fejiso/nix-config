@@ -149,6 +149,12 @@
   # Host-specific networking
   networking.hostName = "butthead";
 
+  # AMD Ryzen 9 5950X (Zen 3)
+  hardware.cpu.tune = {
+    cpu = "znver3";
+    group = "x86-64-v3";
+  };
+
   # Enable container support for media services
   boot.enableContainers = true;
 
@@ -283,7 +289,7 @@
     shadow  # Required for rootless Podman (newuidmap/newgidmap)
 
     # Media tools
-    ffmpeg
+    groupTune.ffmpeg
     mediainfo
 
     # Monitoring

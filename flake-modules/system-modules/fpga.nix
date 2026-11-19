@@ -144,24 +144,24 @@ in {
     # Open-source flow — works out of the box, no license:
     #   yosys (synth) -> nextpnr (P&R; Gowin via himbaechel) -> apycula
     #   (Project Apicula bitstream) -> openFPGALoader (program).
-    pkgs.yosys
-    pkgs.nextpnr
+    pkgs.groupTune.yosys
+    pkgs.groupTune.nextpnr
     pkgs.python3Packages.apycula
     pkgs.openfpgaloader
 
     # Simulation, waveform viewing, linting and formal verification. These are
     # native nix packages (no FHS needed); they're also put on the FHS PATH (via
     # /run/current-system/sw/bin in the vivado runScript) so Vivado can call them.
-    pkgs.verilator                  # fast cycle-based Verilog/SystemVerilog sim
-    pkgs.iverilog                   # Icarus: event-driven Verilog sim
+    pkgs.groupTune.verilator        # fast cycle-based Verilog/SystemVerilog sim
+    pkgs.groupTune.iverilog         # Icarus: event-driven Verilog sim
     pkgs.ghdl                       # VHDL simulator (mcode)
-    pkgs.nvc                        # modern VHDL simulator
+    pkgs.groupTune.nvc              # modern VHDL simulator
     pkgs.gtkwave                    # waveform viewer (VCD/FST)
     pkgs.surfer                     # modern waveform viewer
     pkgs.verible                    # SystemVerilog linter/formatter/LS
     pkgs.python3Packages.cocotb     # Python cosimulation testbenches
     pkgs.sby                        # SymbiYosys: formal verification front-end
-    pkgs.z3                         # SMT solver backend for formal flows
+    pkgs.groupTune.z3               # SMT solver backend for formal flows
 
     # Proprietary vendor toolchains (FHS-wrapped; installer supplied by you).
     # Vivado uses our pixman-patched FHS env (see above); Quartus is upstream;

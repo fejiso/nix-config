@@ -17,6 +17,12 @@
   # Host-specific networking
   networking.hostName = "hispanas";
 
+  # Intel Core i3-3220 (Ivy Bridge — SSE4.2 + POPCNT + AVX + F16C, no AVX2)
+  hardware.cpu.tune = {
+    cpu = "ivybridge";
+    group = "x86-64-v2";
+  };
+
   # bcachefs support (kernel module + bcachefs-tools)
   hardware.bcachefs-support.enable = true;
 

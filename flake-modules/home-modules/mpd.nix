@@ -25,6 +25,7 @@ with lib;
     # MPD - Music Player Daemon
     services.mpd = {
       enable = true;
+      package = pkgs.groupTune.mpd;
       musicDirectory = config.services.mpd-stack.musicDirectory;
       extraConfig = ''
         audio_output {

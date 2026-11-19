@@ -17,8 +17,19 @@
 # and set the soak instance's `package` to its default package. Keep soak
 # hosts on env = "sim" (fleet.toml) so the keyspace never collides with live.
 {
-  flake.modules.nixos.polystack = {
+  flake.modules.nixos.polystack = { lib, pkgs, ... }: {
     imports = [ inputs.polystack.nixosModules.polystack ];
+
+    # Default every polystack instance (and its Crane cargoArtifacts) to the
+    # host's shared groupTune tier while still letting branch soaks override
+    # `package = ...` directly.
+    options.services.polystack.instances = lib.mkOption {
+      type = lib.types.attrsOf (lib.types.submodule {
+        config.package = lib.mkDefault (
+          pkgs.groupTune.tune inputs.polystack.packages.${pkgs.stdenv.hostPlatform.system}.default
+        );
+      });
+    };
   };
 
   # zenoh router daemon — the fleet's inter-site transport hub (hierro).
@@ -46,7 +57,7 @@
           wants = [ "network-online.target" ];
           wantedBy = [ "multi-user.target" ];
           serviceConfig = {
-            ExecStart = "${pkgs.zenoh}/bin/zenohd -l tcp/0.0.0.0:${toString cfg.port}";
+            ExecStart = "${pkgs.groupTune.zenoh}/bin/zenohd -l tcp/0.0.0.0:${toString cfg.port}";
             Restart = "always";
             RestartSec = 5;
             DynamicUser = true;

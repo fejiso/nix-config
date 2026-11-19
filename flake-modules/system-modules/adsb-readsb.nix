@@ -81,7 +81,7 @@ with lib;
 
     (mkIf config.services.adsb-readsb.enable {
       # Install readsb and SDR tools
-      environment.systemPackages = with pkgs; [
+      environment.systemPackages = with pkgs.groupTune; [
         readsb
         rtl-sdr
       ];
@@ -96,7 +96,7 @@ with lib;
           ExecStart = let
             cfg = config.services.adsb-readsb;
             args = [
-              "${pkgs.readsb}/bin/readsb"
+              "${pkgs.groupTune.readsb}/bin/readsb"
               "--device-type ${cfg.deviceType}"
               "--gain ${cfg.gain}"
               "--ppm ${toString cfg.ppm}"

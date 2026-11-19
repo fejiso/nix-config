@@ -15,6 +15,12 @@
   hardware.graphics.enable = lib.mkForce false;
   hardware.graphics.enable32Bit = lib.mkForce false;
 
+  # AMD A8-7410 APU (Carrizo-L / Puma+ — SSE4.2 + POPCNT + AVX + BMI1 + AES-NI, no AVX2)
+  hardware.cpu.tune = {
+    cpu = "btver2";
+    group = "x86-64-v2";
+  };
+
   # Additional server packages
   environment.systemPackages = with pkgs; [
   ];

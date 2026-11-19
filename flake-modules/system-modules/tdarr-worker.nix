@@ -115,15 +115,15 @@ in
 
     extraPackages = mkOption {
       type = types.listOf types.package;
-      default = (with pkgs; [ dovi-tool hdr10plus_tool mkvtoolnix-cli ]) ++ [ hdr10plusToolAv1 ];
-      defaultText = literalExpression "(with pkgs; [ dovi-tool hdr10plus_tool mkvtoolnix-cli ]) ++ [ hdr10plusToolAv1 ]";
+      default = (with pkgs.groupTune; [ ffmpeg handbrake dovi-tool hdr10plus_tool mkvtoolnix-cli ]) ++ [ hdr10plusToolAv1 ];
+      defaultText = literalExpression "(with pkgs.groupTune; [ ffmpeg handbrake dovi-tool hdr10plus_tool mkvtoolnix-cli ]) ++ [ hdr10plusToolAv1 ]";
       description = ''
         Extra packages placed on the Tdarr server/node PATH, for plugins and
         flows that shell out to external tools — e.g. Dolby Vision / HDR10+
         handling (dovi_tool, hdr10plus_tool, hdr10plus_tool_av1) and remuxing
         (mkvextract/mkvmerge). The bundled container images shipped these;
-        native installs do not, so provide them here. ffmpeg is bundled with
-        Tdarr itself.
+        native installs do not, so provide them here. Group-tuned ffmpeg and
+        HandBrakeCLI are also injected via environment variables below.
       '';
     };
 
@@ -187,6 +187,12 @@ in
       (mkIf cfg.serverEnabled {
         tdarr-server = {
           path = cfg.extraPackages;
+          environment = {
+            ffmpegPath = "${pkgs.groupTune.ffmpeg}/bin/ffmpeg";
+            ffprobePath = "${pkgs.groupTune.ffmpeg}/bin/ffprobe";
+            handbrakePath = "${pkgs.groupTune.handbrake}/bin/HandBrakeCLI";
+            mkvpropeditPath = "${pkgs.groupTune.mkvtoolnix-cli}/bin/mkvpropedit";
+          };
           unitConfig = {
             RequiresMountsFor = nonAutomountPaths;
             Requires = automountUnits;
@@ -201,6 +207,12 @@ in
       {
         ${nodeUnit} = {
           path = cfg.extraPackages;
+          environment = {
+            ffmpegPath = "${pkgs.groupTune.ffmpeg}/bin/ffmpeg";
+            ffprobePath = "${pkgs.groupTune.ffmpeg}/bin/ffprobe";
+            handbrakePath = "${pkgs.groupTune.handbrake}/bin/HandBrakeCLI";
+            mkvpropeditPath = "${pkgs.groupTune.mkvtoolnix-cli}/bin/mkvpropedit";
+          };
           unitConfig = {
             RequiresMountsFor = nonAutomountPaths;
             Requires = automountUnits;

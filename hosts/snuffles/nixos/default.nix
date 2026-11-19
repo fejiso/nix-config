@@ -48,6 +48,12 @@
   # Host-specific networking
   networking.hostName = "snuffles";
 
+  # Intel Celeron N3060 (Braswell / Airmont — SSE4.2 + POPCNT + AES-NI, no AVX)
+  hardware.cpu.tune = {
+    cpu = "silvermont";
+    group = "x86-64-v2";
+  };
+
   # ADS-B Readsb decoder with RTL-SDR
   services.adsb-readsb = {
     enable = false;

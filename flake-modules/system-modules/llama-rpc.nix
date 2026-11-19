@@ -14,7 +14,7 @@ let
     vulkan = { vulkanSupport = true; };
   };
 
-  workerPackage = pkgs.llama-cpp.override ({ rpcSupport = true; } // backendFlags.${cfg.worker.gpuBackend});
+  workerPackage = pkgs.cpuTune.llama-cpp.override ({ rpcSupport = true; } // backendFlags.${cfg.worker.gpuBackend});
 
   # Probe all configured workers over netbird and write the reachable ones
   # (comma-separated) to $1. Shared by the master's ExecStartPre and the
@@ -36,7 +36,7 @@ let
     echo "reachable workers: ''${REACHABLE:-<none>}"
   '';
 
-  masterPackage = pkgs.llama-cpp.override { rpcSupport = true; };
+  masterPackage = pkgs.cpuTune.llama-cpp.override { rpcSupport = true; };
 in
 {
   options.services.llama-rpc = {

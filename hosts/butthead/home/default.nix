@@ -31,7 +31,7 @@
   # Media server specific applications
   home.packages = with pkgs; [
     # Media management tools
-    vlc
+    groupTune.vlc
 
     # System monitoring for server
     htop

@@ -14,6 +14,12 @@
   # Enable emulation
   emulation.enable = true;
 
+  # AMD Ryzen 5 2400G (Zen 1 Raven Ridge)
+  hardware.cpu.tune = {
+    cpu = "znver1";
+    group = "x86-64-v3";
+  };
+
   # Host-specific configuration
   # Add desktop environment if this is a desktop system
   services.xserver = {

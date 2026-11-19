@@ -27,6 +27,212 @@ let
       then (finalAttrs: inject (args finalAttrs))
       else inject args
     );
+
+  # Build a lazy package scope that injects -march/-mtune (C/C++), target-cpu
+  # (Rust/Crane), GOAMD64 (Go), and opportunistic Icecream distributed C/C++
+  # compilation (via /run/icecc/iceccd.socket when active) ONLY into derivations
+  # explicitly pulled from the scope (pkgs.cpuTune.<pkg> or pkgs.groupTune.<pkg>),
+  # avoiding global stdenv / reverse-dependency rebuild cascades.
+  # When arch is null/empty (or when cross-compiling), returns `pkgs` unchanged
+  # so unconfigured hosts hit cache.nixos.org 100%.
+  mkTunedScopeWith = rootPkgs: pkgs: arch:
+    let
+      lib = pkgs.lib;
+      isNative = pkgs.stdenv.buildPlatform == pkgs.stdenv.hostPlatform;
+      isX86_64 = pkgs.stdenv.hostPlatform.isx86_64;
+
+      goAmd64 =
+        if !isX86_64 then null
+        else if builtins.elem arch [ "x86-64-v4" "znver4" "znver5" "icelake-client" "icelake-server" "sapphirerapids" ] then "v4"
+        else if builtins.elem arch [ "x86-64-v3" "haswell" "broadwell" "skylake" "alderlake" "raptorlake" "znver1" "znver2" "znver3" ] then "v3"
+        else if builtins.elem arch [ "x86-64-v2" "nehalem" "westmere" "sandybridge" "ivybridge" ] then "v2"
+        else "v1";
+
+      icecreamPkg = rootPkgs.icecream;
+      unwrappedGCC = pkgs.stdenv.cc.cc;
+
+      # Pure Nix-built Icecream compiler environment archive (<md5>.tar.zst) for
+      # this stdenv's exact unwrapped GCC/G++, shipped by iceccd to remote peers.
+      iceccEnv = pkgs.runCommand "icecc-env-${unwrappedGCC.version}" { } ''
+        mkdir -p "$out"
+        cd "$out"
+        "${icecreamPkg}/bin/icecc-create-env" \
+          --gcc "${unwrappedGCC}/bin/gcc" "${unwrappedGCC}/bin/g++" \
+          --compression zstd
+        tarfile=$(ls *.tar.zst)
+        ln -s "$tarfile" env.tar.zst
+      '';
+
+      # Mirror nixpkgs' ccache.links / ccacheStdenv pattern: stdenv.cc (cc-wrapper)
+      # expands all /nix/store header/lib paths + -march flags first, then invokes
+      # our inner wrapper, which dispatches over /run/icecc/iceccd.socket when the
+      # host's icecc-daemon is running and falls back to local GCC otherwise.
+      iceccLinks = pkgs.stdenv.mkDerivation {
+        pname = "icecc-links";
+        inherit (unwrappedGCC) version;
+        passthru = {
+          isClang = unwrappedGCC.isClang or false;
+          isGNU = unwrappedGCC.isGNU or false;
+          isCcache = true;
+        } // builtins.intersectAttrs {
+          hardeningUnsupportedFlagsByTargetPlatform = null;
+          hardeningUnsupportedFlags = null;
+        } unwrappedGCC;
+        lib = lib.getLib unwrappedGCC;
+        buildCommand =
+          let
+            targetPrefix =
+              if unwrappedGCC.isClang or false then ""
+              else lib.optionalString (
+                unwrappedGCC ? targetConfig && unwrappedGCC.targetConfig != null && unwrappedGCC.targetConfig != ""
+              ) "${unwrappedGCC.targetConfig}-";
+          in
+          ''
+            mkdir -p "$out/bin"
+
+            wrapCompiler() {
+              local short="$1"
+              local mode="$2" # "gcc" or "g++"
+              local cname="${targetPrefix}$short"
+              if [ -x "${unwrappedGCC}/bin/$cname" ]; then
+                cat > "$out/bin/$cname" <<EOF
+            #!${pkgs.runtimeShell}
+            if [ -S /run/icecc/iceccd.socket ]; then
+              export ICECC_VERSION="${iceccEnv}/env.tar.zst"
+              export ICECC_TEST_SOCKET="/run/icecc/iceccd.socket"
+              export ICECC_CC="${unwrappedGCC}/bin/$cname"
+              export ICECC_CXX="${unwrappedGCC}/bin/$cname"
+              exec "${icecreamPkg}/bin/icecc" "$mode" "\$@"
+            fi
+            exec "${unwrappedGCC}/bin/$cname" "\$@"
+            EOF
+                chmod +x "$out/bin/$cname"
+              fi
+            }
+
+            wrapCompiler cc  gcc
+            wrapCompiler gcc gcc
+            wrapCompiler c++ g++
+            wrapCompiler g++ g++
+
+            for executable in $(ls "${unwrappedGCC}/bin"); do
+              if [ ! -x "$out/bin/$executable" ]; then
+                ln -s "${unwrappedGCC}/bin/$executable" "$out/bin/$executable"
+              fi
+            done
+            for file in $(ls "${unwrappedGCC}" | grep -vw bin); do
+              ln -s "${unwrappedGCC}/$file" "$out/$file"
+            done
+          '';
+      };
+
+      iceccStdenv = pkgs.overrideCC pkgs.stdenv (pkgs.stdenv.cc.override {
+        cc = iceccLinks;
+      });
+
+      tunePkg = pkg:
+        if !(lib.isDerivation pkg) || !(pkg ? overrideAttrs) then pkg
+        else
+          let
+            canUseIceccStdenv =
+              isX86_64
+              && (pkgs.stdenv.cc.isGNU or false)
+              && (pkg ? override)
+              && ((builtins.tryEval (lib.functionArgs pkg.override)).value ? stdenv)
+              && !(pkg.cudaSupport or false);
+            basePkg =
+              if canUseIceccStdenv
+              then pkg.override { stdenv = iceccStdenv; }
+              else pkg;
+            tuned = basePkg.overrideAttrs (old:
+              let
+                # Note: in GCC/Clang, `-march=<cpu>` automatically implies `-mtune=<cpu>`
+                # for concrete CPUs (znver3, raptorlake, core2, ...) and `-mtune=generic`
+                # for psABI tiers (x86-64-v2, x86-64-v3), where `-mtune=x86-64-v3` is invalid.
+                cflag = "-march=${arch}";
+                rustflag = "-C target-cpu=${arch}";
+                hasEnv = old ? env;
+                oldC =
+                  if hasEnv && (old.env ? NIX_CFLAGS_COMPILE) then toString old.env.NIX_CFLAGS_COMPILE
+                  else if old ? NIX_CFLAGS_COMPILE then toString old.NIX_CFLAGS_COMPILE
+                  else "";
+                oldRust =
+                  if hasEnv && (old.env ? CARGO_BUILD_RUSTFLAGS) then toString old.env.CARGO_BUILD_RUSTFLAGS
+                  else if old ? CARGO_BUILD_RUSTFLAGS then toString old.CARGO_BUILD_RUSTFLAGS
+                  else "";
+                newC = lib.trim "${oldC} ${cflag}";
+                newRust = lib.trim "${oldRust} ${rustflag}";
+                envPatch =
+                  if hasEnv then {
+                    env = old.env // {
+                      NIX_CFLAGS_COMPILE = newC;
+                      CARGO_BUILD_RUSTFLAGS = newRust;
+                    } // lib.optionalAttrs (goAmd64 != null) {
+                      GOAMD64 = goAmd64;
+                    };
+                  } else {
+                    NIX_CFLAGS_COMPILE = newC;
+                    CARGO_BUILD_RUSTFLAGS = newRust;
+                  } // lib.optionalAttrs (goAmd64 != null) {
+                    GOAMD64 = goAmd64;
+                  };
+                cranePatch = lib.optionalAttrs (old ? cargoArtifacts && lib.isDerivation old.cargoArtifacts) {
+                  cargoArtifacts = tunePkg old.cargoArtifacts;
+                };
+                # When Icecream's socket is mounted inside the sandbox, fan make/ninja
+                # out across the fleet's aggregate compile slots (~48); otherwise keep
+                # the host's local NIX_BUILD_CORES (logicalCores / 2).
+                iceccParallelPatch = lib.optionalAttrs canUseIceccStdenv {
+                  preBuild = ''
+                    if [ -S /run/icecc/iceccd.socket ] && [ "''${enableParallelBuilding:-1}" = "1" ]; then
+                      export NIX_BUILD_CORES=48
+                    fi
+                  '' + (old.preBuild or "");
+                };
+              in
+              envPatch // cranePatch // iceccParallelPatch
+            );
+          in
+          if pkg ? override then
+            tuned // {
+              override = args: tunePkg (pkg.override args);
+            }
+          else tuned;
+
+      specialRecipes = {
+        # Tune an arbitrary external derivation (e.g. flake input packages like polystack).
+        tune = tunePkg;
+
+        # Propagate tuning into pkgs.unstable when accessed as pkgs.{cpuTune,groupTune}.unstable.<pkg>.
+        unstable = mkTunedScopeWith rootPkgs pkgs.unstable arch;
+
+        # mpv is a symlinkJoin wrapper around mpv-unwrapped.
+        mpv = pkgs.mpv.override {
+          mpv-unwrapped = tunePkg pkgs.mpv-unwrapped;
+        };
+
+        # retroarch-full is a symlinkJoin wrapper around retroarch-bare + libretro
+        # cores. Tune retroarch-bare and all fast cores, while keeping giant
+        # libretro-mame* cores on cache.nixos.org.
+        retroarch-full =
+          let
+            tunedBare = tunePkg pkgs.retroarch-bare;
+            tunedWrapper = (tunedBare.override { retroarch-bare = tunedBare; }).wrapper { };
+          in
+          tunedWrapper.withCores (cores:
+            map
+              (c: if lib.hasInfix "mame" c.name then c else tunePkg c)
+              (lib.filter (c:
+                (c ? libretroCore)
+                && (lib.meta.availableOn pkgs.stdenv.hostPlatform c)
+                && !(lib.hasInfix "fbalpha2012" c.name)
+              ) (lib.attrValues cores))
+          );
+      };
+    in
+    if arch == null || arch == "" || !isNative
+    then pkgs
+    else (lib.mapAttrs (_: v: tunePkg v) pkgs) // specialRecipes;
 in {
   # This one brings our custom packages from the 'pkgs' directory
   additions = final: prev: {
@@ -264,6 +470,35 @@ in {
         hash = old.src.outputHash;
       };
     });
+
+    # Upstream icecream's icecc-create-env hardcodes FHS paths (/usr/bin/md5sum,
+    # /bin/true) that don't exist on NixOS, producing an unverified ".tar.zst"
+    # with an empty MD5 prefix. Patch in coreutils + runtime tool PATH.
+    icecream = prev.icecream.overrideAttrs (old: {
+      nativeBuildInputs = (old.nativeBuildInputs or [ ]) ++ [ prev.makeWrapper ];
+      postFixup = (old.postFixup or "") + ''
+        substituteInPlace "$out/bin/icecc-create-env" \
+          --replace-fail 'for file in /usr/bin/md5sum' 'for file in ${prev.coreutils}/bin/md5sum /usr/bin/md5sum' \
+          --replace-fail 'if test -x /bin/true; then' 'if test -x ${prev.coreutils}/bin/true; then' \
+          --replace-fail 'add_file /bin/true' 'add_file ${prev.coreutils}/bin/true /bin/true'
+        wrapProgram "$out/bin/icecc-create-env" \
+          --prefix PATH : "${prev.lib.makeBinPath (with prev; [
+            coreutils gnutar zstd gzip bzip2 xz file findutils gnused gnugrep gawk glibc.bin
+          ])}"
+      '';
+    });
+
+    # sccache built with distributed client + scheduler + build-server support.
+    sccache-dist = prev.sccache.override { distributed = true; };
+
+    # Baseline no-op tuning scopes (overridden per NixOS host by
+    # flake-modules/system/cpu-tune.nix when hardware.cpu.tune.{cpu,group} is set).
+    # Unconfigured hosts, cross-compiled targets, and standalone Home Manager
+    # configs default to stock x86_64-linux / cache.nixos.org.
+    tune = prev.tune or (x: x);
+    mkTunedScope = mkTunedScopeWith final final;
+    cpuTune = prev.cpuTune or final;
+    groupTune = prev.groupTune or final;
   };
 
   # Force every buildGo*Module vendor fetch through GOPROXY=direct / GOSUMDB=off.
@@ -370,16 +605,6 @@ in {
               --replace-fail 'await smokeModels(binaryPath)' \
                              'console.log("skipped models smoke test (nix sandbox)")'
           '';
-        });
-
-        # opencode 2.2.5 upstream FOD hash for node_modules in nixpkgs-unstable
-        # is mismatched (specified sha256-xfOVcw1+waLVNhFDwzOtzxrUSQEogvn88YomydOlhwc=
-        # but evaluates to sha256-prx9dX7kUvs/E3zopkaPk5LXh3xJAy5sZeum/W8L7cA=).
-        # Override outputHash until upstream nixpkgs updates the package.
-        opencode = uprev.opencode.overrideAttrs (old: {
-          node_modules = old.node_modules.overrideAttrs (_: {
-            outputHash = "sha256-prx9dX7kUvs/E3zopkaPk5LXh3xJAy5sZeum/W8L7cA=";
-          });
         });
       });
   };

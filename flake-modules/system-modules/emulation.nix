@@ -11,35 +11,35 @@ with lib;
   };
 
   config = mkIf config.emulation.enable {
-    environment.systemPackages = with pkgs; [
-      # RetroArch (can serve as frontend)
-      retroarch-full
-      retroarch-assets
-      retroarch-joypad-autoconfig
-      librashader
-      libretro-shaders-slang
+    environment.systemPackages = [
+      # RetroArch (bare + non-MAME cores group-tuned; libretro-mame* kept cached)
+      pkgs.groupTune.retroarch-full
+      pkgs.retroarch-assets
+      pkgs.retroarch-joypad-autoconfig
+      pkgs.librashader
+      pkgs.libretro-shaders-slang
 
       # DOS
-      dosbox-staging
-      dosbox-x
+      pkgs.groupTune.dosbox-staging
+      pkgs.groupTune.dosbox-x
 
       # Retro computers
-      x16-emulator
+      pkgs.groupTune.x16-emulator
 
       # Nintendo
-      dolphin-emu  # GameCube/Wii
+      pkgs.groupTune.dolphin-emu  # GameCube/Wii
 
       # Sony
-      pcsx2        # PS2
-      ppsspp       # PSP
+      pkgs.groupTune.pcsx2        # PS2
+      pkgs.groupTune.ppsspp       # PSP
 
-      # Arcade
-      mame
+      # Arcade (kept on cache.nixos.org — ~60m C++ build)
+      pkgs.mame
 
       # image management
-      mame-tools
-      _7zz
-      unrar
+      pkgs.mame-tools
+      pkgs.groupTune._7zz
+      pkgs.unrar
     ];
   };
 }

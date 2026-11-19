@@ -60,6 +60,12 @@
   # Host-specific networking
   networking.hostName = "blacktop";
 
+  # AMD Ryzen 7 4700U (Zen 2 Renoir)
+  hardware.cpu.tune = {
+    cpu = "znver2";
+    group = "x86-64-v3";
+  };
+
   # Tdarr worker node (native NixOS service)
   services.tdarr-worker = {
     enable = true;

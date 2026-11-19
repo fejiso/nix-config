@@ -1169,8 +1169,8 @@
     '';
 
     # Host-independent compiled SDR++ package so C++ compilation happens once
-    # across the entire fleet instead of per-host.
-    sdrppUnwrapped = (pkgs.sdrpp.override {
+    # across each ISA group tier instead of per-host.
+    sdrppUnwrapped = (pkgs.groupTune.sdrpp.override {
       airspy_source = true;
       rtl_sdr_source = true;
       sdrplay_source = true;
@@ -2226,7 +2226,7 @@
     # SDRangel with exact Remote TCP device selection and opt-in lazy acquisition.
     # Upstream starts the source immediately and ignores --remote-tcp-serial;
     # neither behavior is safe for a permanently running shared SDR host.
-    sdrangelCustom = pkgs.sdrangel.overrideAttrs (old: {
+    sdrangelCustom = pkgs.groupTune.sdrangel.overrideAttrs (old: {
       postPatch = (old.postPatch or "") + ''
         # Honor --remote-tcp-serial when selecting the device to export.
         substituteInPlace sdrbase/channel/channelwebapiutils.h \
@@ -2601,8 +2601,8 @@ class BasebandSampleSink;
           pkgs.airspy             # Airspy Mini: airspy_info, airspy_rx, airspy_spiflash
         ]
         ++ lib.optionals cfg.devices.rtlsdr [
-          pkgs.rtl-sdr            # RTL-SDR: rtl_test, rtl_fm, rtl_tcp, rtl_power, rtl_sdr
-          pkgs.rtl_433            # ISM band (433/868/915 MHz) protocol decoder
+          pkgs.groupTune.rtl-sdr  # RTL-SDR: rtl_test, rtl_fm, rtl_tcp, rtl_power, rtl_sdr
+          pkgs.groupTune.rtl_433  # ISM band (433/868/915 MHz) protocol decoder
         ]
         ++ lib.optionals cfg.devices.sdrplay [
           pkgs.sdrplay            # SDRplay RSP1/RSP1A API & service
@@ -2619,7 +2619,7 @@ class BasebandSampleSink;
           pkgs.gqrx               # Gqrx SDR receiver
           pkgs.cubicsdr           # CubicSDR receiver
           sdrangelCustom          # SDRangel Rx/Tx workstation + channel decoders
-          pkgs.satdump            # SatDump satellite & general SDR receiver/decoder
+          pkgs.groupTune.satdump  # SatDump satellite & general SDR receiver/decoder
           pkgs.sigdigger          # SigDigger real-time blind signal analyzer
           pkgs.quisk              # Quisk ham transceiver GUI
           pkgs.gnuradio           # GNU Radio + GNU Radio Companion
