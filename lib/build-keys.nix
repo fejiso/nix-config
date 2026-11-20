@@ -25,6 +25,10 @@
       hostPublicKey = "AAAAC3NzaC1lZDI1NTE5AAAAINQePaMUwEu3oPfVMg/Yk9BiX6QbDmxRBC3Icnd1GkGQ";
       nixPublicKey = "blacktop.netbird.cloud:B5ESfgNFS512fO1c6AlX3kW7L0gp77vC6FdU/KhrEEI=";
     };
+    blacktop = {
+      hostPublicKey = "AAAAC3NzaC1lZDI1NTE5AAAAIG6D0pkccfOXCqRSyRhBDH1FJgUtksB27Hofei0+ZNBY";
+      nixPublicKey = "";
+    };
     elitedex = {
       hostPublicKey = "AAAAC3NzaC1lZDI1NTE5AAAAIIjL5IsHvPwtZhjj3VYpcKMoA68f7MlHvayhakVwdG+E";
       nixPublicKey = "";
