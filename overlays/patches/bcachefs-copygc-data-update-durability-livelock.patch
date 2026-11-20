@@ -60,10 +60,9 @@ Four interacting bugs cause or compound this stall:
 4. bch2_copygc_can_make_progress() ignored c->opts.copygc_enabled, leaving
    foreground allocators waiting forever if copygc_enabled is disabled via
    sysfs.
-
 --- a/fs/data/extents.h
 +++ b/fs/data/extents.h
-@@ -682,6 +682,8 @@
+@@ -693,6 +693,8 @@
  };
  
  int bch2_bkey_durability(struct btree_trans *, struct bkey_s_c, struct bkey_durability *);
@@ -74,7 +73,7 @@ Four interacting bugs cause or compound this stall:
  
 --- a/fs/data/extents.c
 +++ b/fs/data/extents.c
-@@ -1064,6 +1064,69 @@
+@@ -1083,6 +1083,69 @@
  	return 0;
  }
  
@@ -146,7 +145,7 @@ Four interacting bugs cause or compound this stall:
  	BUG_ON(!bkey_is_btree_ptr(k.k));
 --- a/fs/data/update.c
 +++ b/fs/data/update.c
-@@ -995,6 +995,7 @@
+@@ -1000,6 +1000,7 @@
  	struct bch_fs *c = trans->c;
  	CLASS(disk_reservation, res)(c); /* extents btree updates always require a disk res passed in */
  
@@ -154,7 +153,7 @@ Four interacting bugs cause or compound this stall:
  	struct bkey_i *n = errptr_try(bch2_bkey_make_mut_noupdate(trans, k));
  
  	if (data_opts->ptrs_kill_ec)
-@@ -1011,6 +1012,16 @@
+@@ -1016,6 +1017,16 @@
  	bch2_bkey_drop_extra_cached_ptrs(c, io_opts, bkey_i_to_s(n));
  
  	/*
@@ -171,7 +170,7 @@ Four interacting bugs cause or compound this stall:
  	 * Since we're not inserting through an extent iterator
  	 * (BTREE_ITER_all_snapshots iterators aren't extent iterators),
  	 * we aren't using the extent overwrite path to delete, we're
-@@ -1249,27 +1260,11 @@
+@@ -1254,27 +1265,11 @@
  	struct bch_devs_list devs_have = {};
  	unsigned durability_keeping = 0;
  
@@ -204,7 +203,7 @@ Four interacting bugs cause or compound this stall:
  
  	if (!bkey_is_btree_ptr(k.k) &&
  	    !data_opts->extra_replicas &&
-@@ -1277,7 +1272,9 @@
+@@ -1282,7 +1277,9 @@
  		return 0;
  
  	if (trace)
@@ -215,7 +214,7 @@ Four interacting bugs cause or compound this stall:
  
  	int ret = __bch2_can_do_write(c, opts, data_opts, &devs_have, k, trace);
  	if (ret)
-@@ -1433,22 +1430,15 @@
+@@ -1440,22 +1437,15 @@
  	if (m->opts.ptrs_kill)
  		checksummed_and_non_checksummed_handling(m, ptrs);
  
@@ -246,7 +245,7 @@ Four interacting bugs cause or compound this stall:
  		/*
  		 * op->csum_type is normally initialized from the fs/file's
  		 * current options - but if an extent is encrypted, we require
-@@ -1470,8 +1460,6 @@
+@@ -1477,8 +1467,6 @@
  
  		buf_bytes = max_t(unsigned, buf_bytes, p.crc.uncompressed_size << 9);
  		unwritten |= p.ptr.unwritten;
@@ -254,10 +253,10 @@ Four interacting bugs cause or compound this stall:
 -		ptr_bit <<= 1;
  	}
  
- 	if (m->opts.type != BCH_DATA_UPDATE_scrub &&
+ 	if (!data_update_is_scrub(m->opts.type)) {
 --- a/fs/data/move.c
 +++ b/fs/data/move.c
-@@ -406,7 +406,7 @@
+@@ -430,7 +430,7 @@
  		ret = btree_trans_restart(trans, BCH_ERR_transaction_restart_nested);
  	}
  
@@ -266,7 +265,7 @@ Four interacting bugs cause or compound this stall:
  	    !ctxt->stats->phys)
  		atomic64_add(!bkey_is_btree_ptr(k.k)
  			     ? k.k->size
-@@ -740,7 +740,7 @@
+@@ -898,7 +898,7 @@
  
  		if (bch2_err_matches(ret, BCH_ERR_transaction_restart))
  			continue;

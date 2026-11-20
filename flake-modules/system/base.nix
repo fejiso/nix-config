@@ -26,6 +26,31 @@
       "**/.vscode"
       "**/.platformio"
       "**/poly_frame"
+      # Electron / Chromium / CEF / Zoom caches outside ~/.cache
+      "**/.zoom/data"
+      "**/cefcache"
+      "**/.config/**/Cache"
+      "**/.config/**/CachedData"
+      "**/.config/**/CachedExtensionVSIXs"
+      "**/.local/share/**/Cache"
+      "**/Code Cache"
+      "**/GPUCache"
+      "**/*ShaderCache*"
+      "**/Dawn*Cache*"
+      "**/Service Worker/CacheStorage"
+      "**/Service Worker/ScriptCache"
+      # Rust / toolchain / nested Nix store caches (chroots, nixos-containers, rootfses)
+      "**/.cargo/registry"
+      "**/.cargo/git"
+      "**/.rustup"
+      "**/nix/store"
+      # Root-anchored /var/lib high-churn trees (leading '/' anchors to source root,
+      # so /home/<user>/dev/docker etc. are unaffected)
+      "/containers/storage"
+      "/docker"
+      "/libvirt/images"
+      "/ktest"
+      "/kopia"
     ];
 
     nixpkgs = {

@@ -47,70 +47,9 @@
   # Home Assistant OS VM
   services.haos-vm.enable = true;
 
-  # bcachefs support (kernel module + bcachefs-tools)
+  # bcachefs support (kernel module + bcachefs-tools; local patches C, F, G
+  # applied globally in overlays/default.nix on top of 1.39.7 — see bcachefs-patchz.md)
   hardware.bcachefs-support.enable = true;
-
-  # Stale needs_reconcile fix (patch A, proven on hispanas - see
-  # bcachefs-patchz.md/disks.md): bch2_stripe_repair() early-returns on
-  # non-degraded stripes without clearing needs_reconcile, so stripes flagged
-  # during transient device states spin in reconcile_hipri forever and starve
-  # real repair work. On butthead this additionally wedged the pool on two
-  # consecutive mounts (1.39.5 and vanilla 1.39.6): reconcile parked in
-  # closure_sync_unbounded processing the ~445k-stripe hipri backlog,
-  # deadlocking wb_flush/ec_stripe_create/copygc behind btree node locks -
-  # writes crawled to ~0.7MB/s and `device remove 6` could never drain its
-  # 6152 dead stripe buckets. stripe_degraded() counts evacuating devices as
-  # degraded, so the dev-6 removal path is unaffected by this patch.
-  # The second patch (device-remove-dead-stripes) fixes two removal dead
-  # ends proven in ktest (see bcachefs-patchz.md "Patch C"): repair never
-  # reaped degraded-but-empty stripes, and the removal scan loop outran the
-  # reconcile repair it enqueues (10 rapid scans, no waiting).
-  # The third patch (device-remove-orphan-stripe-buckets) sweeps stripe
-  # buckets whose stripe key is gone (1.39.5-era fold-bug orphans: no stripe
-  # key, no backpointer) when the removal scan stalls - butthead's dev-6 has
-  # 6152 of them, verified via list -b stripes 2026-09-19.
-  # Drop when fixed upstream.
-  # The fourth patch (userspace-percpu-thread-cap) is TOOLS-ONLY (linux/
-  # shim, not the kernel module): offline fsck aborts mid-repair with
-  # "bch_percpu_thread_init: too many threads (max 256)" -> SIGABRT -
-  # every short-lived workqueue worker permanently burns one of 256
-  # percpu slots, and a repair run with thousands of fixes on slow
-  # devices spawns more than that. Hit twice on butthead 2026-09-20
-  # during check_reconcile_work; slots are NORESERVE address space so
-  # the cap is raised to 8192. Drop when upstream releases slots of
-  # exited threads.
-  # The fifth patch (ec-bound-stripe-reuse, Patch F) bounds the stripe_reuse()
-  # candidate search and filters mismatched disk_labels/algorithm/nr_redundant
-  # early. On pools with multiple tiers (e.g. CMR + SMR), writes to one tier
-  # spun in stripe_reuse() examining thousands of mismatched stripes from the
-  # other tier under intent locks without bounding, pinning flush-bcachefs-*
-  # at 100% CPU and collapsing writeback throughput to <1 MB/s. Candidate
-  # evaluation is capped at 128 matching candidates and 512 total visited keys,
-  # falling through cleanly to new_stripe_alloc_buckets().
-  # The sixth patch (copygc-data-update-durability-livelock, Patch G) fixes a
-  # copygc livelock hit on butthead 2026-11-20 (see bcachefs-patchz.md "Patch G"):
-  # bch2_data_update_init() summed per-pointer durability without device
-  # deduplication, picking nr_replicas=0 on shared-device EC+replica extents
-  # while bch2_extent_drop_ptrs() checked whole-key deduplicated online
-  # durability and committed a no-op, spinning bch-copygc forever at ~3k
-  # evacuations/s and starving foreground allocations across 8 full drives.
-  # Also fixes move.c no-op sectors_seen counting and copygc.c EC stripe
-  # selection (ret2=1 positive return abort, can_widen full-stripe head, and
-  # bucket_frag_ratio==0).
-  nixpkgs.overlays = [
-    (_final: prev: {
-      bcachefs-tools = prev.bcachefs-tools.overrideAttrs (old: {
-        patches = (old.patches or [ ]) ++ [
-          ../../../overlays/patches/bcachefs-stripe-repair-clear-stale-needs-reconcile.patch
-          ../../../overlays/patches/bcachefs-device-remove-dead-stripes.patch
-          ../../../overlays/patches/bcachefs-device-remove-orphan-stripe-buckets.patch
-          ../../../overlays/patches/bcachefs-userspace-percpu-thread-cap.patch
-          ../../../overlays/patches/bcachefs-ec-bound-stripe-reuse.patch
-          ../../../overlays/patches/bcachefs-copygc-data-update-durability-livelock.patch
-        ];
-      });
-    })
-  ];
 
   # llama.cpp RPC worker for hierro's distributed inference master
   # (CUDA build compiles from source on first deploy)

@@ -15,7 +15,7 @@ set -u
 FSUUID=de105d4d-df96-444c-8fdb-b616c589a422
 SYS=/sys/fs/bcachefs/$FSUUID
 POOL_USERS="media-podman utils-podman soundcork nginx-proxy-manager"
-SYS_SERVICES="tdarr-node-butthead_worker.service tdarr-server.service nfs-server.service nfs-mountd.service nfs-idmapd.service rpcbind.service rpcbind.socket kopia-server.service kopia-register-clients.service"
+SYS_SERVICES="heimdall-sync-watchdog.timer bor.service heimdalld.service bor-snapshot-fetch.service heimdall-snapshot-fetch.service tdarr-node-butthead_worker.service tdarr-server.service nfs-server.service nfs-mountd.service nfs-idmapd.service rpcbind.service rpcbind.socket kopia-maintenance.timer kopia-maintenance.service kopia-register-clients.timer kopia-server.service kopia-register-clients.service"
 # NFS-export bind mounts are SIBLINGS of /mnt/user, not children
 BIND_MOUNTS="/mnt/Series /mnt/Movies /mnt/downloadtemp"
 
@@ -38,8 +38,8 @@ running_kver=$(uname -r)
 [ "$vermagic" = "$running_kver" ] \
   || die "module vermagic ($vermagic) != running kernel ($running_kver) - aborting before unmount!"
 say "swapping to module: $deployed ($MODULE, vermagic $vermagic)"
-echo "$deployed" | grep -q '^1\.39\.6$' \
-  || die "module is $deployed, expected 1.39.6 - wrong module?"
+echo "$deployed" | grep -qE '^1\.[0-9]+\.[0-9]+' \
+  || die "unexpected module version '$deployed' - wrong module?"
 say "loaded module:      $(cat /sys/module/bcachefs/version 2>/dev/null || echo 'not loaded')"
 
 # Guard against calling umount while flush-bcachefs-* is parked in
@@ -59,36 +59,61 @@ for flusher in /proc/[0-9]*/comm; do
 done
 
 # --- stop everything that uses the pool ------------------------------------
+WAS_BOR_ACTIVE=0
+systemctl is-active --quiet bor.service 2>/dev/null && WAS_BOR_ACTIVE=1
+
 say "stopping system services: $SYS_SERVICES"
-systemctl stop $SYS_SERVICES
+systemctl stop $SYS_SERVICES 2>/dev/null || true
 # nfsd is kernel-side: make sure all exports are actually dropped
 exportfs -ua 2>/dev/null || true
 
 for u in $POOL_USERS; do
   if id "$u" >/dev/null 2>&1; then
-    say "terminating user manager: $u"
-    loginctl terminate-user "$u"
+    uid=$(id -u "$u")
+    say "stopping user manager: $u (user@$uid.service)"
+    systemctl stop "user@$uid.service" 2>/dev/null || true
+    loginctl terminate-user "$u" 2>/dev/null || true
   fi
 done
 
+find_pool_holders() {
+  {
+    find /proc/[0-9]*/cwd /proc/[0-9]*/root /proc/[0-9]*/fd -maxdepth 1 \
+      \( -lname '/mnt/user*' -o -lname '/mnt/bcachefs*' \
+         -o -lname '/mnt/Series*' -o -lname '/mnt/Movies*' \
+         -o -lname '/mnt/downloadtemp*' \) \
+      -printf '%H %l\n' 2>/dev/null \
+      | awk '{
+          split($1, a, "/"); pid = a[3];
+          if (!seen[pid]++) {
+            comm = ""; getline comm < ("/proc/" pid "/comm"); close("/proc/" pid "/comm");
+            print pid, comm, $2
+          }
+        }'
+    grep -lE '/mnt/(user|bcachefs|Series|Movies|downloadtemp)' /proc/[0-9]*/maps 2>/dev/null \
+      | awk -F/ '{
+          pid = $3;
+          comm = ""; getline comm < ("/proc/" pid "/comm"); close("/proc/" pid "/comm");
+          print pid, comm, "(mmap)"
+        }'
+  } | sort -u -k1,1n
+}
+
 # --- wait for file handles to drain ----------------------------------------
 say "waiting for open handles on /mnt/user + /mnt/bcachefs to clear"
+holders=""
 for i in $(seq 1 30); do
-  holders=$(
-    for p in /proc/[0-9]*; do
-      for f in "$p"/cwd "$p"/root "$p"/fd/*; do
-        r=$(readlink "$f" 2>/dev/null) || continue
-        case "$r" in
-          /mnt/user*|/mnt/bcachefs*|/mnt/Series*|/mnt/Movies*|/mnt/downloadtemp*) echo "$p $(cat "$p"/comm 2>/dev/null) $r"; break;;
-        esac
-      done
-    done)
+  holders=$(find_pool_holders)
   [ -z "$holders" ] && break
+  if [ "$i" = 1 ] || [ $((i % 5)) = 0 ]; then
+    say "still open (${i}/30s):"
+    echo "$holders" | sed 's/^/    /' | head -20
+  fi
   sleep 1
 done
 if [ -n "$holders" ]; then
-  echo "$holders" | head -20
-  die "pool still busy after 30s - stop the above and retry"
+  echo "$holders" | head -30
+  die "pool still busy after 30s - close/stop the above (e.g. reconcile status / shell cwd) and retry"
 fi
 
 # --- unmount ----------------------------------------------------------------
@@ -132,7 +157,10 @@ echo 1 > "$SYS/internal/trigger_reconcile_pending_wakeup"
 
 # --- restart services ----------------------------------------------------------
 say "restarting services"
-systemctl start kopia-server.service nfs-server.service tdarr-server.service tdarr-node-butthead_worker.service
+systemctl start kopia-server.service kopia-register-clients.timer kopia-maintenance.timer nfs-server.service tdarr-server.service tdarr-node-butthead_worker.service heimdalld.service heimdall-sync-watchdog.timer
+if [ "$WAS_BOR_ACTIVE" = 1 ]; then
+  systemctl start bor.service
+fi
 for u in $POOL_USERS; do
   uid=$(id -u "$u" 2>/dev/null) && systemctl start "user@$uid"
 done

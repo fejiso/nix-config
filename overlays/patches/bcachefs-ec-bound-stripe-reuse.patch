@@ -28,10 +28,9 @@ Fix:
    128 matching-tier candidates and total LRU entries visited at 512. If no
    reusable stripe is found, return -BCH_ERR_stripe_alloc_blocked so
    __stripe_alloc_or_reuse() falls through to new_stripe_alloc_buckets().
-
 --- a/fs/data/ec/create.c
 +++ b/fs/data/ec/create.c
-@@ -1622,7 +1622,8 @@
+@@ -1683,7 +1683,8 @@
  
  static int get_old_stripe(struct btree_trans *trans,
  			  struct ec_stripe_new *new,
@@ -41,7 +40,7 @@ Fix:
  {
  	struct bch_fs *c = trans->c;
  
-@@ -1656,6 +1657,18 @@
+@@ -1717,6 +1718,18 @@
  	}
  
  	/*
@@ -60,7 +59,7 @@ Fix:
  	 * Demote can_widen if the RW-member set for this disk_label has shrunk
  	 * since the last reconcile_scan_stripes pass: a stale-high value would
  	 * keep a non-widenable stripe at the top of the LRU, blocking real
-@@ -1805,14 +1818,34 @@
+@@ -1897,14 +1910,34 @@
  	struct bch_fs *c = trans->c;
  	struct bkey_s_c lru_k;
  	int ret = 0;

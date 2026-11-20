@@ -29,11 +29,9 @@ remove_by_backpointer_did_not_terminate):
    rescanning, so the async work the scan itself enqueued has wall-clock
    time to produce a new low. The stall counter still terminates a
    genuine livelock.
-
---- a/fs/data/ec/create.c
 --- a/fs/data/ec/create.c
 +++ b/fs/data/ec/create.c
-@@ -2374,8 +2374,27 @@
+@@ -2562,8 +2562,27 @@
  	for_each_data_block(i, nr_data)
  		nr_live_data_blocks += stripe_blockcount_get(old_s, i) != 0;
  
@@ -75,7 +73,7 @@ remove_by_backpointer_did_not_terminate):
  
  #include "journal/journal.h"
  
-@@ -288,6 +291,17 @@
+@@ -301,6 +304,17 @@
  			prt_printf(err, "%s(): no progress after %u scans, %llu data buckets remain\n",
  				   __func__, nr_stalled, data_buckets);
  			return bch_err_throw(c, remove_by_backpointer_did_not_terminate);

@@ -118,13 +118,25 @@ in {
       # (as root@<host> — the repo + maintenance owner), so admin operations
       # the backup-user-via-server context denies (maintenance, repository
       # change-password, repair, maintenance info) just work. Forwards args.
-      environment.systemPackages = [
-        (pkgs.writeShellScriptBin "kopia-admin" ''
-          set -euo pipefail
-          export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_repo_password.path})"
-          exec ${kopia}/bin/kopia --config-file /var/lib/kopia/.config/kopia/repository.config "$@"
-        '')
-      ];
+      environment.systemPackages =
+        let
+          kopiaAdmin = pkgs.writeShellScriptBin "kopia-admin" ''
+            set -euo pipefail
+            export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_repo_password.path})"
+            exec ${kopia}/bin/kopia --config-file /var/lib/kopia/.config/kopia/repository.config "$@"
+          '';
+          kopiaDu = pkgs.writeShellScriptBin "kopia-du" ''
+            set -euo pipefail
+            export PATH="${lib.makeBinPath [ kopiaAdmin pkgs.coreutils ]}:$PATH"
+            exec ${pkgs.python3}/bin/python3 ${../../scripts/kopia-du.py} \
+              --kopia-cmd "${kopiaAdmin}/bin/kopia-admin" \
+              --repo-config /var/lib/kopia/.config/kopia/repository.config \
+              "$@"
+          '';
+        in [
+          kopiaAdmin
+          kopiaDu
+        ];
 
       systemd.services.kopia-server = {
         description = "Kopia Repository Server";
@@ -168,6 +180,13 @@ in {
           echo "$FINGERPRINT" > ${cfg.repoPath}/server-fingerprint
           chmod 0644 ${cfg.repoPath}/server-fingerprint
           echo "Server fingerprint published: $FINGERPRINT"
+
+          # Ensure this server host owns repository maintenance (kopia server
+          # clients connect as backup-user@<host> and cannot run GC/maintenance).
+          ${kopia}/bin/kopia maintenance set \
+            --owner="root@${hostname}" \
+            --enable-quick=true \
+            --enable-full=true
 
           # Set repo-wide global policy (retention + ignores) via the direct
           # repo connection. All clients inherit these automatically — they
@@ -241,6 +260,54 @@ in {
           OnBootSec = "30s";
           OnUnitActiveSec = "60s";
           AccuracySec = "10s";
+        };
+      };
+
+      # Daily full repository maintenance + global snapshot expiration.
+      # Crucial in `kopia server` deployments: clients connect via HTTPS as
+      # restricted `backup-user@<host>` accounts (which cannot run repository
+      # GC/maintenance, and offline/retired hosts never expire their own old
+      # snapshots), while `kopia server start` itself does not run full GC
+      # unless triggered as the direct repository maintenance owner.
+      systemd.services.kopia-maintenance = {
+        description = "Kopia Repository Expiration & Full Maintenance (GC)";
+        after = [ "sops-nix.service" "kopia-server.service" ];
+        wants = [ "kopia-server.service" ];
+        environment = {
+          HOME = "/var/lib/kopia";
+        };
+        path = [ kopia ];
+        serviceConfig = {
+          Type = "oneshot";
+          IOSchedulingClass = "idle";
+          CPUSchedulingPolicy = "idle";
+        };
+        script = ''
+          set -euo pipefail
+          export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_repo_password.path})"
+          CFG="/var/lib/kopia/.config/kopia/repository.config"
+
+          echo "Ensuring maintenance owner is root@${hostname}..."
+          ${kopia}/bin/kopia --config-file "$CFG" maintenance set \
+            --owner="root@${hostname}" \
+            --enable-quick=true \
+            --enable-full=true
+
+          echo "Expiring snapshots across all hosts against retention policies..."
+          ${kopia}/bin/kopia --config-file "$CFG" snapshot expire --all --delete
+
+          echo "Running Kopia full maintenance (snapshot GC + pack compaction + blob deletion)..."
+          ${kopia}/bin/kopia --config-file "$CFG" maintenance run --full
+        '';
+      };
+
+      systemd.timers.kopia-maintenance = {
+        description = "Run Kopia repository expiration and full GC daily";
+        wantedBy = [ "timers.target" ];
+        timerConfig = {
+          OnCalendar = "*-*-* 04:30:00";
+          Persistent = true;
+          RandomizedDelaySec = "15m";
         };
       };
 

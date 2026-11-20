@@ -470,37 +470,27 @@ in {
       })
       else { };
 
-    # Pin bcachefs to 1.39.6: fixes EC stripe allocation non-convergence
-    # (stripe reuse now engages instead of allocating at BCH_WATERMARK_stripe
-    # against copygc, deadlocking stripe creation on a partly-full array) and
-    # the ec_stripe_new leak on failed allocations. On 1.39.2, butthead's pool
-    # had 9.19T of stripe rework + 280G of data permanently parked in
-    # reconcile's pending queue ("watermark: stripe" allocation failures).
-    # 1.39.6 additionally fixes the ec_stripe_create() old-stripe fold leak
-    # (b1f067414) and reuse-fail aborts (b4bcf1867) - candidates for why
-    # `device remove` on butthead's sdj1 stalled with 6152 dead stripe buckets
-    # (remove_by_backpointer_did_not_terminate).
-    # The out-of-tree kernel module (linuxPackages.*.bcachefs) builds from
-    # bcachefs-tools.dkms, so it follows this pin automatically.
-    # Drop once nixpkgs ships >= 1.39.6.
-    bcachefs-tools = prev.bcachefs-tools.overrideAttrs (old: rec {
-      version = "1.39.6";
-      src = final.fetchFromGitHub {
-        owner = "koverstreet";
-        repo = "bcachefs-tools";
-        tag = "v${version}";
-        hash = "sha256-cBYn/g6eLT5rTumo4Y24rWSHS2Sc7gFthPuCg1AQ22k=";
-      };
-      cargoDeps = final.rustPlatform.fetchCargoVendor {
-        inherit src;
-        hash = "sha256-djiIwZie9HjQ/+bCEGniMFkJA66oI0n+9y9Iax4GHOM=";
-      };
-      # 1.39.3+ installs a systemd mount generator; without an override its
-      # Makefile resolves systemdsystemgeneratordir via pkg-config into the
-      # (read-only) systemd store path and the install fails. Same fix as
-      # nixpkgs' existing PKGCONFIG_SERVICEDIR/PKGCONFIG_UDEVDIR entries.
-      makeFlags = (old.makeFlags or [ ]) ++ [
-        "PKGCONFIG_GENERATORDIR=$(out)/lib/systemd/system-generators"
+    # Local bcachefs patches on top of nixpkgs' bcachefs-tools (1.39.7; the
+    # out-of-tree kernel module linuxPackages.*.bcachefs builds from
+    # bcachefs-tools.dkms so it inherits these patches automatically).
+    # Rationale & upstream audit in bcachefs-patchz.md:
+    #   - Patch C (device-remove-dead-stripes): reap degraded+empty stripes in
+    #     bch2_stripe_repair() and wake/pace reconcile during device removal.
+    #   - Patch F (ec-bound-stripe-reuse): filter mismatched label/algo/redundancy
+    #     early in get_old_stripe() and bound stripe_reuse() LRU scans (128/512).
+    #   - Patch G (copygc-data-update-durability-livelock): compute whole-key
+    #     deduplicated online durability in bch2_bkey_durability_keeping() so
+    #     copygc does not livelock on shared-device EC+replica extents, fix
+    #     move.c no-op sectors_seen counting, and fix copygc.c EC stripe copygc
+    #     (ret2=1 positive return abort, can_widen full-stripe head, and
+    #     bucket_frag_ratio==0).
+    # Former Patches A & E were merged upstream in 1.39.7 (468334a60a, f820d39953)
+    # and dropped along with the 1.39.6 pin.
+    bcachefs-tools = prev.bcachefs-tools.overrideAttrs (old: {
+      patches = (old.patches or [ ]) ++ [
+        ./patches/bcachefs-device-remove-dead-stripes.patch
+        ./patches/bcachefs-ec-bound-stripe-reuse.patch
+        ./patches/bcachefs-copygc-data-update-durability-livelock.patch
       ];
     });
 
