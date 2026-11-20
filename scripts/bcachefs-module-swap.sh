@@ -33,10 +33,30 @@ MODULE=${1:-$(find -L /run/current-system/kernel-modules -name 'bcachefs.ko*' 2>
 # --- preflight: the module we're swapping to -------------------------------
 deployed=$(modinfo "$MODULE" 2>/dev/null | awk '/^version/{print $2; exit}')
 [ -n "$deployed" ] || die "modinfo $MODULE has no version"
-say "swapping to module: $deployed ($MODULE)"
+vermagic=$(modinfo -F vermagic "$MODULE" 2>/dev/null | awk '{print $1}')
+running_kver=$(uname -r)
+[ "$vermagic" = "$running_kver" ] \
+  || die "module vermagic ($vermagic) != running kernel ($running_kver) - aborting before unmount!"
+say "swapping to module: $deployed ($MODULE, vermagic $vermagic)"
 echo "$deployed" | grep -q '^1\.39\.6$' \
   || die "module is $deployed, expected 1.39.6 - wrong module?"
 say "loaded module:      $(cat /sys/module/bcachefs/version 2>/dev/null || echo 'not loaded')"
+
+# Guard against calling umount while flush-bcachefs-* is parked in
+# __bch2_wait_on_allocator with Dirty pages: sync_filesystem() inside umount
+# would otherwise wedge umount in uninterruptible D state.
+for flusher in /proc/[0-9]*/comm; do
+  case "$(cat "$flusher" 2>/dev/null)" in
+    flush-bcachefs*)
+      fpid=${flusher#/proc/}; fpid=${fpid%/comm}
+      wchan=$(cat "/proc/$fpid/wchan" 2>/dev/null || true)
+      if grep -q 'wait_on_allocator' "/proc/$fpid/stack" 2>/dev/null || [ "$wchan" = "__bch2_wait_on_allocator" ]; then
+        dirty_kb=$(awk '/^Dirty:/{print $2}' /proc/meminfo)
+        die "PID $fpid ($(cat "$flusher")) is blocked in __bch2_wait_on_allocator (Dirty=${dirty_kb}kB) - drain writeback BEFORE running swap or umount will hang in D state!"
+      fi
+      ;;
+  esac
+done
 
 # --- stop everything that uses the pool ------------------------------------
 say "stopping system services: $SYS_SERVICES"
@@ -86,13 +106,14 @@ modprobe -r bcachefs || die "modprobe -r bcachefs failed (still in use?)"
 # `modprobe -r` above removes the ones bcachefs alone was using (lz4hc) -
 # reload them or insmod fails with "Unknown symbol LZ4_compress_*".
 say "loading new module: $MODULE"
-modprobe lz4_compress lz4hc_compress xor libchacha libpoly1305 2>/dev/null || true
+modprobe -a lz4_compress lz4hc_compress raid6_pq xor libchacha libpoly1305 2>/dev/null || true
 TMPKO=$(mktemp /tmp/bcachefs.XXXXXX.ko)
 xz -dc "$MODULE" > "$TMPKO" 2>/dev/null || cp "$MODULE" "$TMPKO"
 insmod "$TMPKO" || die "insmod failed"
 rm -f "$TMPKO"
 loaded=$(cat /sys/module/bcachefs/version)
-say "loaded module now: $loaded"
+srcver=$(cat /sys/module/bcachefs/srcversion 2>/dev/null || echo unknown)
+say "loaded module now: $loaded (srcversion $srcver)"
 [ "$loaded" = "$deployed" ] || echo "WARNING: expected $deployed, got $loaded"
 
 # --- remount -----------------------------------------------------------------

@@ -160,12 +160,16 @@
           mkdir -p "$HOME/.kimi" "$HOME/.config/opencode" "$HOME/.local/share/opencode" "$HOME/.claude" "$HOME/.gemini" "$HOME/.codex"
 
           set -l bwrap_args \
-            # 1. Isolate mount, PID, IPC, and UTS namespaces, but KEEP network shared
-            --unshare-all \
-            --share-net \
+            # 1. Isolate mount, user, IPC, UTS, and cgroup namespaces, but KEEP PID & network shared
+            #    (host PID ns is required so --ro-bind /proc /proc matches getpid() / /proc/self)
+            --unshare-user \
+            --unshare-ipc \
+            --unshare-uts \
+            --unshare-cgroup-try \
             --die-with-parent \
-            # 2. Core virtual filesystems
-            --proc /proc \
+            # 2. Core virtual filesystems (/proc and /sys read-only from host)
+            --ro-bind /proc /proc \
+            --ro-bind-try /sys /sys \
             --dev /dev \
             --tmpfs /tmp \
             --tmpfs /run \

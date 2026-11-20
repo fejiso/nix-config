@@ -87,6 +87,16 @@
   # at 100% CPU and collapsing writeback throughput to <1 MB/s. Candidate
   # evaluation is capped at 128 matching candidates and 512 total visited keys,
   # falling through cleanly to new_stripe_alloc_buckets().
+  # The sixth patch (copygc-data-update-durability-livelock, Patch G) fixes a
+  # copygc livelock hit on butthead 2026-11-20 (see bcachefs-patchz.md "Patch G"):
+  # bch2_data_update_init() summed per-pointer durability without device
+  # deduplication, picking nr_replicas=0 on shared-device EC+replica extents
+  # while bch2_extent_drop_ptrs() checked whole-key deduplicated online
+  # durability and committed a no-op, spinning bch-copygc forever at ~3k
+  # evacuations/s and starving foreground allocations across 8 full drives.
+  # Also fixes move.c no-op sectors_seen counting and copygc.c EC stripe
+  # selection (ret2=1 positive return abort, can_widen full-stripe head, and
+  # bucket_frag_ratio==0).
   nixpkgs.overlays = [
     (_final: prev: {
       bcachefs-tools = prev.bcachefs-tools.overrideAttrs (old: {
@@ -96,6 +106,7 @@
           ../../../overlays/patches/bcachefs-device-remove-orphan-stripe-buckets.patch
           ../../../overlays/patches/bcachefs-userspace-percpu-thread-cap.patch
           ../../../overlays/patches/bcachefs-ec-bound-stripe-reuse.patch
+          ../../../overlays/patches/bcachefs-copygc-data-update-durability-livelock.patch
         ];
       });
     })

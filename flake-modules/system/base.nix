@@ -198,8 +198,9 @@
     hardware.bluetooth.enable = lib.mkDefault true;
     services.blueman.enable = lib.mkDefault true;
 
-    # Enable Magic SysRq (REISUB)
+    # Enable Magic SysRq (REISUB) and unprivileged dmesg access
     boot.kernel.sysctl."kernel.sysrq" = 1;
+    boot.kernel.sysctl."kernel.dmesg_restrict" = 0;
 
     # Memory management: zswap for hosts with swap, zram for those without
     boot.kernelParams = lib.mkIf (config.swapDevices != []) [

@@ -1,0 +1,499 @@
+copygc, data/update: fix durability_keeping mismatch livelock and EC copygc
+
+On pools combining replication and erasure coding (or degraded EC stripes),
+copygc can enter a 100%-deterministic non-progressing livelock that pins
+bch-copygc on CPU, keeps bch2_copygc_can_make_progress() true on full
+devices, and permanently stalls foreground allocations and reconcile.
+
+Four interacting bugs cause or compound this stall:
+
+1. Whole-key vs per-pointer durability mismatch in data_update:
+   bch2_data_update_init() and bch2_can_do_data_update() compute
+   durability_keeping by summing bch2_extent_ptr_durability() independently
+   per kept pointer (returning .total with no cross-pointer device
+   deduplication). When kept pointers share devices across EC stripes and/or
+   plain replicas, or when a stripe block is offline so .online < .total,
+   durability_keeping >= io_opts->data_replicas sets m->op.nr_replicas = 0
+   and takes the no-write bch2_extent_drop_ptrs() path.
+   bch2_extent_drop_ptrs() delegates to bch2_bkey_drop_extra_durability() /
+   bch2_bkey_drop_extra_ec_durability(), which evaluate whole-key
+   bch2_bkey_durability().online WITH @seen device deduplication, find
+   durability.online < data_replicas, refuse to drop the pointer, commit an
+   unchanged key, and return 0 -> data_update_done_no_writes_needed.
+   Copygc treats that no-op as completed work (sectors_seen > 0 -> did_work
+   == true), skips io_clock backoff, and spins forever on the same LRU head
+   buckets (~3,000 no-op evacuations/sec observed in production).
+
+   Fix: introduce bch2_bkey_durability_keeping(), which computes whole-key
+   deduplicated online durability over the kept pointers (matching
+   bch2_bkey_drop_extra_*_durability()) and adds @seen.online devices to
+   devs_have so newly allocated replacement replicas are guaranteed to land
+   on non-overlapping devices that increase whole-key durability. Also guard
+   bch2_extent_drop_ptrs() against ever committing an unchanged key and
+   reporting data_update_done_no_writes_needed.
+
+2. No-op / failed evacuations counted as sectors_seen in move.c:
+   __bch2_move_data_phys() unconditionally added bucket_len to sectors_seen
+   even when pred() returned 0 (e.g. bucket generation mismatch) or when
+   bch2_move_extent() returned BCH_ERR_data_update_fail, and double-counted
+   sectors when stats->phys == false (copygc). Only count sectors_seen in
+   __bch2_move_data_phys() when stats->phys is true, and in
+   bch2_move_extent() when !ret, so copygc's did_work backoff triggers when
+   no extents were actually processed.
+
+3. Broken EC stripe copygc selection and positive return leak in copygc.c:
+   - try_add_copygc_bucket() returns 1 when a bucket is added to the batch;
+     bch2_copygc_get_stripe_buckets() failed to clear ret2 = 1 when the
+     stripe had fewer blocks than the batch size (16), returning 1 from
+     bch2_copygc_get_stripe_buckets() and causing bch2_copygc()'s `if (ret)
+     goto err;` check to abort and free the batch without evacuating anything.
+   - stripe_lru_pos() scores empty slots + s->can_widen, placing 100%-full
+     widenable stripes (blocks_nonempty == nr_data) at the head of
+     BCH_LRU_STRIPE_FRAGMENTATION; should_do_ec_copygc() inspected only the
+     first non-empty entry (returning false forever on a full can_widen
+     stripe) and evaluated `stripe_frag_ratio * 2 < bucket_frag_ratio` as
+     false when bucket_frag_ratio == 0 (devices with fragmented stripes and
+     zero fragmented normal buckets).
+   Fix all three, filter stripes to those holding blocks on pressured
+   devices, and bound skipped LRU entries at 512.
+
+4. bch2_copygc_can_make_progress() ignored c->opts.copygc_enabled, leaving
+   foreground allocators waiting forever if copygc_enabled is disabled via
+   sysfs.
+
+--- a/fs/data/extents.h
++++ b/fs/data/extents.h
+@@ -682,6 +682,8 @@
+ };
+ 
+ int bch2_bkey_durability(struct btree_trans *, struct bkey_s_c, struct bkey_durability *);
++int bch2_bkey_durability_keeping(struct btree_trans *, struct bkey_s_c,
++				 unsigned, unsigned, struct bch_devs_list *, unsigned *);
+ struct bkey_durability bch2_bkey_durability_safe(const struct bch_fs *, struct bkey_s_c);
+ struct bkey_durability bch2_btree_ptr_durability(struct bch_fs *, struct bkey_s_c);
+ 
+--- a/fs/data/extents.c
++++ b/fs/data/extents.c
+@@ -1064,6 +1064,69 @@
+ 	return 0;
+ }
+ 
++/*
++ * Online durability of @k remaining after dropping @ptrs_kill and stripping
++ * EC stripe associations in @ptrs_kill_ec.
++ *
++ * Must use the same whole-key deduplicated online durability check as
++ * bch2_bkey_drop_extra_durability() and bch2_bkey_drop_extra_ec_durability():
++ * summing per-pointer bch2_extent_ptr_durability() ignores device sharing
++ * across stripes/replicas and offline stripe blocks, causing data updates to
++ * pick nr_replicas == 0 while bch2_extent_drop_ptrs() refuses to drop the
++ * pointer.
++ */
++int bch2_bkey_durability_keeping(struct btree_trans *trans, struct bkey_s_c k,
++				 unsigned ptrs_kill, unsigned ptrs_kill_ec,
++				 struct bch_devs_list *devs_have,
++				 unsigned *keeping)
++{
++	struct bch_fs *c = trans->c;
++	struct bkey_ptrs_c ptrs = bch2_bkey_ptrs_c(k);
++	const union bch_extent_entry *entry;
++	struct extent_ptr_decoded p;
++	struct durability_dedup seen = {};
++	struct bkey_durability d = { .min_durability = U8_MAX };
++	unsigned ptr_bit = 1;
++
++	if (devs_have)
++		devs_have->nr = 0;
++
++	bkey_for_each_ptr_decode(k.k, ptrs, p, entry) {
++		if (!p.ptr.cached && !(ptr_bit & ptrs_kill)) {
++			if (devs_have && p.ptr.dev != BCH_SB_MEMBER_INVALID &&
++			    devs_have->nr < ARRAY_SIZE(devs_have->data))
++				bch2_dev_list_add_dev(devs_have, p.ptr.dev);
++
++			if (p.has_ec && !(ptr_bit & ptrs_kill_ec)) {
++				int ret = bch2_stripe_durability(trans, p, &d, &seen, NULL);
++				if (ret < 0)
++					return ret;
++			} else if (p.ptr.dev != BCH_SB_MEMBER_INVALID) {
++				guard(rcu)();
++				unsigned cur = bch2_dev_durability(c, p.ptr.dev);
++
++				if (!__test_and_set_bit(p.ptr.dev, seen.total.d))
++					d.total += cur;
++				if (bch2_dev_idx_is_online(c, p.ptr.dev) &&
++				    !__test_and_set_bit(p.ptr.dev, seen.online.d))
++					d.online += cur;
++			}
++		}
++
++		ptr_bit <<= 1;
++	}
++
++	if (devs_have) {
++		unsigned dev;
++		for_each_set_bit(dev, seen.online.d, BCH_SB_MEMBERS_MAX)
++			if (devs_have->nr < ARRAY_SIZE(devs_have->data))
++				bch2_dev_list_add_dev(devs_have, dev);
++	}
++
++	*keeping = d.online;
++	return 0;
++}
++
+ struct bkey_durability bch2_btree_ptr_durability(struct bch_fs *c, struct bkey_s_c k)
+ {
+ 	BUG_ON(!bkey_is_btree_ptr(k.k));
+--- a/fs/data/update.c
++++ b/fs/data/update.c
+@@ -995,6 +995,7 @@
+ 	struct bch_fs *c = trans->c;
+ 	CLASS(disk_reservation, res)(c); /* extents btree updates always require a disk res passed in */
+ 
++	struct bkey_i *orig = errptr_try(bch2_bkey_make_mut_noupdate(trans, k));
+ 	struct bkey_i *n = errptr_try(bch2_bkey_make_mut_noupdate(trans, k));
+ 
+ 	if (data_opts->ptrs_kill_ec)
+@@ -1011,6 +1012,16 @@
+ 	bch2_bkey_drop_extra_cached_ptrs(c, io_opts, bkey_i_to_s(n));
+ 
+ 	/*
++	 * Never commit a no-op update and report data_update_done if nothing
++	 * was actually dropped or converted to cached: callers such as copygc
++	 * would otherwise treat the bucket evacuation as completed work and
++	 * livelock on the same extent.
++	 */
++	if (n->k.u64s == orig->k.u64s &&
++	    !memcmp(n, orig, bkey_bytes(&n->k)))
++		return bch_err_throw(c, data_update_fail_would_block);
++
++	/*
+ 	 * Since we're not inserting through an extent iterator
+ 	 * (BTREE_ITER_all_snapshots iterators aren't extent iterators),
+ 	 * we aren't using the extent overwrite path to delete, we're
+@@ -1249,27 +1260,11 @@
+ 	struct bch_devs_list devs_have = {};
+ 	unsigned durability_keeping = 0;
+ 
+-	struct bkey_ptrs_c ptrs = bch2_bkey_ptrs_c(k);
+-	const union bch_extent_entry *entry;
+-	struct extent_ptr_decoded p;
+-	unsigned ptr_bit = 1;
+-
+-	bkey_for_each_ptr_decode(k.k, ptrs, p, entry) {
+-		if (p.ptr.dev != BCH_SB_MEMBER_INVALID &&
+-		    !(ptr_bit & data_opts->ptrs_kill)) {
+-			int d = ptr_bit & data_opts->ptrs_kill_ec
+-				? bch2_dev_durability(c, p.ptr.dev)
+-				: bch2_extent_ptr_durability(trans, &p);
+-			if (d < 0)
+-				return d;
+-
+-			durability_keeping += d;
+-			if (!data_opts->no_devs_have && !p.ptr.cached)
+-				devs_have.data[devs_have.nr++] = p.ptr.dev;
+-		}
+-
+-		ptr_bit <<= 1;
+-	}
++	try(bch2_bkey_durability_keeping(trans, k,
++					 data_opts->ptrs_kill,
++					 data_opts->ptrs_kill_ec,
++					 data_opts->no_devs_have ? NULL : &devs_have,
++					 &durability_keeping));
+ 
+ 	if (!bkey_is_btree_ptr(k.k) &&
+ 	    !data_opts->extra_replicas &&
+@@ -1277,7 +1272,9 @@
+ 		return 0;
+ 
+ 	if (trace)
+-		prt_printf(trace, "need %u replicas\n", opts->data_replicas - durability_keeping);
++		prt_printf(trace, "need %u replicas\n",
++			   max(0, (int) (opts->data_replicas - durability_keeping)) +
++			   data_opts->extra_replicas);
+ 
+ 	int ret = __bch2_can_do_write(c, opts, data_opts, &devs_have, k, trace);
+ 	if (ret)
+@@ -1433,22 +1430,15 @@
+ 	if (m->opts.ptrs_kill)
+ 		checksummed_and_non_checksummed_handling(m, ptrs);
+ 
+-	unsigned ptr_bit = 1;
+-	bkey_for_each_ptr_decode(k.k, ptrs, p, entry) {
+-		if (!(ptr_bit & m->opts.ptrs_kill)) {
+-			int d = ptr_bit & m->opts.ptrs_kill_ec
+-				? bch2_dev_durability(c, p.ptr.dev)
+-				: bch2_extent_ptr_durability(trans, &p);
+-			if (d < 0) {
+-				ret = d;
+-				goto out;
+-			}
+-
+-			durability_keeping += d;
+-			if (!m->opts.no_devs_have && !p.ptr.cached)
+-				bch2_dev_list_add_dev(&m->op.devs_have, p.ptr.dev);
+-		}
++	ret = bch2_bkey_durability_keeping(trans, k,
++					   m->opts.ptrs_kill,
++					   m->opts.ptrs_kill_ec,
++					   m->opts.no_devs_have ? NULL : &m->op.devs_have,
++					   &durability_keeping);
++	if (ret)
++		goto out;
+ 
++	bkey_for_each_ptr_decode(k.k, ptrs, p, entry) {
+ 		/*
+ 		 * op->csum_type is normally initialized from the fs/file's
+ 		 * current options - but if an extent is encrypted, we require
+@@ -1470,8 +1460,6 @@
+ 
+ 		buf_bytes = max_t(unsigned, buf_bytes, p.crc.uncompressed_size << 9);
+ 		unwritten |= p.ptr.unwritten;
+-
+-		ptr_bit <<= 1;
+ 	}
+ 
+ 	if (m->opts.type != BCH_DATA_UPDATE_scrub &&
+--- a/fs/data/move.c
++++ b/fs/data/move.c
+@@ -406,7 +406,7 @@
+ 		ret = btree_trans_restart(trans, BCH_ERR_transaction_restart_nested);
+ 	}
+ 
+-	if (!bch2_err_matches(ret, BCH_ERR_transaction_restart) && ctxt->stats &&
++	if (!ret && ctxt->stats &&
+ 	    !ctxt->stats->phys)
+ 		atomic64_add(!bkey_is_btree_ptr(k.k)
+ 			     ? k.k->size
+@@ -740,7 +740,7 @@
+ 
+ 		if (bch2_err_matches(ret, BCH_ERR_transaction_restart))
+ 			continue;
+-		if (ctxt->stats)
++		if (ctxt->stats && ctxt->stats->phys)
+ 			atomic64_add(bucket_len, &ctxt->stats->sectors_seen);
+ 		if (bch2_err_matches(ret, BCH_ERR_data_update_fail))
+ 			ret = 0; /* failure for this extent, keep going */
+--- a/fs/data/copygc.c
++++ b/fs/data/copygc.c
+@@ -373,13 +373,28 @@
+ 	return 0;
+ }
+ 
++static bool stripe_has_copygc_dev(const struct bch_stripe *s,
++				  const struct bch_devs_mask *devs_mask)
++{
++	for (unsigned i = 0; i < s->nr_blocks; i++) {
++		unsigned dev = s->ptrs[i].dev;
++		if (dev < BCH_SB_MEMBERS_MAX && test_bit(dev, devs_mask->d))
++			return true;
++	}
++	return false;
++}
++
+ static int bch2_copygc_get_stripe_buckets(struct moving_context *ctxt,
+-			struct buckets_in_flight *buckets_in_flight)
++			struct buckets_in_flight *buckets_in_flight,
++			const struct bch_devs_mask *devs_mask,
++			u64 bucket_frag_ratio)
+ {
+ 	struct btree_trans *trans = ctxt->trans;
++	unsigned nr_visited = 0;
++	const unsigned max_visited = 512;
+ 
+ 	int ret = for_each_btree_key_max(trans, iter, BTREE_ID_lru,
+-				  lru_start(BCH_LRU_STRIPE_FRAGMENTATION),
++				  lru_pos(BCH_LRU_STRIPE_FRAGMENTATION, 0, STRIPE_LRU_POS_EMPTY + 1),
+ 				  lru_end(BCH_LRU_STRIPE_FRAGMENTATION),
+ 				  0, lru_k, ({
+ 		CLASS(btree_iter, s_iter)(trans, BTREE_ID_stripes, POS(0, lru_k.k->p.offset), 0);
+@@ -397,7 +412,32 @@
+ 		if (stripe_lru_pos(s) != lru_pos_time(lru_k.k->p))
+ 			continue;
+ 
+-		unsigned nr_data = s->nr_blocks - s->nr_redundant;
++		unsigned nr_data = s->nr_blocks - s->nr_redundant, blocks_nonempty = 0;
++		for (unsigned i = 0; i < nr_data; i++)
++			blocks_nonempty += !!stripe_blockcount_get(s, i);
++
++		u64 stripe_frag_ratio = nr_data
++			? div_u64(blocks_nonempty * (1ULL << 31), nr_data)
++			: 0;
++
++		/*
++		 * stripe_lru_pos() also scores s->can_widen for stripe reuse:
++		 * skip empty stripes (pending delete), full stripes
++		 * (blocks_nonempty == nr_data, which free zero buckets on net),
++		 * stripes with no blocks on pressured devices, and stripes less
++		 * fragmented than normal bucket candidates.
++		 */
++		if (!blocks_nonempty ||
++		    blocks_nonempty == nr_data ||
++		    !stripe_has_copygc_dev(s, devs_mask) ||
++		    (bucket_frag_ratio && stripe_frag_ratio * 2 >= bucket_frag_ratio)) {
++			if (++nr_visited >= max_visited) {
++				ret2 = -BCH_ERR_fc_break;
++				goto err;
++			}
++			continue;
++		}
++
+ 		for (unsigned i = 0; i < nr_data; i++) {
+ 			if (!stripe_blockcount_get(s, i))
+ 				continue;
+@@ -411,6 +451,7 @@
+ 						     PTR_BUCKET_POS(ca, ptr), U64_MAX);
+ 			if (ret2 < 0)
+ 				break;
++			ret2 = 0;
+ 
+ 			if (copygc_batch_full(buckets_in_flight)) {
+ 				ret2 = -BCH_ERR_fc_break;
+@@ -424,12 +465,45 @@
+ 	return ret;
+ }
+ 
+-static bool should_do_ec_copygc(struct btree_trans *trans, darray_copygc_dev *devs)
++static bool should_do_ec_copygc(struct btree_trans *trans,
++				darray_copygc_dev *devs,
++				struct bch_devs_mask *devs_mask,
++				u64 *bucket_frag_ratio_out)
+ {
+-	u64 stripe_frag_ratio = 0;
++	*devs_mask = (struct bch_devs_mask) {};
++
++	/*
++	 * Compare against the best bucket candidate this round can actually
++	 * evacuate - the emptiest lru head across the devices that need
++	 * copygc:
++	 */
++	u64 bucket_frag_ratio = 0;
++	darray_for_each(*devs, i) {
++		__set_bit(i->dev, devs_mask->d);
++
++		u16 lru_id = bucket_fragmentation_lru(i->dev);
++
++		CLASS(btree_iter, iter)(trans, BTREE_ID_lru, lru_start(lru_id), 0);
++		struct bkey_s_c lru_k;
++		struct bpos lru_end_pos = lru_end(lru_id);
++
++		lockrestart_do(trans, bkey_err(lru_k = bch2_btree_iter_peek_max(&iter, &lru_end_pos)));
++
++		if (lru_k.k && !bkey_err(lru_k)) {
++			u64 t = lru_pos_time(lru_k.k->p);
++
++			if (!bucket_frag_ratio || t < bucket_frag_ratio)
++				bucket_frag_ratio = t;
++		}
++	}
++	*bucket_frag_ratio_out = bucket_frag_ratio;
++
++	bool do_ec = false;
++	unsigned nr_visited = 0;
++	const unsigned max_visited = 512;
+ 
+ 	for_each_btree_key_max(trans, iter, BTREE_ID_lru,
+-			       lru_start(BCH_LRU_STRIPE_FRAGMENTATION),
++			       lru_pos(BCH_LRU_STRIPE_FRAGMENTATION, 0, STRIPE_LRU_POS_EMPTY + 1),
+ 			       lru_end(BCH_LRU_STRIPE_FRAGMENTATION),
+ 			       0, lru_k, ({
+ 		CLASS(btree_iter, s_iter)(trans, BTREE_ID_stripes, POS(0, lru_k.k->p.offset), 0);
+@@ -451,45 +525,39 @@
+ 		for (unsigned i = 0; i < nr_data; i++)
+ 			blocks_nonempty += !!stripe_blockcount_get(s, i);
+ 
+-		/* stripe is pending delete */
+-		if (!blocks_nonempty)
++		if (!blocks_nonempty ||
++		    blocks_nonempty == nr_data ||
++		    !stripe_has_copygc_dev(s, devs_mask)) {
++			if (++nr_visited >= max_visited) {
++				ret = -BCH_ERR_fc_break;
++				goto err;
++			}
+ 			continue;
++		}
+ 
+-		/* This matches the calculation in alloc_lru_idx_fragmentation, so we can
+-		 * directly compare without actually looking up the bucket pointed to by the
+-		 * bucket fragmentation lru:
++		/*
++		 * Matches alloc_lru_idx_fragmentation, so we can directly
++		 * compare without looking up the bucket pointed to by the
++		 * bucket fragmentation lru. Prefer normal bucket copygc when
++		 * normal fragmented buckets exist:
+ 		 */
+-		stripe_frag_ratio = div_u64(blocks_nonempty * (1ULL << 31), nr_data);
+-		break;
++		u64 stripe_frag_ratio = div_u64(blocks_nonempty * (1ULL << 31), nr_data);
++		if (stripe_frag_ratio &&
++		    (!bucket_frag_ratio || stripe_frag_ratio * 2 < bucket_frag_ratio)) {
++			do_ec = true;
++			ret = -BCH_ERR_fc_break;
++			goto err;
++		}
++
++		if (++nr_visited >= max_visited) {
++			ret = -BCH_ERR_fc_break;
++			goto err;
++		}
+ err:
+ 		ret;
+ 	}));
+ 
+-	/*
+-	 * Compare against the best bucket candidate this round can actually
+-	 * evacuate - the emptiest lru head across the devices that need
+-	 * copygc:
+-	 */
+-	u64 bucket_frag_ratio = 0;
+-	darray_for_each(*devs, i) {
+-		u16 lru_id = bucket_fragmentation_lru(i->dev);
+-
+-		CLASS(btree_iter, iter)(trans, BTREE_ID_lru, lru_start(lru_id), 0);
+-		struct bkey_s_c lru_k;
+-		struct bpos lru_end_pos = lru_end(lru_id);
+-
+-		lockrestart_do(trans, bkey_err(lru_k = bch2_btree_iter_peek_max(&iter, &lru_end_pos)));
+-
+-		if (lru_k.k && !bkey_err(lru_k)) {
+-			u64 t = lru_pos_time(lru_k.k->p);
+-
+-			if (!bucket_frag_ratio || t < bucket_frag_ratio)
+-				bucket_frag_ratio = t;
+-		}
+-	}
+-
+-	/* Prefer normal bucket copygc */
+-	return stripe_frag_ratio && stripe_frag_ratio * 2 < bucket_frag_ratio;
++	return do_ec;
+ }
+ 
+ noinline
+@@ -517,8 +585,11 @@
+ 	if (bch2_fs_fatal_err_on(ret, c, "%s: from bch2_btree_write_buffer_tryflush()", bch2_err_str(ret)))
+ 		goto err;
+ 
+-	ret = should_do_ec_copygc(trans, devs)
+-		? bch2_copygc_get_stripe_buckets(ctxt, buckets_in_flight)
++	struct bch_devs_mask devs_mask;
++	u64 bucket_frag_ratio;
++
++	ret = should_do_ec_copygc(trans, devs, &devs_mask, &bucket_frag_ratio)
++		? bch2_copygc_get_stripe_buckets(ctxt, buckets_in_flight, &devs_mask, bucket_frag_ratio)
+ 		: bch2_copygc_get_buckets(ctxt, buckets_in_flight, devs);
+ 	if (ret)
+ 		goto err;
+@@ -588,8 +659,9 @@
+  */
+ bool bch2_copygc_can_make_progress(struct bch_dev *ca)
+ {
+-	return atomic_read(&ca->copygc_in_flight) ||
+-		bch2_copygc_dev_wait_amount(ca, NULL) <= 0;
++	return ca->fs->opts.copygc_enabled &&
++		(atomic_read(&ca->copygc_in_flight) ||
++		 bch2_copygc_dev_wait_amount(ca, NULL) <= 0);
+ }
+ 
+ /*
