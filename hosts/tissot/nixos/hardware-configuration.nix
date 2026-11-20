@@ -10,7 +10,7 @@
   ];
 
   nixpkgs.hostPlatform = lib.mkForce "aarch64-linux";
-  nixpkgs.buildPlatform = lib.mkDefault "x86_64-linux";
+  nixpkgs.buildPlatform = lib.mkForce "x86_64-linux";
 
   hardware.deviceTree.enable = lib.mkDefault false;
 }
