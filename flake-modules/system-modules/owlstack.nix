@@ -83,12 +83,27 @@ in
         };
       });
 
-      siteSubmodule = { defaultName, defaultRemote, defaultKissPort, defaultWebPort, defaultScope, defaultPathHashSize, defaultFreqMHz }:
+      siteSubmodule = { defaultName, defaultAdvertName, defaultRemote, defaultKissPort, defaultWebPort, defaultScope, defaultPathHashSize, defaultFreqMHz }:
         lib.types.submodule {
           options = {
             name = lib.mkOption {
               type = lib.types.str;
               default = defaultName;
+            };
+            advertName = lib.mkOption {
+              type = lib.types.str;
+              default = defaultAdvertName;
+              description = "Signed REPEATER advert name emitted for this site's tunnel hop (empty string disables adverts).";
+            };
+            directAdvertMins = lib.mkOption {
+              type = lib.types.int;
+              default = 120;
+              description = "0-hop DIRECT repeater advert interval in minutes (MeshCore default: 120m / 2h; <0 disables).";
+            };
+            floodAdvertMins = lib.mkOption {
+              type = lib.types.int;
+              default = 720;
+              description = "Scoped FLOOD repeater advert interval in minutes (MeshCore default: 720m / 12h; <0 disables).";
             };
             remoteAddr = lib.mkOption {
               type = lib.types.str;
@@ -166,7 +181,7 @@ in
         ) [ ] (map normalizeChannel chs);
 
       mkSiteBridgeJson = s: {
-        inherit (s) name remoteAddr defaultScope freqMHz bwKHz sf cr txPower;
+        inherit (s) name advertName directAdvertMins floodAdvertMins pathHashSize remoteAddr defaultScope freqMHz bwKHz sf cr txPower;
         listenAddr = "127.0.0.1:${toString s.virtualKissPort}";
       };
 
@@ -362,6 +377,7 @@ in
         pinto = lib.mkOption {
           type = siteSubmodule {
             defaultName = "pinto";
+            defaultAdvertName = "MAD-DUB-TUNNEL";
             defaultRemote = "hispanas.netbird.cloud:7620";
             defaultKissPort = 17620;
             defaultWebPort = 8620;
@@ -376,6 +392,7 @@ in
         dublin = lib.mkOption {
           type = siteSubmodule {
             defaultName = "dublin";
+            defaultAdvertName = "DUB-MAD-TUNNEL";
             defaultRemote = "lenovix.netbird.cloud:7620";
             defaultKissPort = 17621;
             defaultWebPort = 8621;

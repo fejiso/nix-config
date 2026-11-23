@@ -61,11 +61,19 @@ type BridgeCounters struct {
 	DedupDropped    atomic.Uint64
 	HopLimitDropped atomic.Uint64
 	InvalidDropped  atomic.Uint64
+	AdvertsSent     atomic.Uint64
 }
 
 type persistedIdentities struct {
-	SiteAPubHex string `json:"siteAPubHex"`
-	SiteBPubHex string `json:"siteBPubHex"`
+	SiteAPubHex  string `json:"siteAPubHex"`
+	SiteASeedHex string `json:"siteASeedHex,omitempty"`
+	SiteBPubHex  string `json:"siteBPubHex"`
+	SiteBSeedHex string `json:"siteBSeedHex,omitempty"`
+}
+
+type persistedAdvertState struct {
+	LastDirectUnix [2]int64 `json:"lastDirectUnix"`
+	LastFloodUnix  [2]int64 `json:"lastFloodUnix"`
 }
 
 type BridgeEngine struct {
@@ -73,7 +81,12 @@ type BridgeEngine struct {
 	log *slog.Logger
 
 	siteRegion    [2]*meshcore.Region
+	siteBridgeID  [2]meshcore.LocalIdentity
 	siteBridgePub [2][meshcore.PubKeySize]byte
+	hasBridgeKeys bool
+
+	advertMu    sync.Mutex
+	advertState persistedAdvertState
 
 	mu              sync.RWMutex
 	companions      []parsedCompanion
@@ -127,23 +140,24 @@ func parseDefaultRegion(scope string) (*meshcore.Region, error) {
 	return r, nil
 }
 
-func generateBridgePub(avoidFirstByte int) ([meshcore.PubKeySize]byte, error) {
-	var out [meshcore.PubKeySize]byte
+func generateBridgeIdentity(avoidFirstByte int) (meshcore.LocalIdentity, [ed25519.SeedSize]byte, error) {
+	var seed [ed25519.SeedSize]byte
 	for range 256 {
-		pub, _, err := ed25519.GenerateKey(rand.Reader)
-		if err != nil {
-			return out, err
+		if _, err := rand.Read(seed[:]); err != nil {
+			return meshcore.LocalIdentity{}, seed, err
 		}
+		id := meshcore.NewLocalIdentityFromSeed(seed)
+		pub := id.PublicKey()
 		if pub[0] == 0x00 || pub[0] == 0xFF || int(pub[0]) == avoidFirstByte {
 			continue
 		}
-		copy(out[:], pub)
-		return out, nil
+		return id, seed, nil
 	}
-	return out, fmt.Errorf("failed to generate valid bridge public key")
+	return meshcore.LocalIdentity{}, seed, fmt.Errorf("failed to generate valid bridge identity")
 }
 
 func (b *BridgeEngine) initPersistence() error {
+	hadLegacyPubOnly := false
 	if b.cfg.StateDir != "" {
 		if err := os.MkdirAll(b.cfg.StateDir, 0o750); err != nil {
 			return fmt.Errorf("mkdir stateDir %s: %w", b.cfg.StateDir, err)
@@ -152,11 +166,19 @@ func (b *BridgeEngine) initPersistence() error {
 		if raw, err := os.ReadFile(idPath); err == nil {
 			var p persistedIdentities
 			if json.Unmarshal(raw, &p) == nil {
-				aBytes, errA := hex.DecodeString(p.SiteAPubHex)
-				bBytes, errB := hex.DecodeString(p.SiteBPubHex)
-				if errA == nil && errB == nil && len(aBytes) == meshcore.PubKeySize && len(bBytes) == meshcore.PubKeySize {
-					copy(b.siteBridgePub[SiteA][:], aBytes)
-					copy(b.siteBridgePub[SiteB][:], bBytes)
+				seedA, errSA := hex.DecodeString(p.SiteASeedHex)
+				seedB, errSB := hex.DecodeString(p.SiteBSeedHex)
+				if errSA == nil && errSB == nil && len(seedA) == ed25519.SeedSize && len(seedB) == ed25519.SeedSize {
+					var arrA, arrB [ed25519.SeedSize]byte
+					copy(arrA[:], seedA)
+					copy(arrB[:], seedB)
+					b.siteBridgeID[SiteA] = meshcore.NewLocalIdentityFromSeed(arrA)
+					b.siteBridgeID[SiteB] = meshcore.NewLocalIdentityFromSeed(arrB)
+					b.siteBridgePub[SiteA] = b.siteBridgeID[SiteA].PublicKey()
+					b.siteBridgePub[SiteB] = b.siteBridgeID[SiteB].PublicKey()
+					b.hasBridgeKeys = true
+				} else if p.SiteAPubHex != "" || p.SiteBPubHex != "" {
+					hadLegacyPubOnly = true
 				}
 			}
 		}
@@ -165,31 +187,57 @@ func (b *BridgeEngine) initPersistence() error {
 		if raw, err := os.ReadFile(namesPath); err == nil {
 			_ = json.Unmarshal(raw, &b.learnedNames)
 		}
+
+		advPath := filepath.Join(b.cfg.StateDir, "advert_state.json")
+		if raw, err := os.ReadFile(advPath); err == nil {
+			_ = json.Unmarshal(raw, &b.advertState)
+		}
 	}
 
-	var zero [meshcore.PubKeySize]byte
-	if b.siteBridgePub[SiteA] == zero || b.siteBridgePub[SiteB] == zero {
-		pubA, err := generateBridgePub(-1)
+	if !b.hasBridgeKeys {
+		idA, seedA, err := generateBridgeIdentity(-1)
 		if err != nil {
 			return err
 		}
-		pubB, err := generateBridgePub(int(pubA[0]))
+		idB, seedB, err := generateBridgeIdentity(int(idA.PublicKey()[0]))
 		if err != nil {
 			return err
 		}
-		b.siteBridgePub[SiteA] = pubA
-		b.siteBridgePub[SiteB] = pubB
+		b.siteBridgeID[SiteA] = idA
+		b.siteBridgeID[SiteB] = idB
+		b.siteBridgePub[SiteA] = idA.PublicKey()
+		b.siteBridgePub[SiteB] = idB.PublicKey()
+		b.hasBridgeKeys = true
+
+		if hadLegacyPubOnly {
+			b.log.Info("upgraded legacy pubkey-only bridge_identities.json to full Ed25519 signing identities",
+				"siteA_hash", hex.EncodeToString(b.siteBridgePub[SiteA][:3]),
+				"siteB_hash", hex.EncodeToString(b.siteBridgePub[SiteB][:3]),
+			)
+		}
 
 		if b.cfg.StateDir != "" {
 			idPath := filepath.Join(b.cfg.StateDir, "bridge_identities.json")
 			raw, _ := json.MarshalIndent(persistedIdentities{
-				SiteAPubHex: hex.EncodeToString(pubA[:]),
-				SiteBPubHex: hex.EncodeToString(pubB[:]),
+				SiteAPubHex:  hex.EncodeToString(b.siteBridgePub[SiteA][:]),
+				SiteASeedHex: hex.EncodeToString(seedA[:]),
+				SiteBPubHex:  hex.EncodeToString(b.siteBridgePub[SiteB][:]),
+				SiteBSeedHex: hex.EncodeToString(seedB[:]),
 			}, "", "  ")
-			_ = os.WriteFile(idPath, raw, 0o640)
+			_ = os.WriteFile(idPath, raw, 0o600)
 		}
 	}
 	return nil
+}
+
+func (b *BridgeEngine) saveAdvertStateLocked() {
+	if b.cfg.StateDir == "" {
+		return
+	}
+	advPath := filepath.Join(b.cfg.StateDir, "advert_state.json")
+	if raw, err := json.MarshalIndent(b.advertState, "", "  "); err == nil {
+		_ = os.WriteFile(advPath, raw, 0o640)
+	}
 }
 
 func (b *BridgeEngine) saveLearnedNamesLocked() {
@@ -204,6 +252,107 @@ func (b *BridgeEngine) saveLearnedNamesLocked() {
 
 func (b *BridgeEngine) SiteBridgePubKey(s SiteID) [meshcore.PubKeySize]byte {
 	return b.siteBridgePub[s]
+}
+
+func (b *BridgeEngine) siteConfig(s SiteID) SiteConfig {
+	if s == SiteA {
+		return b.cfg.SiteA
+	}
+	return b.cfg.SiteB
+}
+
+// BuildSiteAdvert constructs a signed REPEATER ADVERT packet for the tunnel
+// endpoint at site (either 0-hop DIRECT or scoped FLOOD matching the site's
+// defaultScope and pathHashSize).
+func (b *BridgeEngine) BuildSiteAdvert(site SiteID, flood bool, now time.Time) ([]byte, error) {
+	sc := b.siteConfig(site)
+	name := strings.TrimSpace(sc.AdvertName)
+	if name == "" {
+		return nil, fmt.Errorf("site %s advertName is empty", sc.Name)
+	}
+	hashSize := sc.PathHashSize
+	if hashSize < 1 || hashSize > 3 {
+		hashSize = 3
+	}
+
+	adv, err := meshcore.NewAdvert(b.siteBridgeID[site], meshcore.AdvertAppData{
+		Type: "REPEATER",
+		Name: name,
+	}, uint32(now.Unix()))
+	if err != nil {
+		return nil, err
+	}
+	advBytes, err := adv.ToBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	routeType := meshcore.RouteTypeDirect
+	if flood {
+		routeType = meshcore.RouteTypeFlood
+	}
+	pkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(routeType, meshcore.PayloadTypeAdvert, 0),
+		PathLength: meshcore.MakePathLen(hashSize, 0),
+		Payload:    advBytes,
+	}
+	if flood && b.siteRegion[site] != nil {
+		pkt.SetScope(b.siteRegion[site])
+	}
+
+	raw, err := pkt.ToBytes()
+	if err != nil {
+		return nil, err
+	}
+	_ = b.hasSeenOrMark(pkt)
+	return raw, nil
+}
+
+// CheckDueSiteAdvert checks whether site should transmit a periodic FLOOD or
+// 0-hop DIRECT tunnel REPEATER advert at now. On the first connection of a
+// process (sentStartup == false), it emits a 0-hop DIRECT advert if no FLOOD
+// advert is due so local OwlShack and nearby companions resolve the tunnel hop
+// immediately without spamming the wider mesh across restarts.
+func (b *BridgeEngine) CheckDueSiteAdvert(site SiteID, sentStartup bool, now time.Time) ([]byte, bool, error) {
+	sc := b.siteConfig(site)
+	if strings.TrimSpace(sc.AdvertName) == "" {
+		return nil, false, nil
+	}
+
+	directMins := sc.DirectAdvertMins
+	floodMins := sc.FloodAdvertMins
+	if directMins == 0 && floodMins == 0 {
+		directMins = 120
+		floodMins = 720
+	}
+
+	b.advertMu.Lock()
+	lastDirect := b.advertState.LastDirectUnix[site]
+	lastFlood := b.advertState.LastFloodUnix[site]
+	b.advertMu.Unlock()
+
+	nowUnix := now.Unix()
+	if floodMins > 0 && (lastFlood == 0 || nowUnix-lastFlood >= int64(floodMins)*60) {
+		raw, err := b.BuildSiteAdvert(site, true, now)
+		return raw, true, err
+	}
+	if directMins > 0 && (!sentStartup || lastDirect == 0 || nowUnix-lastDirect >= int64(directMins)*60) {
+		raw, err := b.BuildSiteAdvert(site, false, now)
+		return raw, false, err
+	}
+	return nil, false, nil
+}
+
+func (b *BridgeEngine) MarkSiteAdvertSent(site SiteID, wasFlood bool, now time.Time) {
+	b.advertMu.Lock()
+	nowUnix := now.Unix()
+	b.advertState.LastDirectUnix[site] = nowUnix
+	if wasFlood {
+		b.advertState.LastFloodUnix[site] = nowUnix
+	}
+	b.saveAdvertStateLocked()
+	b.advertMu.Unlock()
+	b.Counters[site].AdvertsSent.Add(1)
 }
 
 func parseSingleChannel(label string, cc ChannelConfig) (*meshcore.ChannelEntry, string, string, error) {

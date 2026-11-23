@@ -157,7 +157,7 @@ func main() {
 	}
 
 	var wg sync.WaitGroup
-	wg.Add(3)
+	wg.Add(5)
 	go func() {
 		defer wg.Done()
 		_ = modems[SiteA].Run(ctx)
@@ -165,6 +165,14 @@ func main() {
 	go func() {
 		defer wg.Done()
 		_ = modems[SiteB].Run(ctx)
+	}()
+	go func() {
+		defer wg.Done()
+		runSiteAdvertLoop(ctx, engine, modems[SiteA], SiteA, cfg.SiteA, log)
+	}()
+	go func() {
+		defer wg.Done()
+		runSiteAdvertLoop(ctx, engine, modems[SiteB], SiteB, cfg.SiteB, log)
 	}()
 	go func() {
 		defer wg.Done()
@@ -179,6 +187,61 @@ func main() {
 	defer cancel()
 	_ = httpSrv.Shutdown(shutCtx)
 	wg.Wait()
+}
+
+func runSiteAdvertLoop(ctx context.Context, engine *BridgeEngine, modem *SiteModem, site SiteID, sc SiteConfig, log *slog.Logger) {
+	if sc.AdvertName == "" {
+		return
+	}
+
+	sentStartup := false
+	settledAfterConnect := false
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			if !modem.IsConnected() {
+				settledAfterConnect = false
+				continue
+			}
+			if !settledAfterConnect {
+				// Allow 1 tick (5s) after modem connect so OwlShack attaches to virtual KISS first.
+				settledAfterConnect = true
+				continue
+			}
+
+			now := time.Now()
+			pkt, isFlood, err := engine.CheckDueSiteAdvert(site, sentStartup, now)
+			if err != nil {
+				log.Warn("failed to build tunnel repeater advert", "site", sc.Name, "error", err)
+				continue
+			}
+			if pkt == nil {
+				continue
+			}
+
+			sendCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+			err = modem.BridgeSend(sendCtx, pkt)
+			cancel()
+			if err != nil {
+				log.Warn("tunnel repeater advert send failed", "site", sc.Name, "name", sc.AdvertName, "flood", isFlood, "error", err)
+				continue
+			}
+
+			engine.MarkSiteAdvertSent(site, isFlood, now)
+			sentStartup = true
+			routeKind := "direct_0hop"
+			if isFlood {
+				routeKind = "flood"
+			}
+			log.Info("transmitted tunnel repeater advert", "site", sc.Name, "name", sc.AdvertName, "mode", routeKind)
+			ticker.Reset(30 * time.Second)
+		}
+	}
 }
 
 func siteName(cfg *Config, s SiteID) string {
@@ -197,6 +260,7 @@ func writeSiteMetrics(w http.ResponseWriter, name string, m *SiteModem, c *Bridg
 	fmt.Fprintf(w, "owlstack_modem_rx_packets_total{site=%q} %d\n", name, m.rxPackets.Load())
 	fmt.Fprintf(w, "owlstack_modem_tx_packets_total{site=%q} %d\n", name, m.txPackets.Load())
 	fmt.Fprintf(w, "owlstack_modem_tx_errors_total{site=%q} %d\n", name, m.txErrors.Load())
+	fmt.Fprintf(w, "owlstack_bridge_adverts_total{site=%q} %d\n", name, c.AdvertsSent.Load())
 	fmt.Fprintf(w, "owlstack_bridge_packets_total{from=%q,action=\"identity_bridged\"} %d\n", name, c.IdentityBridged.Load())
 	fmt.Fprintf(w, "owlstack_bridge_packets_total{from=%q,action=\"channel_bridged\"} %d\n", name, c.ChannelBridged.Load())
 	fmt.Fprintf(w, "owlstack_bridge_packets_total{from=%q,action=\"zerohop_flood\"} %d\n", name, c.ZeroHopFlood.Load())

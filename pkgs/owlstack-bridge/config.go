@@ -9,15 +9,19 @@ import (
 )
 
 type SiteConfig struct {
-	Name         string  `json:"name"`
-	RemoteAddr   string  `json:"remoteAddr"`
-	ListenAddr   string  `json:"listenAddr"`
-	DefaultScope string  `json:"defaultScope"` // "*" for unscoped, or "#region" (e.g. "#ioi")
-	FreqMHz      float64 `json:"freqMHz"`
-	BwKHz        float64 `json:"bwKHz"`
-	SF           uint8   `json:"sf"`
-	CR           uint8   `json:"cr"`
-	TxPower      uint8   `json:"txPower"`
+	Name             string  `json:"name"`
+	RemoteAddr       string  `json:"remoteAddr"`
+	ListenAddr       string  `json:"listenAddr"`
+	DefaultScope     string  `json:"defaultScope"` // "*" for unscoped, or "#region" (e.g. "#ioi")
+	PathHashSize     uint8   `json:"pathHashSize,omitempty"`
+	AdvertName       string  `json:"advertName,omitempty"`       // REPEATER advert name for this tunnel hop (e.g. "MAD-DUB-TUNNEL")
+	DirectAdvertMins int     `json:"directAdvertMins,omitempty"` // 0-hop DIRECT advert interval in minutes (default 120; <0 disables)
+	FloodAdvertMins  int     `json:"floodAdvertMins,omitempty"`  // scoped FLOOD advert interval in minutes (default 720; <0 disables)
+	FreqMHz          float64 `json:"freqMHz"`
+	BwKHz            float64 `json:"bwKHz"`
+	SF               uint8   `json:"sf"`
+	CR               uint8   `json:"cr"`
+	TxPower          uint8   `json:"txPower"`
 }
 
 type CompanionEntry struct {
@@ -53,8 +57,17 @@ type Config struct {
 }
 
 func applySiteDefaults(s *SiteConfig) {
+	s.AdvertName = strings.TrimSpace(s.AdvertName)
 	if s.DefaultScope == "" {
 		s.DefaultScope = "*"
+	}
+	if s.PathHashSize < 1 || s.PathHashSize > 3 {
+		s.PathHashSize = 3
+	}
+	if s.AdvertName != "" && s.DirectAdvertMins == 0 && s.FloodAdvertMins == 0 {
+		// MeshCore simple_repeater defaults: 2h 0-hop direct, 12h flood.
+		s.DirectAdvertMins = 120
+		s.FloodAdvertMins = 720
 	}
 	if s.FreqMHz == 0 {
 		s.FreqMHz = 869.618

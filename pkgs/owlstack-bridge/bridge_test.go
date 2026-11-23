@@ -7,6 +7,8 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"net"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -866,5 +868,113 @@ func TestKissArbiterWithFakeModemAndVirtualClient(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for physical modem TX")
+	}
+}
+
+func TestBridgeTunnelRepeaterAdvertsAndPersistence(t *testing.T) {
+	stateDir := t.TempDir()
+
+	// Seed a legacy pubkey-only bridge_identities.json (no private seeds) to ensure seamless upgrade.
+	legacyJSON := `{"siteAPubHex":"10a7cb0000000000000000000000000000000000000000000000000000000001","siteBPubHex":"483c8c0000000000000000000000000000000000000000000000000000000002"}`
+	if err := os.WriteFile(filepath.Join(stateDir, "bridge_identities.json"), []byte(legacyJSON), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := newTestConfig(t, "")
+	cfg.StateDir = stateDir
+	cfg.SiteA.AdvertName = " MAD-DUB-TUNNEL" // leading space trimmed cleanly
+	cfg.SiteA.PathHashSize = 3
+	cfg.SiteA.DirectAdvertMins = 120
+	cfg.SiteA.FloodAdvertMins = 720
+	cfg.SiteB.AdvertName = "DUB-MAD-TUNNEL"
+	cfg.SiteB.PathHashSize = 3
+	cfg.SiteB.DirectAdvertMins = 120
+	cfg.SiteB.FloodAdvertMins = 720
+
+	eng, err := NewBridgeEngine(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pubA := eng.SiteBridgePubKey(SiteA)
+	pubB := eng.SiteBridgePubKey(SiteB)
+	if pubA[0] == 0x10 && pubA[1] == 0xa7 && pubA[2] == 0xcb {
+		t.Fatalf("expected legacy pubkey-only identity to upgrade to a full signing identity")
+	}
+
+	now := time.Now()
+	ioi := meshcore.NewRegion("#ioi")
+
+	// 1. First boot -> 12h FLOOD advert is due on both Pinto (unscoped) and Dublin (#ioi).
+	rawMadFlood, isFloodMad, err := eng.CheckDueSiteAdvert(SiteA, false, now)
+	if err != nil || !isFloodMad || len(rawMadFlood) == 0 {
+		t.Fatalf("expected initial Pinto FLOOD advert, got flood=%v len=%d err=%v", isFloodMad, len(rawMadFlood), err)
+	}
+	pktMad, err := meshcore.PacketFromBytes(rawMadFlood)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pktMad.RouteType() != meshcore.RouteTypeFlood || pktMad.IsTransport() || pktMad.PathHashSize() != 3 || pktMad.PathHashCount() != 0 {
+		t.Fatalf("unexpected Pinto FLOOD advert header: route=%s sz=%d hops=%d", pktMad.RouteTypeString(), pktMad.PathHashSize(), pktMad.PathHashCount())
+	}
+	advMad, err := meshcore.AdvertFromBytes(pktMad.Payload)
+	if err != nil || !advMad.Verify() {
+		t.Fatalf("expected valid signed Pinto ADVERT, err=%v", err)
+	}
+	if !bytes.Equal(advMad.PublicKey.PublicKeyBytes(), pubA[:]) || advMad.AppData().Type != "REPEATER" || advMad.AppData().Name != "MAD-DUB-TUNNEL" {
+		t.Fatalf("unexpected Pinto ADVERT payload: type=%s name=%q", advMad.AppData().Type, advMad.AppData().Name)
+	}
+	eng.MarkSiteAdvertSent(SiteA, true, now)
+
+	rawDubFlood, isFloodDub, err := eng.CheckDueSiteAdvert(SiteB, false, now)
+	if err != nil || !isFloodDub || len(rawDubFlood) == 0 {
+		t.Fatalf("expected initial Dublin FLOOD advert, got flood=%v len=%d err=%v", isFloodDub, len(rawDubFlood), err)
+	}
+	pktDub, err := meshcore.PacketFromBytes(rawDubFlood)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pktDub.RouteType() != meshcore.RouteTypeTransportFlood || !ioi.MatchesPacket(pktDub) || pktDub.PathHashSize() != 3 || pktDub.PathHashCount() != 0 {
+		t.Fatalf("expected Dublin #ioi 3-byte FLOOD advert, got route=%s sz=%d hops=%d", pktDub.RouteTypeString(), pktDub.PathHashSize(), pktDub.PathHashCount())
+	}
+	advDub, err := meshcore.AdvertFromBytes(pktDub.Payload)
+	if err != nil || !advDub.Verify() {
+		t.Fatalf("expected valid signed Dublin ADVERT, err=%v", err)
+	}
+	if !bytes.Equal(advDub.PublicKey.PublicKeyBytes(), pubB[:]) || advDub.AppData().Type != "REPEATER" || advDub.AppData().Name != "DUB-MAD-TUNNEL" {
+		t.Fatalf("unexpected Dublin ADVERT payload: type=%s name=%q", advDub.AppData().Type, advDub.AppData().Name)
+	}
+	eng.MarkSiteAdvertSent(SiteB, true, now)
+
+	// 2. Restarting 10 minutes later preserves exact signing identities AND sends only a 0-hop DIRECT advert (no flood spam!).
+	eng2, err := NewBridgeEngine(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if eng2.SiteBridgePubKey(SiteA) != pubA || eng2.SiteBridgePubKey(SiteB) != pubB {
+		t.Fatalf("expected signing identities to persist identically across restarts")
+	}
+
+	restartRaw, restartFlood, err := eng2.CheckDueSiteAdvert(SiteB, false, now.Add(10*time.Minute))
+	if err != nil || restartFlood || len(restartRaw) == 0 {
+		t.Fatalf("expected 0-hop DIRECT startup advert on restart within 12h window, got flood=%v len=%d err=%v", restartFlood, len(restartRaw), err)
+	}
+	restartPkt, _ := meshcore.PacketFromBytes(restartRaw)
+	if !restartPkt.IsRouteDirect() || restartPkt.PathHashCount() != 0 {
+		t.Fatalf("expected 0-hop DIRECT advert on restart, got route=%s hops=%d", restartPkt.RouteTypeString(), restartPkt.PathHashCount())
+	}
+	eng2.MarkSiteAdvertSent(SiteB, false, now.Add(10*time.Minute))
+
+	// 3. 30 minutes later (within 2h direct & 12h flood windows, sentStartup=true) -> nothing due.
+	if idleRaw, _, err := eng2.CheckDueSiteAdvert(SiteB, true, now.Add(40*time.Minute)); err != nil || idleRaw != nil {
+		t.Fatalf("expected no advert due within 2h window, got len=%d err=%v", len(idleRaw), err)
+	}
+
+	// 4. 2h15m later -> 0-hop DIRECT advert due; 12h05m later -> scoped FLOOD advert due again.
+	if dirRaw, dirFlood, err := eng2.CheckDueSiteAdvert(SiteB, true, now.Add(135*time.Minute)); err != nil || dirFlood || dirRaw == nil {
+		t.Fatalf("expected 2h 0-hop DIRECT advert due, got flood=%v nil=%v err=%v", dirFlood, dirRaw == nil, err)
+	}
+	if flRaw, flFlood, err := eng2.CheckDueSiteAdvert(SiteB, true, now.Add(725*time.Minute)); err != nil || !flFlood || flRaw == nil {
+		t.Fatalf("expected 12h FLOOD advert due, got flood=%v nil=%v err=%v", flFlood, flRaw == nil, err)
 	}
 }
