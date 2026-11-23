@@ -152,6 +152,9 @@ in {
         };
         environment = {
           HOME = "/var/lib/kopia";
+          # Only ignores rewrite errors on already-deleted (ci.Deleted) tombstones
+          # whose old short pack is missing, while still failing on live contents.
+          KOPIA_IGNORE_MAINTENANCE_REWRITE_ERROR = "true";
         };
         script = ''
           export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_repo_password.path})"
@@ -275,6 +278,9 @@ in {
         wants = [ "kopia-server.service" ];
         environment = {
           HOME = "/var/lib/kopia";
+          # Only ignores rewrite errors on already-deleted (ci.Deleted) tombstones
+          # whose old short pack is missing, while still failing on live contents.
+          KOPIA_IGNORE_MAINTENANCE_REWRITE_ERROR = "true";
         };
         path = [ kopia ];
         serviceConfig = {

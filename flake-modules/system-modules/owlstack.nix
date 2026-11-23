@@ -340,6 +340,7 @@ in
             { name = "#ireland"; homeSite = "dublin"; }
             { name = "#dublin"; homeSite = "dublin"; }
             { name = "#madrid"; homeSite = "pinto"; }
+            { name = "#bot"; homeSite = "pinto"; }
           ];
           description = "Non-overlapping city channels bridged asymmetrically: transmissions heard at the away site (even multi-hop via local repeaters) flood onto homeSite's mesh (write), while homeSite mesh floods are clamped to 0-hop DIRECT at the peer site (read without repeater re-broadcast).";
         };
