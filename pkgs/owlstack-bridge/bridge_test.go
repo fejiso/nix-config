@@ -978,3 +978,107 @@ func TestBridgeTunnelRepeaterAdvertsAndPersistence(t *testing.T) {
 		t.Fatalf("expected 12h FLOOD advert due, got flood=%v nil=%v err=%v", flFlood, flRaw == nil, err)
 	}
 }
+
+func TestCrossSiteRepeaterLoginZeroHopAndWormhole(t *testing.T) {
+	ultrabirdID := makeIdentityWithPrefix(t, 0xa8)
+	ultrabirdPK := ultrabirdID.PublicKey()
+	nonAllowedID := makeIdentityWithPrefix(t, 0xa8, ultrabirdPK[0])
+	nonAllowedPK := nonAllowedID.PublicKey()
+
+	cfg := newTestConfig(t, hex.EncodeToString(ultrabirdPK[:]))
+	cfg.SiteA.PathHashSize = 3
+	cfg.SiteB.PathHashSize = 3
+	eng, err := NewBridgeEngine(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now()
+	ioi := meshcore.NewRegion("#ioi")
+	pintoBridge := eng.SiteBridgePubKey(SiteA)
+	dublinBridge := eng.SiteBridgePubKey(SiteB)
+
+	// 1. Reproduce packet #9047: ultrabird in Dublin sends 0-hop DIRECT (sz=1) ANON_REQ to MAD-PINTO-CENTRO (0xa8).
+	var anonPayload []byte
+	anonPayload = append(anonPayload, 0xa8)
+	anonPayload = append(anonPayload, ultrabirdPK[:]...)
+	anonPayload = append(anonPayload, 0x11, 0x22, 0x33, 0x44)
+
+	anonDirect0 := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeDirect, meshcore.PayloadTypeAnonReq, 0),
+		PathLength: meshcore.MakePathLen(1, 0), // sz=1, hops=0 (exact wire encoding of #9047)
+		Payload:    anonPayload,
+	}
+	anonRaw, _ := anonDirect0.ToBytes()
+
+	outRaw, act, err := eng.RoutePacket(anonRaw, SiteB, now)
+	if err != nil || act != ActionIdentityBridged {
+		t.Fatalf("expected 0-hop DIRECT ANON_REQ from ultrabird to bridge, got act=%s err=%v", act, err)
+	}
+	outPkt, _ := meshcore.PacketFromBytes(outRaw)
+	if outPkt.RouteType() != meshcore.RouteTypeFlood || outPkt.PathHashSize() != 3 || outPkt.PathHashCount() != 2 {
+		t.Fatalf("expected upgraded 3-byte FLOOD with [dublinBridge, pintoBridge], got route=%s sz=%d hops=%d",
+			outPkt.RouteTypeString(), outPkt.PathHashSize(), outPkt.PathHashCount())
+	}
+
+	// 2. MAD-PINTO-CENTRO replies via reverse wormhole DIRECT [pintoBridge, dublinBridge] -> arrives 0-hop DIRECT in Dublin.
+	var revPath []byte
+	revPath = append(revPath, pintoBridge[:3]...)
+	revPath = append(revPath, dublinBridge[:3]...)
+	respWormhole := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeDirect, meshcore.PayloadTypeResponse, 0),
+		PathLength: meshcore.MakePathLen(3, 2),
+		Path:       revPath,
+		Payload:    []byte{ultrabirdPK[0], 0xa8, 0xaa, 0xbb, 0xcc, 0xdd},
+	}
+	respWormRaw, _ := respWormhole.ToBytes()
+	respOutRaw, respAct, err := eng.RoutePacket(respWormRaw, SiteA, now)
+	if err != nil || respAct != ActionDirectWormhole {
+		t.Fatalf("expected repeater login response through wormhole to succeed, got act=%s err=%v", respAct, err)
+	}
+	respOutPkt, _ := meshcore.PacketFromBytes(respOutRaw)
+	if !respOutPkt.IsRouteDirect() || respOutPkt.PathHashCount() != 0 {
+		t.Fatalf("expected 0-hop DIRECT delivery in Dublin, got route=%s hops=%d", respOutPkt.RouteTypeString(), respOutPkt.PathHashCount())
+	}
+
+	// 3. Conversely, if ultrabird manually routes via [solarbird, DUB-MAD-TUNNEL, MAD-DUB-TUNNEL], MAD-PINTO-CENTRO
+	//    receives a 0-hop DIRECT request and replies 0-hop DIRECT [dst=ultrabird, src=0xa8] -> bridges back to Dublin (#ioi)!
+	respDirect0 := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeDirect, meshcore.PayloadTypeResponse, 0),
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    []byte{ultrabirdPK[0], 0xa8, 0xde, 0xad, 0xbe, 0xef},
+	}
+	respDirect0Raw, _ := respDirect0.ToBytes()
+	backRaw, backAct, err := eng.RoutePacket(respDirect0Raw, SiteA, now)
+	if err != nil || backAct != ActionIdentityBridged {
+		t.Fatalf("expected 0-hop DIRECT repeater response targeting ultrabird to bridge, got act=%s err=%v", backAct, err)
+	}
+	backPkt, _ := meshcore.PacketFromBytes(backRaw)
+	if !ioi.MatchesPacket(backPkt) || backPkt.PathHashCount() != 2 {
+		t.Fatalf("expected #ioi flood back to Dublin, got route=%s hops=%d", backPkt.RouteTypeString(), backPkt.PathHashCount())
+	}
+
+	// 4. Non-allowlisted local OwlShack companion (punctumatic) polling MAD-PINTO-CENTRO at 0-hop DIRECT stays local!
+	localPoll := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeDirect, meshcore.PayloadTypeReq, 0),
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    []byte{0xa8, nonAllowedPK[0], 1, 2, 3, 4},
+	}
+	localPollRaw, _ := localPoll.ToBytes()
+	if out, lAct, _ := eng.RoutePacket(localPollRaw, SiteA, now); out != nil || lAct != ActionFilteredDrop {
+		t.Fatalf("expected non-allowlisted 0-hop DIRECT repeater poll to stay local, got %s", lAct)
+	}
+
+	// 5. 0-hop DIRECT ADVERT from allowlisted companion is NOT turned into a remote flood.
+	adv, _ := meshcore.NewAdvert(ultrabirdID, meshcore.AdvertAppData{Type: "CHAT", Name: "ultrabird"}, uint32(now.Unix()))
+	advBytes, _ := adv.ToBytes()
+	advDirect0 := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeDirect, meshcore.PayloadTypeAdvert, 0),
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    advBytes,
+	}
+	advDirect0Raw, _ := advDirect0.ToBytes()
+	if out, aAct, _ := eng.RoutePacket(advDirect0Raw, SiteB, now); out != nil || aAct != ActionFilteredDrop {
+		t.Fatalf("expected 0-hop DIRECT ADVERT to stay local, got %s", aAct)
+	}
+}

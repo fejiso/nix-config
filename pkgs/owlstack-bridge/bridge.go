@@ -837,6 +837,13 @@ func (b *BridgeEngine) floodToPeerSite(pkt *meshcore.Packet, fromSite, toSite Si
 	if clone.IsRouteDirect() {
 		clone.Header = meshcore.MakeHeader(meshcore.RouteTypeFlood, clone.PayloadType(), clone.PayloadVer())
 		clone.TransportCode1, clone.TransportCode2 = 0, 0
+		if clone.PathHashCount() == 0 {
+			hashSize := b.siteConfig(toSite).PathHashSize
+			if hashSize < 1 || hashSize > 3 {
+				hashSize = 3
+			}
+			clone.PathLength = meshcore.MakePathLen(hashSize, 0)
+		}
 	}
 
 	fromRegion := b.siteRegion[fromSite]
@@ -978,6 +985,30 @@ func (b *BridgeEngine) RoutePacket(raw []byte, fromSite SiteID, now time.Time) (
 				}
 				b.Counters[fromSite].ZeroHopClamped.Add(1)
 				return out, ActionZeroHopClamped, nil
+			}
+
+			// Also bridge 0-hop DIRECT identity/repeater-login packets (ANON_REQ, REQ,
+			// RESPONSE, TXT_MSG, PATH, or ACK within ackWindow — excluding 0-hop ADVERTs)
+			// involving an allowlisted companion. This handles both:
+			//   - logging into a remote site repeater whose outPath is still cached as
+			//     0-hop DIRECT from an earlier in-person visit, and
+			//   - 0-hop DIRECT responses from a local repeater back to a remote
+			//     allowlisted companion that routed through the wormhole.
+			if pkt.PayloadType() != meshcore.PayloadTypeAdvert {
+				if idMatch := b.classifyIdentityPacket(pkt, now); idMatch.allowed {
+					if b.hasSeenOrMark(pkt) {
+						b.Counters[fromSite].DedupDropped.Add(1)
+						return nil, ActionDedupDrop, nil
+					}
+					b.applyIdentitySideEffects(idMatch, now)
+					out, err := b.floodToPeerSite(pkt, fromSite, toSite)
+					if err != nil {
+						b.Counters[fromSite].InvalidDropped.Add(1)
+						return nil, ActionInvalidDrop, err
+					}
+					b.Counters[fromSite].IdentityBridged.Add(1)
+					return out, ActionIdentityBridged, nil
+				}
 			}
 		}
 
