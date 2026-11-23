@@ -69,7 +69,8 @@ in {
     withRuby = true;
     
     extraPackages = with pkgs; [
-      # LazyVim dependencies
+      # LazyVim / plugin dependencies
+      curl
       git
       ripgrep
       fd
@@ -132,13 +133,7 @@ in {
                     args = {},
                     file = "${config.home.homeDirectory}/.tidal/BootTidal.hs",
                     enabled = true,
-                    highlight = { autostart = true, fps = 10 },
-                  },
-                  sclang = {
-                    cmd = "sclang",
-                    args = {},
-                    file = nil,
-                    enabled = false,
+                    highlight = { fps = 10 },
                   },
                   split = "v",
                 },
@@ -152,20 +147,6 @@ in {
                 },
               })
 
-              -- Drain stdout/stderr on start to prevent GHCi pipe deadlock.
-              -- tidal.nvim defers attaching pipe readers until :TidalNotification,
-              -- so without this, the OS pipe buffer fills and GHCi blocks on write.
-              local Repl = require("tidal.util.repl.repl")
-              local _orig_start = Repl.start
-              function Repl:start(opts)
-                local result = _orig_start(self, opts)
-                if self.proc then
-                  if self.stdout then self.stdout:read_start(function() end) end
-                  if self.stderr then self.stderr:read_start(function() end) end
-                end
-                return result
-              end
-
               -- Silence the nearest previous d<N> stream
               vim.keymap.set("n", "<Leader>ds", function()
                 local line_num = vim.fn.search([[\v<d\d+]], "bnW")
@@ -178,6 +159,22 @@ in {
                 end
               end, { silent = true, desc = "Silence nearest Tidal stream" })
             end,
+          },
+          { "kawre/leetcode.nvim",
+            build = ":TSUpdate html",
+            cmd = "Leet",
+            lazy = "leetcode.nvim" ~= vim.fn.argv(0, -1),
+            dependencies = {
+              "folke/snacks.nvim",
+              "nvim-lua/plenary.nvim",
+              "MunifTanjim/nui.nvim",
+            },
+            opts = {
+              arg = "leetcode.nvim",
+              plugins = {
+                non_standalone = true,
+              },
+            },
           },
         },
         defaults = {
