@@ -28,6 +28,7 @@ type CompanionEntry struct {
 type ChannelConfig struct {
 	Name      string `json:"name"`
 	PSKBase64 string `json:"pskBase64,omitempty"` // empty for "#hashtag" channels
+	HomeSite  string `json:"homeSite,omitempty"`  // optional home site name (e.g. "pinto" or "dublin") for zeroHopChannels
 }
 
 type AllowlistData struct {

@@ -20,6 +20,7 @@ let
     hispanas = 4;  # Core i3-3220 (2C/4T) -> 2
     a8       = 4;  # AMD A8-7410 (4C/4T) -> 2
     snuffles = 2;  # Celeron N3060 (2C/2T) -> 1
+    quicksilver = 2; # Core 2 Duo SU7300 (2C/2T) -> 1
   };
 
   halfLogicalCores =

@@ -85,7 +85,27 @@
                   size = "100%";
                   content = {
                     type = "btrfs";
-                    extraArgs = [ "-f" ];
+                    # Disable block-group-tree (newly default in btrfs-progs 6.19, requires
+                    # kernel >= 6.1) so older Live USB kernels can mount /mnt during install.
+                    extraArgs = [ "-f" "-O" "^block-group-tree" ];
+                    preCreateHook = ''
+                      if [ -d /run/booted-system/kernel-modules ]; then
+                        /run/current-system/sw/bin/modprobe -d /run/booted-system/kernel-modules btrfs 2>/dev/null || true
+                      else
+                        modprobe btrfs 2>/dev/null || true
+                      fi
+                      wipefs -af "$device" || true
+                      dd if=/dev/zero of="$device" bs=1M count=16 conv=notrunc status=none || true
+                      dev_mib=$(( $(blockdev --getsize64 "$device") / 1048576 ))
+                      if [ "$dev_mib" -gt 32 ]; then
+                        dd if=/dev/zero of="$device" bs=1M seek=$(( dev_mib - 16 )) count=16 conv=notrunc status=none || true
+                      fi
+                      udevadm settle || true
+                      mount() { command mount -t btrfs "$@"; }
+                    '';
+                    preMountHook = ''
+                      mount() { command mount -t btrfs "$@"; }
+                    '';
                     subvolumes = {
                       "@" = {
                         mountpoint = "/";
@@ -119,7 +139,7 @@
         fileSystems."/var/log".neededForBoot = true;
 
         boot.loader.systemd-boot.enable = lib.mkIf cfg.biosBoot (lib.mkForce false);
-        boot.loader.efi.canTouchEfiVariables = lib.mkIf cfg.biosBoot (lib.mkDefault false);
+        boot.loader.efi.canTouchEfiVariables = lib.mkIf cfg.biosBoot (lib.mkForce false);
         boot.loader.grub = lib.mkIf cfg.biosBoot {
           enable = lib.mkDefault true;
           efiSupport = lib.mkDefault true;

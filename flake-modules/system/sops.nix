@@ -1,7 +1,9 @@
 { ... }: {
   flake.modules.nixos.cli =
-{ inputs, config, ... }:
-
+{ inputs, lib, config, ... }:
+let
+  hasUsersSecretFile = builtins.pathExists "${inputs.private}/secrets/users.yaml";
+in
 {
   imports = [ inputs.sops-nix.nixosModules.sops ];
 
@@ -81,6 +83,12 @@
         # and the oneshot sync never re-runs. sops-nix restarts the sync when
         # the decrypted content actually changes at activation.
         restartUnits = [ "iwd-secrets-sync.service" ];
+      };
+    } // lib.optionalAttrs hasUsersSecretFile {
+      z-247-password-hash = {
+        sopsFile = "${inputs.private}/secrets/users.yaml";
+        key = "z-247_password_hash";
+        neededForUsers = true;
       };
     };
   };

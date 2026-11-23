@@ -14,10 +14,11 @@
         hispanas = 4;  # -> 2 slots (clientOnly by default)
         a8       = 4;  # -> 2 slots (clientOnly by default)
         snuffles = 2;  # -> 1 slot  (clientOnly by default)
+        quicksilver = 2; # -> 1 slot (clientOnly by default)
       };
 
       workerPoolHosts = [ "butthead" "tungsten" "hierro" "blacktop" "elitedex" "lenovix" ];
-      clientOnlyHosts = [ "hispanas" "a8" "snuffles" ];
+      clientOnlyHosts = [ "hispanas" "a8" "snuffles" "quicksilver" ];
 
       defaultHalfCores =
         let n = logicalCoresByHost.${hostname} or 4;

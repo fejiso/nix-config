@@ -98,7 +98,20 @@
                     };
                     content = {
                       type = "btrfs";
-                      extraArgs = [ "-f" ];
+                      extraArgs = [ "-f" "-O" "^block-group-tree" ];
+                      preCreateHook = ''
+                        if [ -d /run/booted-system/kernel-modules ]; then
+                          /run/current-system/sw/bin/modprobe -d /run/booted-system/kernel-modules btrfs 2>/dev/null || true
+                        else
+                          modprobe btrfs 2>/dev/null || true
+                        fi
+                        wipefs -af "$device" || true
+                        udevadm settle || true
+                        mount() { command mount -t btrfs "$@"; }
+                      '';
+                      preMountHook = ''
+                        mount() { command mount -t btrfs "$@"; }
+                      '';
                       subvolumes = {
                         "@" = {
                           mountpoint = "/";
@@ -133,7 +146,7 @@
         fileSystems."/var/log".neededForBoot = true;
 
         boot.loader.systemd-boot.enable = lib.mkIf cfg.biosBoot (lib.mkForce false);
-        boot.loader.efi.canTouchEfiVariables = lib.mkIf cfg.biosBoot (lib.mkDefault false);
+        boot.loader.efi.canTouchEfiVariables = lib.mkIf cfg.biosBoot (lib.mkForce false);
         boot.loader.grub = lib.mkIf cfg.biosBoot {
           enable = lib.mkDefault true;
           efiSupport = lib.mkDefault true;

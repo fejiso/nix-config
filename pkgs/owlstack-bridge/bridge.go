@@ -21,8 +21,9 @@ import (
 type SiteID int
 
 const (
-	SiteA SiteID = 0
-	SiteB SiteID = 1
+	SiteUnspecified SiteID = -1
+	SiteA           SiteID = 0
+	SiteB           SiteID = 1
 )
 
 type BridgeAction string
@@ -42,6 +43,11 @@ const (
 type parsedCompanion struct {
 	keyPrefix []byte
 	name      string
+}
+
+type zeroHopEntry struct {
+	ch       *meshcore.ChannelEntry
+	homeSite SiteID // SiteA, SiteB, or SiteUnspecified
 }
 
 type BridgeCounters struct {
@@ -72,7 +78,7 @@ type BridgeEngine struct {
 	mu              sync.RWMutex
 	companions      []parsedCompanion
 	bridgedChannels []*meshcore.ChannelEntry
-	zeroHopChannels []*meshcore.ChannelEntry
+	zeroHopChannels []zeroHopEntry
 	learnedNames    map[string]string // hex pubkey -> verified ADVERT name
 	ackWindowUntil  time.Time
 
@@ -200,44 +206,93 @@ func (b *BridgeEngine) SiteBridgePubKey(s SiteID) [meshcore.PubKeySize]byte {
 	return b.siteBridgePub[s]
 }
 
+func parseSingleChannel(label string, cc ChannelConfig) (*meshcore.ChannelEntry, string, string, error) {
+	name := strings.TrimSpace(cc.Name)
+	if name == "" || name == "*" {
+		return nil, "", "", nil
+	}
+	psk := strings.TrimSpace(cc.PSKBase64)
+	if psk != "" {
+		ch, err := meshcore.NewChannelFromBase64(name, psk)
+		if err != nil {
+			return nil, "", "", fmt.Errorf("%s %q PSK: %w", label, name, err)
+		}
+		return ch, name, name + "\x00" + psk, nil
+	}
+	if strings.EqualFold(name, "Public") {
+		return meshcore.PublicChannel(), "Public", "Public", nil
+	}
+	norm := meshcore.NormalizeHashtag(name)
+	return meshcore.NewChannelFromHashtag(norm), norm, norm, nil
+}
+
 func parseChannelConfigs(label string, chConfigs []ChannelConfig) ([]*meshcore.ChannelEntry, []string, error) {
 	var out []*meshcore.ChannelEntry
 	seen := map[string]bool{}
 	var names []string
 
 	for _, cc := range chConfigs {
-		name := strings.TrimSpace(cc.Name)
-		if name == "" || name == "*" {
+		ch, dispName, key, err := parseSingleChannel(label, cc)
+		if err != nil {
+			return nil, nil, err
+		}
+		if ch == nil || seen[key] {
 			continue
 		}
-		psk := strings.TrimSpace(cc.PSKBase64)
-		if psk != "" {
-			key := name + "\x00" + psk
-			if seen[key] {
-				continue
+		seen[key] = true
+		out = append(out, ch)
+		names = append(names, dispName)
+	}
+	return out, names, nil
+}
+
+func (b *BridgeEngine) resolveHomeSite(home string) (SiteID, error) {
+	home = strings.TrimSpace(home)
+	if home == "" {
+		return SiteUnspecified, nil
+	}
+	if strings.EqualFold(home, b.cfg.SiteA.Name) {
+		return SiteA, nil
+	}
+	if strings.EqualFold(home, b.cfg.SiteB.Name) {
+		return SiteB, nil
+	}
+	return SiteUnspecified, fmt.Errorf("unknown homeSite %q (expected %q or %q)", home, b.cfg.SiteA.Name, b.cfg.SiteB.Name)
+}
+
+func (b *BridgeEngine) parseZeroHopConfigs(chConfigs []ChannelConfig) ([]zeroHopEntry, []string, error) {
+	var out []zeroHopEntry
+	seenIdx := map[string]int{}
+	var names []string
+
+	for _, cc := range chConfigs {
+		ch, dispName, key, err := parseSingleChannel("zeroHopChannel", cc)
+		if err != nil {
+			return nil, nil, err
+		}
+		if ch == nil {
+			continue
+		}
+		hs, err := b.resolveHomeSite(cc.HomeSite)
+		if err != nil {
+			return nil, nil, fmt.Errorf("zeroHopChannel %q: %w", dispName, err)
+		}
+		if idx, exists := seenIdx[key]; exists {
+			if out[idx].homeSite == SiteUnspecified && hs != SiteUnspecified {
+				out[idx].homeSite = hs
 			}
-			seen[key] = true
-			ch, err := meshcore.NewChannelFromBase64(name, psk)
-			if err != nil {
-				return nil, nil, fmt.Errorf("%s %q PSK: %w", label, name, err)
+			continue
+		}
+		seenIdx[key] = len(out)
+		out = append(out, zeroHopEntry{ch: ch, homeSite: hs})
+		if hs != SiteUnspecified {
+			siteLabel := b.cfg.SiteA.Name
+			if hs == SiteB {
+				siteLabel = b.cfg.SiteB.Name
 			}
-			out = append(out, ch)
-			names = append(names, name)
-		} else if strings.EqualFold(name, "Public") {
-			if seen["Public"] {
-				continue
-			}
-			seen["Public"] = true
-			out = append(out, meshcore.PublicChannel())
-			names = append(names, "Public")
+			names = append(names, fmt.Sprintf("%s@%s", dispName, siteLabel))
 		} else {
-			norm := meshcore.NormalizeHashtag(name)
-			if seen[norm] {
-				continue
-			}
-			seen[norm] = true
-			out = append(out, meshcore.NewChannelFromHashtag(norm))
-			names = append(names, norm)
+			names = append(names, dispName)
 		}
 	}
 	return out, names, nil
@@ -262,6 +317,7 @@ func (b *BridgeEngine) ReloadAllowlist() error {
 	}
 
 	var parsed []parsedCompanion
+	seenComp := map[string]int{}
 	for _, e := range entries {
 		clean := strings.TrimPrefix(strings.TrimSpace(e.PubKey), "0x")
 		if clean == "" {
@@ -271,9 +327,22 @@ func (b *BridgeEngine) ReloadAllowlist() error {
 		if err != nil || len(decoded) == 0 || len(decoded) > meshcore.PubKeySize {
 			return fmt.Errorf("invalid companion pubKey %q: must be 2..64 hex chars", e.PubKey)
 		}
+		name := strings.TrimSpace(e.Name)
+		dedupKey := hex.EncodeToString(decoded) + "\x00" + name
+		if len(decoded) >= 4 {
+			// Full/long pubkey prefixes uniquely identify the companion; merge optional display name.
+			dedupKey = hex.EncodeToString(decoded)
+		}
+		if idx, exists := seenComp[dedupKey]; exists {
+			if parsed[idx].name == "" && name != "" {
+				parsed[idx].name = name
+			}
+			continue
+		}
+		seenComp[dedupKey] = len(parsed)
 		parsed = append(parsed, parsedCompanion{
 			keyPrefix: decoded,
-			name:      strings.TrimSpace(e.Name),
+			name:      name,
 		})
 	}
 
@@ -281,7 +350,7 @@ func (b *BridgeEngine) ReloadAllowlist() error {
 	if err != nil {
 		return err
 	}
-	zeroHopChannels, zeroHopNames, err := parseChannelConfigs("zeroHopChannel", zeroHopCfgs)
+	zeroHopChannels, zeroHopNames, err := b.parseZeroHopConfigs(zeroHopCfgs)
 	if err != nil {
 		return err
 	}
@@ -302,11 +371,73 @@ func (b *BridgeEngine) ReloadAllowlist() error {
 	return nil
 }
 
-func (b *BridgeEngine) matchPubKeyLocked(pubKey []byte) bool {
+// pinnedFullKeyHexLocked returns the learned 64-hex-char public key for a
+// short-prefix companion with a configured display name, if previously verified
+// via a signed ADVERT.
+func (b *BridgeEngine) pinnedFullKeyHexLocked(c parsedCompanion) string {
+	if c.name == "" {
+		return ""
+	}
+	for pubHex, learnedName := range b.learnedNames {
+		if learnedName != c.name {
+			continue
+		}
+		if raw, err := hex.DecodeString(pubHex); err == nil && len(raw) >= len(c.keyPrefix) && bytes.Equal(raw[:len(c.keyPrefix)], c.keyPrefix) {
+			return pubHex
+		}
+	}
+	return ""
+}
+
+// matchAdvertLocked checks whether a verified ADVERT public key + name matches
+// an allowlisted companion. Short prefixes (< 4 bytes) paired with a configured
+// display name require either a previously pinned full key or an exact name
+// match so unrelated repeaters sharing a 1-byte prefix are never bridged.
+func (b *BridgeEngine) matchAdvertLocked(pubKey []byte, advName string) bool {
+	pubHex := ""
 	for _, c := range b.companions {
-		if len(pubKey) >= len(c.keyPrefix) && bytes.Equal(pubKey[:len(c.keyPrefix)], c.keyPrefix) {
+		if len(pubKey) < len(c.keyPrefix) || !bytes.Equal(pubKey[:len(c.keyPrefix)], c.keyPrefix) {
+			continue
+		}
+		if len(c.keyPrefix) >= 4 || c.name == "" {
 			return true
 		}
+		if pubHex == "" {
+			pubHex = hex.EncodeToString(pubKey)
+		}
+		if pinned := b.pinnedFullKeyHexLocked(c); pinned != "" {
+			if pubHex == pinned {
+				return true
+			}
+			continue
+		}
+		if advName != "" && advName == c.name {
+			return true
+		}
+	}
+	return false
+}
+
+// matchPubKeyLocked checks a 32-byte sender public key on ANON_REQ packets.
+func (b *BridgeEngine) matchPubKeyLocked(pubKey []byte) bool {
+	pubHex := ""
+	for _, c := range b.companions {
+		if len(pubKey) < len(c.keyPrefix) || !bytes.Equal(pubKey[:len(c.keyPrefix)], c.keyPrefix) {
+			continue
+		}
+		if len(c.keyPrefix) >= 4 || c.name == "" {
+			return true
+		}
+		if pinned := b.pinnedFullKeyHexLocked(c); pinned != "" {
+			if pubHex == "" {
+				pubHex = hex.EncodeToString(pubKey)
+			}
+			if pubHex == pinned {
+				return true
+			}
+			continue
+		}
+		return true
 	}
 	return false
 }
@@ -314,6 +445,28 @@ func (b *BridgeEngine) matchPubKeyLocked(pubKey []byte) bool {
 func (b *BridgeEngine) matchHash1Locked(h byte) bool {
 	for _, c := range b.companions {
 		if c.keyPrefix[0] == h {
+			return true
+		}
+	}
+	return false
+}
+
+func (b *BridgeEngine) matchCompanionSender(sender string) bool {
+	if sender == "" {
+		return false
+	}
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	for _, c := range b.companions {
+		if c.name != "" && c.name == sender {
+			return true
+		}
+	}
+	for pubHex, learnedName := range b.learnedNames {
+		if learnedName != sender {
+			continue
+		}
+		if raw, err := hex.DecodeString(pubHex); err == nil && b.matchAdvertLocked(raw, learnedName) {
 			return true
 		}
 	}
@@ -354,15 +507,22 @@ const (
 	channelTierZeroHop
 )
 
+type channelMatch struct {
+	tier     channelTier
+	name     string
+	sender   string
+	homeSite SiteID
+}
+
 // classifyChannel checks whether pkt is a GRP_TXT packet that decrypts and
 // authenticates cleanly under bridgedChannels (full-mesh) or zeroHopChannels.
-func (b *BridgeEngine) classifyChannel(pkt *meshcore.Packet) (string, channelTier) {
+func (b *BridgeEngine) classifyChannel(pkt *meshcore.Packet) channelMatch {
 	if pkt.PayloadType() != meshcore.PayloadTypeGrpTxt {
-		return "", channelTierNone
+		return channelMatch{}
 	}
 	gt, err := meshcore.GroupTextFromBytes(pkt.Payload)
 	if err != nil {
-		return "", channelTierNone
+		return channelMatch{}
 	}
 
 	b.mu.RLock()
@@ -370,19 +530,70 @@ func (b *BridgeEngine) classifyChannel(pkt *meshcore.Packet) (string, channelTie
 
 	for _, ch := range b.bridgedChannels {
 		if ch.Hash == gt.ChannelHash {
-			if _, err := gt.DecryptStruct(ch.PSK); err == nil {
-				return ch.Name, channelTierFullMesh
+			if msg, err := gt.DecryptStruct(ch.PSK); err == nil {
+				return channelMatch{
+					tier:     channelTierFullMesh,
+					name:     ch.Name,
+					sender:   msg.Sender,
+					homeSite: SiteUnspecified,
+				}
 			}
 		}
 	}
-	for _, ch := range b.zeroHopChannels {
-		if ch.Hash == gt.ChannelHash {
-			if _, err := gt.DecryptStruct(ch.PSK); err == nil {
-				return ch.Name, channelTierZeroHop
+	for _, ze := range b.zeroHopChannels {
+		if ze.ch.Hash == gt.ChannelHash {
+			if msg, err := gt.DecryptStruct(ze.ch.PSK); err == nil {
+				return channelMatch{
+					tier:     channelTierZeroHop,
+					name:     ze.ch.Name,
+					sender:   msg.Sender,
+					homeSite: ze.homeSite,
+				}
 			}
 		}
 	}
-	return "", channelTierNone
+	return channelMatch{}
+}
+
+// shouldFloodZeroHop decides whether a zeroHopChannel packet received at fromSite
+// should flood onto the peer site's mesh (write) or clamp to 0-hop DIRECT (read).
+//
+//   - When homeSite is configured (e.g. #madrid -> pinto, #ireland/#dublin -> dublin):
+//     any transmission heard at the away site (fromSite != homeSite, whether 0-hop or
+//     relayed across local repeaters such as DUB-DUNDRUM-solarbird) floods onto
+//     homeSite's mesh, while traffic heard on homeSite clamps to 0-hop DIRECT at the
+//     peer site so OwlShack and nearby companions can read without cross-country spam.
+//   - When homeSite is unset: 0-hop transmissions or messages sent by an allowlisted
+//     companion name flood; multi-hop mesh chatter from unknown senders clamps.
+func (b *BridgeEngine) shouldFloodZeroHop(pkt *meshcore.Packet, fromSite SiteID, cm channelMatch) bool {
+	if cm.homeSite != SiteUnspecified {
+		return fromSite != cm.homeSite
+	}
+	return pkt.PathHashCount() == 0 || b.matchCompanionSender(cm.sender)
+}
+
+// hasBridgePathPair reports whether pkt's flood Path already contains our
+// synthetic [siteA, siteB] or [siteB, siteA] bridge hop pair, preventing
+// long-delayed multi-hop mesh echoes (or bit-corrupted repeats) from ever
+// ping-ponging back across the bridge.
+func (b *BridgeEngine) hasBridgePathPair(pkt *meshcore.Packet) bool {
+	if pkt.PathHashCount() < 2 {
+		return false
+	}
+	hashes := pkt.PathHashes()
+	hSize := int(pkt.PathHashSize())
+	if hSize <= 0 || hSize > meshcore.PubKeySize {
+		return false
+	}
+	pubA := b.siteBridgePub[SiteA][:hSize]
+	pubB := b.siteBridgePub[SiteB][:hSize]
+	for i := 0; i+1 < len(hashes); i++ {
+		if (bytes.Equal(hashes[i], pubA) && bytes.Equal(hashes[i+1], pubB)) ||
+			(bytes.Equal(hashes[i], pubB) && bytes.Equal(hashes[i+1], pubA)) {
+			return true
+		}
+	}
+	return false
 }
 
 // classifyIdentityPacket checks whether pkt is non-channel identity discovery
@@ -403,14 +614,18 @@ func (b *BridgeEngine) classifyIdentityPacket(pkt *meshcore.Packet, now time.Tim
 			return identityMatch{}
 		}
 		pubBytes := adv.PublicKey.PublicKeyBytes()
-		if !b.matchPubKeyLocked(pubBytes) {
+		advName := ""
+		appData := adv.AppData()
+		if adv.AppDataErr() == nil {
+			advName = appData.Name
+		}
+		if !b.matchAdvertLocked(pubBytes, advName) {
 			return identityMatch{}
 		}
 		m := identityMatch{allowed: true}
-		appData := adv.AppData()
-		if adv.AppDataErr() == nil && appData.Name != "" {
+		if advName != "" {
 			m.learnedPubHex = hex.EncodeToString(pubBytes)
-			m.learnedName = appData.Name
+			m.learnedName = advName
 		}
 		return m
 
@@ -518,12 +733,11 @@ func clampZeroHopDirect(pkt *meshcore.Packet) ([]byte, error) {
 // Policy:
 //   1. Bridged channels (e.g. #maddub or private PSK channels): full-mesh flood
 //      in both directions regardless of hop count or sender.
-//   2. Zero-hop channels (e.g. #ireland, #dublin, #madrid — zero city overlap):
-//      - Originated locally at 0 hops (PathHashCount == 0, near a site or from OwlShack)
-//        -> flooded onto the peer site's mesh (with scope translation) so you can write.
-//      - Heard from the mesh via repeaters (PathHashCount > 0)
-//        -> clamped to 0-hop ROUTE_TYPE_DIRECT on the peer site so you can read near
-//           your site (and on OwlShack) without peer-mesh repeaters re-broadcasting.
+//   2. Zero-hop channels (e.g. #ireland@dublin, #dublin@dublin, #madrid@pinto):
+//      - Heard at the away site (fromSite != homeSite, or 0-hop / allowlisted sender
+//        when homeSite is unset) -> flooded onto the target mesh (with scope translation).
+//      - Heard on the channel's home mesh -> clamped to 0-hop ROUTE_TYPE_DIRECT on
+//        the peer site so you can read locally without repeater re-broadcast.
 //   3. Identity discovery (signed ADVERT of allowlisted companions) and private
 //      messages / path discovery where either src or dst matches an allowlisted
 //      companion: flood-bridged + direct wormhole return routing.
@@ -560,10 +774,10 @@ func (b *BridgeEngine) RoutePacket(raw []byte, fromSite SiteID, now time.Time) (
 				clone.TransportCode1, clone.TransportCode2 = 0, 0
 
 				idMatch := b.classifyIdentityPacket(clone, now)
-				_, chTier := b.classifyChannel(clone)
+				cm := b.classifyChannel(clone)
 				// Direct ACKs explicitly routed through our synthetic bridge pair carry only a
 				// 4-byte checksum (no src/dst hash) and were learned from a prior bridged flood.
-				if !idMatch.allowed && chTier == channelTierNone && !isAckPayload(clone) {
+				if !idMatch.allowed && cm.tier == channelTierNone && !isAckPayload(clone) {
 					b.Counters[fromSite].FilteredDropped.Add(1)
 					return nil, ActionFilteredDrop, nil
 				}
@@ -583,25 +797,38 @@ func (b *BridgeEngine) RoutePacket(raw []byte, fromSite SiteID, now time.Time) (
 			}
 		}
 
-		// A 0-hop direct GRP_TXT sent near this site on a bridged or zero-hop channel
-		// floods onto the peer site's mesh.
+		// A 0-hop direct GRP_TXT sent near this site on a bridged or zero-hop channel.
 		if pkt.PathHashCount() == 0 {
-			if _, chTier := b.classifyChannel(pkt); chTier != channelTierNone {
+			if cm := b.classifyChannel(pkt); cm.tier != channelTierNone {
 				if b.hasSeenOrMark(pkt) {
 					b.Counters[fromSite].DedupDropped.Add(1)
 					return nil, ActionDedupDrop, nil
 				}
-				out, err := b.floodToPeerSite(pkt, fromSite, toSite)
+				if cm.tier == channelTierFullMesh {
+					out, err := b.floodToPeerSite(pkt, fromSite, toSite)
+					if err != nil {
+						b.Counters[fromSite].InvalidDropped.Add(1)
+						return nil, ActionInvalidDrop, err
+					}
+					b.Counters[fromSite].ChannelBridged.Add(1)
+					return out, ActionChannelBridged, nil
+				}
+				if b.shouldFloodZeroHop(pkt, fromSite, cm) {
+					out, err := b.floodToPeerSite(pkt, fromSite, toSite)
+					if err != nil {
+						b.Counters[fromSite].InvalidDropped.Add(1)
+						return nil, ActionInvalidDrop, err
+					}
+					b.Counters[fromSite].ZeroHopFlood.Add(1)
+					return out, ActionZeroHopFlood, nil
+				}
+				out, err := clampZeroHopDirect(pkt)
 				if err != nil {
 					b.Counters[fromSite].InvalidDropped.Add(1)
 					return nil, ActionInvalidDrop, err
 				}
-				if chTier == channelTierFullMesh {
-					b.Counters[fromSite].ChannelBridged.Add(1)
-					return out, ActionChannelBridged, nil
-				}
-				b.Counters[fromSite].ZeroHopFlood.Add(1)
-				return out, ActionZeroHopFlood, nil
+				b.Counters[fromSite].ZeroHopClamped.Add(1)
+				return out, ActionZeroHopClamped, nil
 			}
 		}
 
@@ -611,13 +838,17 @@ func (b *BridgeEngine) RoutePacket(raw []byte, fromSite SiteID, now time.Time) (
 
 	// 2. Flood traffic: full-mesh bridgedChannels, asymmetric zeroHopChannels, or allowlisted identity/DM packets.
 	if pkt.IsRouteFlood() && !pkt.IsShare() {
-		_, chTier := b.classifyChannel(pkt)
+		cm := b.classifyChannel(pkt)
 		var idMatch identityMatch
-		if chTier == channelTierNone {
+		if cm.tier == channelTierNone {
 			idMatch = b.classifyIdentityPacket(pkt, now)
 		}
 
-		if chTier != channelTierNone || idMatch.allowed {
+		if cm.tier != channelTierNone || idMatch.allowed {
+			if b.hasBridgePathPair(pkt) {
+				b.Counters[fromSite].DedupDropped.Add(1)
+				return nil, ActionDedupDrop, nil
+			}
 			if int(pkt.PathHashCount()) > b.cfg.MaxFloodHops {
 				b.Counters[fromSite].HopLimitDropped.Add(1)
 				return nil, ActionHopLimitDrop, nil
@@ -628,7 +859,7 @@ func (b *BridgeEngine) RoutePacket(raw []byte, fromSite SiteID, now time.Time) (
 			}
 			b.applyIdentitySideEffects(idMatch, now)
 
-			switch chTier {
+			switch cm.tier {
 			case channelTierFullMesh:
 				out, err := b.floodToPeerSite(pkt, fromSite, toSite)
 				if err != nil {
@@ -639,7 +870,7 @@ func (b *BridgeEngine) RoutePacket(raw []byte, fromSite SiteID, now time.Time) (
 				return out, ActionChannelBridged, nil
 
 			case channelTierZeroHop:
-				if pkt.PathHashCount() == 0 {
+				if b.shouldFloodZeroHop(pkt, fromSite, cm) {
 					out, err := b.floodToPeerSite(pkt, fromSite, toSite)
 					if err != nil {
 						b.Counters[fromSite].InvalidDropped.Add(1)

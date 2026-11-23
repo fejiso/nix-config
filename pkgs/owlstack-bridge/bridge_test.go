@@ -433,6 +433,265 @@ func TestZeroHopChannelsReadAndWrite(t *testing.T) {
 	}
 }
 
+func TestDirectionalZeroHopHomeSiteAndLoopGuard(t *testing.T) {
+	ultrabirdID := makeIdentityWithPrefix(t, 0x04)
+	ultrabirdPK := ultrabirdID.PublicKey()
+
+	cfg := newTestConfig(t, hex.EncodeToString(ultrabirdPK[:]))
+	cfg.AllowedCompanions = []CompanionEntry{
+		{PubKey: hex.EncodeToString(ultrabirdPK[:]), Name: "⚡🦅ultrabird"},
+		{PubKey: "04", Name: "🟩🦅greenbird"},
+	}
+	cfg.ZeroHopChannels = []ChannelConfig{
+		{Name: "#ireland", HomeSite: "dublin"},
+		{Name: "#dublin", HomeSite: "dublin"},
+		{Name: "#madrid", HomeSite: "pinto"},
+	}
+
+	eng, err := NewBridgeEngine(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Now()
+	ioi := meshcore.NewRegion("#ioi")
+	madridCh := meshcore.NewChannelFromHashtag("#madrid")
+	irelandCh := meshcore.NewChannelFromHashtag("#ireland")
+
+	// 1. ⚡🦅ultrabird in Dublin writes to #madrid via DUB-DUNDRUM-solarbird (1 repeater hop, #ioi scope)
+	//    -> because fromSite (dublin) != homeSite (pinto), it MUST flood unscoped into Pinto instead of clamping!
+	madWrite := &meshcore.GroupTextPayload{
+		Timestamp: uint32(now.Unix()) + 100,
+		Sender:    "⚡🦅ultrabird",
+		Text:      "hola #madrid via solarbird en dublin!",
+	}
+	madEnc, err := madWrite.Encrypt(madridCh.Hash, madridCh.PSK)
+	if err != nil {
+		t.Fatal(err)
+	}
+	madBytes, _ := madEnc.ToBytes()
+	madViaRepeater := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeGrpTxt, 0),
+		PathLength: meshcore.MakePathLen(3, 1),
+		Path:       []byte{0x24, 0x41, 0xf6}, // DUB-DUNDRUM-solarbird
+		Payload:    madBytes,
+	}
+	madViaRepeater.SetScope(ioi)
+	madViaRaw, _ := madViaRepeater.ToBytes()
+
+	outRaw, act, err := eng.RoutePacket(madViaRaw, SiteB, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if act != ActionZeroHopFlood {
+		t.Fatalf("expected multi-hop #madrid write from Dublin to ActionZeroHopFlood, got %s", act)
+	}
+	outPkt, _ := meshcore.PacketFromBytes(outRaw)
+	if outPkt.RouteType() != meshcore.RouteTypeFlood || outPkt.IsTransport() || outPkt.PathHashCount() != 3 {
+		t.Fatalf("expected unscoped flood in Pinto with 3 hops (1 repeater + 2 bridge), got route=%s hops=%d", outPkt.RouteTypeString(), outPkt.PathHashCount())
+	}
+
+	// 2. Madrid local mesh traffic on #madrid (fromSite == homeSite == pinto) -> clamped to 0-hop DIRECT in Dublin!
+	madLocal := &meshcore.GroupTextPayload{
+		Timestamp: uint32(now.Unix()) + 101,
+		Sender:    "MadMesh_Rad",
+		Text:      "buenas noches madrid",
+	}
+	madLocalEnc, _ := madLocal.Encrypt(madridCh.Hash, madridCh.PSK)
+	madLocalBytes, _ := madLocalEnc.ToBytes()
+	madLocalPkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeGrpTxt, 0),
+		PathLength: meshcore.MakePathLen(3, 4),
+		Path:       bytes.Repeat([]byte{0xc4, 0xf2, 0x93}, 4),
+		Payload:    madLocalBytes,
+	}
+	madLocalRaw, _ := madLocalPkt.ToBytes()
+
+	clampRaw, clampAct, err := eng.RoutePacket(madLocalRaw, SiteA, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if clampAct != ActionZeroHopClamped {
+		t.Fatalf("expected Pinto #madrid mesh chatter to clamp in Dublin, got %s", clampAct)
+	}
+	clampPkt, _ := meshcore.PacketFromBytes(clampRaw)
+	if !clampPkt.IsRouteDirect() || clampPkt.PathHashCount() != 0 {
+		t.Fatalf("expected 0-hop DIRECT on Dublin, got route=%s hops=%d", clampPkt.RouteTypeString(), clampPkt.PathHashCount())
+	}
+
+	// 3. Writing to #ireland from Pinto via MAD-PINTO-CENTRO repeater (1 hop) -> floods into Dublin (#ioi)!
+	ireWrite := &meshcore.GroupTextPayload{
+		Timestamp: uint32(now.Unix()) + 102,
+		Sender:    "⚡🦅ultrabird",
+		Text:      "hello #ireland from pinto repeater!",
+	}
+	ireEnc, _ := ireWrite.Encrypt(irelandCh.Hash, irelandCh.PSK)
+	ireBytes, _ := ireEnc.ToBytes()
+	ireViaRepeater := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeGrpTxt, 0),
+		PathLength: meshcore.MakePathLen(3, 1),
+		Path:       []byte{0xa8, 0xba, 0xc6}, // MAD-PINTO-CENTRO
+		Payload:    ireBytes,
+	}
+	ireViaRaw, _ := ireViaRepeater.ToBytes()
+	ireOutRaw, ireAct, err := eng.RoutePacket(ireViaRaw, SiteA, now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if ireAct != ActionZeroHopFlood {
+		t.Fatalf("expected multi-hop #ireland write from Pinto to flood in Dublin, got %s", ireAct)
+	}
+	ireOutPkt, _ := meshcore.PacketFromBytes(ireOutRaw)
+	if !ioi.MatchesPacket(ireOutPkt) || ireOutPkt.PathHashCount() != 3 {
+		t.Fatalf("expected #ioi flood in Dublin with 3 hops, got route=%s hops=%d", ireOutPkt.RouteTypeString(), ireOutPkt.PathHashCount())
+	}
+
+	// 4. Cross-bridge ping-pong loop guard:
+	//    Simulate dub#8733 -> pin#15168 -> 9 Madrid repeaters -> pin#15171 returning AFTER DedupCache wraparound
+	//    (or with a mutated payload byte). Path still contains [dublinBridge, pintoBridge] -> MUST drop!
+	dmPkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeTxtMsg, 0),
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    []byte{0xa4, ultrabirdPK[0], 0xde, 0xad, 0xbe, 0xef},
+	}
+	dmRaw, _ := dmPkt.ToBytes()
+	bridgedDMRaw, dmAct, err := eng.RoutePacket(dmRaw, SiteB, now)
+	if err != nil || dmAct != ActionIdentityBridged {
+		t.Fatalf("expected DM to bridge Dublin->Pinto, got act=%s err=%v", dmAct, err)
+	}
+
+	// Evict DedupCache completely (> MaxPacketHashes = 160 entries).
+	for i := range 200 {
+		filler := &meshcore.Packet{
+			Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeTxtMsg, 0),
+			PathLength: meshcore.MakePathLen(3, 0),
+			Payload:    []byte{byte(i), ultrabirdPK[0], byte(i >> 8), 0xaa, 0xbb},
+		}
+		fillerRaw, _ := filler.ToBytes()
+		_, _, _ = eng.RoutePacket(fillerRaw, SiteB, now)
+	}
+
+	echoAfterWrap, _ := meshcore.PacketFromBytes(bridgedDMRaw)
+	echoAfterWrap.AppendPathHash([]byte{0x42, 0x38, 0x03})
+	echoAfterWrap.AppendPathHash([]byte{0xc4, 0xf2, 0x93})
+	echoWrapRaw, _ := echoAfterWrap.ToBytes()
+
+	loopOut, loopAct, err := eng.RoutePacket(echoWrapRaw, SiteA, now.Add(20*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loopOut != nil || loopAct != ActionDedupDrop {
+		t.Fatalf("expected cross-bridge mesh echo after DedupCache eviction to be DedupDrop, got %s", loopAct)
+	}
+}
+
+func TestShortPrefixNamedCompanionAllowlist(t *testing.T) {
+	// Generate two distinct identities whose Ed25519 public key starts with 0x04:
+	// one for 🟩🦅greenbird and one for an unrelated repeater ("EA4HGI QTH").
+	makePrefix04 := func() meshcore.LocalIdentity {
+		for range 8192 {
+			id, err := meshcore.GenerateLocalIdentity(rand.Reader)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if id.PublicKey()[0] == 0x04 {
+				return id
+			}
+		}
+		t.Fatal("failed to generate 0x04 identity")
+		return meshcore.LocalIdentity{}
+	}
+
+	greenbirdID := makePrefix04()
+	foreignRepeater04 := makePrefix04()
+	for greenbirdID.PublicKey() == foreignRepeater04.PublicKey() {
+		foreignRepeater04 = makePrefix04()
+	}
+	impostor04 := makePrefix04()
+	for impostor04.PublicKey() == greenbirdID.PublicKey() {
+		impostor04 = makePrefix04()
+	}
+
+	cfg := newTestConfig(t, "")
+	cfg.AllowedCompanions = []CompanionEntry{
+		{PubKey: "04", Name: "🟩🦅greenbird"},
+	}
+	eng, err := NewBridgeEngine(cfg, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+
+	// 1. Foreign repeater starting with 0x04 ("EA4HGI QTH") sends ADVERT -> strictly dropped!
+	repAdv, err := meshcore.NewAdvert(foreignRepeater04, meshcore.AdvertAppData{
+		Type: "REPEATER",
+		Name: "EA4HGI QTH",
+	}, uint32(now.Unix()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	repBytes, _ := repAdv.ToBytes()
+	repPkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeAdvert, 0),
+		PathLength: meshcore.MakePathLen(3, 1),
+		Path:       []byte{0x2e, 0xc4, 0xa8},
+		Payload:    repBytes,
+	}
+	repRaw, _ := repPkt.ToBytes()
+	if out, act, _ := eng.RoutePacket(repRaw, SiteA, now); out != nil || act != ActionFilteredDrop {
+		t.Fatalf("expected 0x04 foreign repeater ADVERT to be filtered_drop, got %s", act)
+	}
+
+	// 2. DM involving 0x04 bridges immediately even before ADVERT is seen.
+	dmPkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeTxtMsg, 0),
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    []byte{0x99, 0x04, 1, 2, 3, 4},
+	}
+	dmRaw, _ := dmPkt.ToBytes()
+	if out, act, _ := eng.RoutePacket(dmRaw, SiteB, now); out == nil || act != ActionIdentityBridged {
+		t.Fatalf("expected 0x04 greenbird DM to bridge, got %s", act)
+	}
+
+	// 3. Genuine signed ADVERT from 🟩🦅greenbird bridges AND pins its full 32-byte key!
+	gbAdv, err := meshcore.NewAdvert(greenbirdID, meshcore.AdvertAppData{
+		Type: "CHAT",
+		Name: "🟩🦅greenbird",
+	}, uint32(now.Unix())+1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	gbBytes, _ := gbAdv.ToBytes()
+	gbPkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeAdvert, 0),
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    gbBytes,
+	}
+	gbRaw, _ := gbPkt.ToBytes()
+	if out, act, _ := eng.RoutePacket(gbRaw, SiteB, now); out == nil || act != ActionIdentityBridged {
+		t.Fatalf("expected genuine 🟩🦅greenbird ADVERT to bridge, got %s", act)
+	}
+
+	// 4. Different 0x04 key spoofing "🟩🦅greenbird" after key pinning -> rejected!
+	impAdv, err := meshcore.NewAdvert(impostor04, meshcore.AdvertAppData{
+		Type: "CHAT",
+		Name: "🟩🦅greenbird",
+	}, uint32(now.Unix())+2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	impBytes, _ := impAdv.ToBytes()
+	impPkt := &meshcore.Packet{
+		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeAdvert, 0),
+		PathLength: meshcore.MakePathLen(3, 0),
+		Payload:    impBytes,
+	}
+	impRaw, _ := impPkt.ToBytes()
+	if out, act, _ := eng.RoutePacket(impRaw, SiteA, now); out != nil || act != ActionFilteredDrop {
+		t.Fatalf("expected spoofed 0x04 ADVERT after key pinning to be filtered_drop, got %s", act)
+	}
+}
+
 func TestDirectWormholeReturnRouting(t *testing.T) {
 	allowedID := makeIdentityWithPrefix(t)
 	peerID := makeIdentityWithPrefix(t, allowedID.PublicKey()[0])

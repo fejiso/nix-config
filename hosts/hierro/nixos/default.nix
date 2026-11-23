@@ -172,10 +172,18 @@
     in
     {
       enable = true;
-      allowedCompanions = privateMeshcore.allowedCompanions or [ ];
-      bridgedChannels = privateMeshcore.bridgedChannels or [ "#maddub" ];
-      zeroHopChannels = privateMeshcore.zeroHopChannels or [ "#ireland" "#dublin" "#madrid" ];
-      extraChannels = privateMeshcore.extraChannels or privateMeshcore.channels or [ "#ioi" ];
+      allowedCompanions = (privateMeshcore.allowedCompanions or [ ]) ++ [
+        {
+          name = "🟩🦅greenbird";
+          pubKey = "04";
+        }
+      ];
+    } // lib.optionalAttrs (privateMeshcore ? bridgedChannels) {
+      inherit (privateMeshcore) bridgedChannels;
+    } // lib.optionalAttrs (privateMeshcore ? zeroHopChannels) {
+      inherit (privateMeshcore) zeroHopChannels;
+    } // lib.optionalAttrs (privateMeshcore ? extraChannels || privateMeshcore ? channels) {
+      extraChannels = privateMeshcore.extraChannels or privateMeshcore.channels;
     } // lib.optionalAttrs (privateMeshcore ? allowlistFile) {
       inherit (privateMeshcore) allowlistFile;
     };

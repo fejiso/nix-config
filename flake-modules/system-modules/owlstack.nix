@@ -75,6 +75,11 @@ in
             default = "";
             description = "Optional base64 16/32-byte PSK (omit for '#hashtag' channels).";
           };
+          homeSite = lib.mkOption {
+            type = lib.types.str;
+            default = "";
+            description = "Optional home site name ('pinto' or 'dublin') for directional zeroHopChannels.";
+          };
         };
       });
 
@@ -148,8 +153,12 @@ in
 
       normalizeChannel = ch:
         if builtins.isString ch then { name = normalizeHashtagName ch; }
-        else if ch.pskBase64 != "" then { inherit (ch) name pskBase64; }
-        else { name = normalizeHashtagName ch.name; };
+        else
+          ({
+            name = if ch.pskBase64 != "" then ch.name else normalizeHashtagName ch.name;
+          }
+          // lib.optionalAttrs (ch.pskBase64 != "") { inherit (ch) pskBase64; }
+          // lib.optionalAttrs (ch.homeSite != "") { inherit (ch) homeSite; });
 
       dedupChannels = chs:
         lib.foldl' (acc: ch:
@@ -312,8 +321,12 @@ in
 
         zeroHopChannels = lib.mkOption {
           type = lib.types.listOf channelType;
-          default = [ "#ireland" "#dublin" "#madrid" ];
-          description = "Non-overlapping city channels bridged asymmetrically: 0-hop transmissions near a site flood onto the remote mesh (write), while remote mesh floods are clamped to 0-hop DIRECT at the peer site (read without repeater re-broadcast).";
+          default = [
+            { name = "#ireland"; homeSite = "dublin"; }
+            { name = "#dublin"; homeSite = "dublin"; }
+            { name = "#madrid"; homeSite = "pinto"; }
+          ];
+          description = "Non-overlapping city channels bridged asymmetrically: transmissions heard at the away site (even multi-hop via local repeaters) flood onto homeSite's mesh (write), while homeSite mesh floods are clamped to 0-hop DIRECT at the peer site (read without repeater re-broadcast).";
         };
 
         extraChannels = lib.mkOption {
