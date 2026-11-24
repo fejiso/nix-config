@@ -26,6 +26,12 @@
       OPENCODE_ENABLE_EXA = "1";
     };
 
+    # Skip user sops-nix activation cleanly on freshly bootstrapped / edge hosts
+    # where ~/.config/sops/age/keys.txt has not been provisioned.
+    systemd.user.services.sops-nix = lib.mkIf pkgs.stdenv.hostPlatform.isLinux {
+      Unit.ConditionPathExists = config.sops.age.keyFile;
+    };
+
     sops = {
       age.keyFile = "${config.home.homeDirectory}/.config/sops/age/keys.txt";
       validateSopsFiles = false;

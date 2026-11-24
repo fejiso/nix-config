@@ -491,6 +491,7 @@ in {
         ./patches/bcachefs-device-remove-dead-stripes.patch
         ./patches/bcachefs-ec-bound-stripe-reuse.patch
         ./patches/bcachefs-copygc-data-update-durability-livelock.patch
+        ./patches/bcachefs-linux-6.18.64-inode-state.patch
       ];
     });
 

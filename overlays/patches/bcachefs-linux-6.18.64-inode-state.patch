@@ -1,0 +1,24 @@
+vfs: guard inode_state_* compat helpers against 6.18.64+ stable backport
+
+Linux 6.18.64 backported the 6.19 VFS helper series that converts I_NEW et al.
+from preprocessor macros to `enum inode_state_flags_enum` and defines
+`inode_state_read()`, `inode_state_read_once()`, and `inode_state_set_raw()` in
+`<linux/fs.h>`. Guard bcachefs's pre-6.19 fallback definitions on `defined(I_NEW)`
+so kernels carrying the backport do not fail with conflicting redefinitions.
+--- a/fs/vfs/fs.h
++++ b/fs/vfs/fs.h
+@@ -8,12 +8,13 @@
+ #include "util/two_state_shared_lock.h"
+ #include "vfs/types.h"
+ 
++#include <linux/fs.h>
+ #include <linux/seqlock.h>
+ #include <linux/stat.h>
+ #include <linux/version.h>
+ 
+-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,19,0)
++#if LINUX_VERSION_CODE < KERNEL_VERSION(6,19,0) && defined(I_NEW)
+ static inline unsigned inode_state_read(struct inode *inode)
+ {
+ 	return inode->i_state;
+ }
