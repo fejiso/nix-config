@@ -13,7 +13,6 @@ import ../../lib/mk-host.nix {
     config.flake.modules.nixos.emulation
     config.flake.modules.nixos.tdarr-worker
     config.flake.modules.nixos.adsb-readsb
-    config.flake.modules.nixos.llama-rpc
   ];
   homeModules = [
     config.flake.modules.homeManager.linux-default

@@ -667,6 +667,40 @@ in {
                              'console.log("skipped models smoke test (nix sandbox)")'
           '';
         });
+
+        # llama.cpp v1.1.0 (adds Inkling 2 / Inkling 2 Mini looped MoE + DSpark
+        # speculative decoding; nixpkgs-unstable is still on v1.0.0).
+        # Skip build-time ctest and bash-completion binary execution so hierro's
+        # Zen 2 nix-builder can cross-microarch compile raptorlake/znver3
+        # cpuTune derivations without SIGILL.
+        llama-cpp = uprev.llama-cpp.overrideAttrs (finalAttrs: prevAttrs: {
+          version = "1.1.0";
+          src = ufinal.fetchFromGitHub {
+            owner = "ggml-org";
+            repo = "llama.cpp";
+            tag = "v${finalAttrs.version}";
+            hash = "sha256-0O3An2dgjy3HGF6T3ZDiEPwnv26+6B8os7htE6ocG8I=";
+          };
+          npmRoot = "ui/apps/chat";
+          npmDepsHash = "sha256-5NCbd2NT4xSo5dCaLndj/FVorm82fUN3iv1BTwurMy4=";
+          # v1.1.0's ggml-cuda.cu includes <nvml.h> (dlopen'd at runtime); only
+          # add cuda_nvml_dev on CUDA builds so CPU derivations stay unchanged.
+          buildInputs = (prevAttrs.buildInputs or [ ])
+            ++ ufinal.lib.optionals (
+              builtins.any (x: ufinal.lib.hasInfix "cudart" (x.pname or x.name or "")) (prevAttrs.buildInputs or [ ])
+            ) [ ufinal.cudaPackages.cuda_nvml_dev ];
+          preConfigure = ''
+            pushd ${finalAttrs.npmRoot}
+            LLAMA_BUILD_NUMBER=12775 npm run build
+            popd
+          '';
+          cmakeFlags = (prevAttrs.cmakeFlags or [ ]) ++ [
+            (ufinal.lib.cmakeFeature "LLAMA_BUILD_NUMBER" "12775")
+            (ufinal.lib.cmakeFeature "LLAMA_BUILD_COMMIT" "bdda036")
+          ];
+          doCheck = false;
+          postInstall = "";
+        });
       });
   };
 }

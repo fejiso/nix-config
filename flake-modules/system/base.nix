@@ -51,6 +51,7 @@
       "/libvirt/images"
       "/ktest"
       "/kopia"
+      "/llama-models"
     ];
 
     nixpkgs = {

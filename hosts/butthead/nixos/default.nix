@@ -51,11 +51,13 @@
   # applied globally in overlays/default.nix on top of 1.39.7 — see bcachefs-patchz.md)
   hardware.bcachefs-support.enable = true;
 
-  # llama.cpp RPC worker for hierro's distributed inference master
-  # (CUDA build compiles from source on first deploy)
-  services.llama-rpc.worker = {
+  # Local llama.cpp inference server — Inkling 2 Mini (NVFP4 + mmproj + DSpark)
+  # EVGA RTX 3060 12GB (Ampere SM86) with loop-aware CPU-MoE offload + CUDA Unified Memory spillover
+  services.llama-cpp = {
     enable = true;
     gpuBackend = "cuda";
+    cudaArch = "86";
+    cudaUnifiedMemory = true;
   };
 
   # SANE scanner support
@@ -188,8 +190,14 @@
     ];
   };
 
-  # NVIDIA Container Toolkit (CDI) — GPU access in Docker & Podman containers
+  # NVIDIA Container Toolkit (CDI) — GPU access in Docker & Podman containers.
+  # Don't restart the oneshot CDI generator during live `switch`: when nixpkgs
+  # bumps nvidia-x11, stopping the unit wipes /run/cdi and starting the new
+  # binary fails NVML init ("Driver/library version mismatch") against the
+  # still-loaded old nvidia.ko. Boot and the `KERNEL=="nvidia"` udev rule still
+  # regenerate /run/cdi whenever matching nvidia.ko loads.
   hardware.nvidia-container-toolkit.enable = true;
+  systemd.services.nvidia-container-toolkit-cdi-generator.restartIfChanged = false;
 
   # ROCm on pre-Vega: override GFX version to gfx803 and limit HW queues for stability
   environment.variables = {

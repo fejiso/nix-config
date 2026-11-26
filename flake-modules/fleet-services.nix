@@ -52,9 +52,10 @@
     # sso = false: Bitwarden clients talk to the API directly.
     vaultwarden = { host = "butthead"; port = 4743; group = "Documents"; description = "Passwords"; public = true; sso = false; };
 
-    open-webui = { host = "butthead"; port = 3003;  group = "AI"; description = "Ollama chat UI"; };
-    ollama     = { host = "butthead"; port = 11434; group = "AI"; description = "Local models API"; healthPath = "/api/version"; };
-    comfyui    = { host = "butthead"; port = 8188;  group = "AI"; description = "Image generation"; public = true; };
+    open-webui     = { host = "butthead"; port = 3003;  group = "AI"; description = "LLM chat UI (Ollama + llama.cpp)"; };
+    ollama         = { host = "butthead"; port = 11434; group = "AI"; description = "Local models API"; healthPath = "/api/version"; };
+    llama-butthead = { host = "butthead"; port = 8079;  group = "AI"; description = "Inkling 2 Mini (llama.cpp CUDA)"; healthPath = "/health"; };
+    comfyui        = { host = "butthead"; port = 8188;  group = "AI"; description = "Image generation"; public = true; };
 
     kopia          = { host = "butthead"; port = 51515; group = "Infra"; description = "Backup server"; scheme = "https"; };
     homepage       = { host = "butthead"; port = 3002;  group = "Infra"; description = "Dashboard"; };
@@ -69,8 +70,8 @@
     # sso = false: git over HTTP(S).
     forgejo     = { host = "hierro"; port = 3000; group = "Infra";      description = "Git (SSH :2222)"; public = true; sso = false; };
     silverbullet = { host = "hierro"; port = 3004; group = "Documents"; description = "Notes"; };
-    openclaw    = { host = "hierro"; port = 3080; group = "AI";         description = "AI assistant gateway"; };
-    llama-rpc   = { host = "hierro"; port = 8079; group = "AI";         description = "Distributed inference API"; };
+    openclaw     = { host = "hierro"; port = 3080; group = "AI";         description = "AI assistant gateway"; };
+    llama-hierro = { host = "hierro"; port = 8079; group = "AI";         description = "Inkling 2 Mini (llama.cpp CPU)"; healthPath = "/health"; };
 
     grafana         = { host = "hierro"; port = 3001; group = "Monitoring"; description = "Dashboards"; };
     victoriametrics = { host = "hierro"; port = 8428; group = "Monitoring"; description = "Metrics DB"; healthPath = "/health"; };

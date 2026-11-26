@@ -7,7 +7,35 @@
 #   sops secrets/opencodego.yaml
 # The z.ai (GLM coding plan) API key lives in secrets/zai.yaml; edit with:
 #   sops secrets/zai.yaml
-{ config, lib, pkgs, inputs, ... }: {
+{ config, lib, pkgs, inputs, hostname ? "", ... }:
+let
+  mkLlamaProvider = host: label: {
+    npm = "@ai-sdk/openai-compatible";
+    name = "llama.cpp (${label})";
+    options = {
+      baseURL =
+        if hostname == host
+        then "http://127.0.0.1:8079/v1"
+        else "http://${host}.netbird.cloud:8079/v1";
+      apiKey = "sk-no-key-required";
+    };
+    models."inkling-2-mini-${host}" = {
+      name = "Inkling 2 Mini (${label})";
+      attachment = true;
+      reasoning = true;
+      tool_call = true;
+      modalities = {
+        input = [ "text" "image" ];
+        output = [ "text" ];
+      };
+      limit = {
+        context = 65536;
+        output = 16384;
+      };
+    };
+  };
+in
+{
   # personalProviders controls OpenRouter/OpenCode Go secret deployment.
   # Set to false on work machines that use a different AI backend.
   options.programs.opencode.personalProviders = lib.mkOption {
@@ -55,6 +83,11 @@
         # Only the API key needs supplying; pick another GLM with /models.
         provider."zai-coding-plan".options.apiKey =
           "{file:${config.sops.secrets.zai-api-key.path}}";
+        # Local/mesh llama.cpp Inkling 2 Mini servers (uses loopback on the
+        # host itself, NetBird mesh hostname everywhere else).
+        provider."llama-butthead" = mkLlamaProvider "butthead" "butthead · RTX 3060 CUDA";
+        provider."llama-hierro" = mkLlamaProvider "hierro" "hierro · CPU";
+        provider."llama-tungsten" = mkLlamaProvider "tungsten" "tungsten · RTX 3500 Ada CUDA";
         lsp = true;
         # /usage — show the z.ai (GLM coding plan) API usage limits. The key is
         # read at runtime from the sops path so nothing secret lands in the

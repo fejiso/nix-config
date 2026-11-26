@@ -56,11 +56,12 @@
       }
       {
         "AI" = [
-          { "Open WebUI" = { href = "http://butthead.netbird.cloud:3003"; description = "Ollama chat UI"; }; }
+          { "Open WebUI" = { href = "http://butthead.netbird.cloud:3003"; description = "LLM chat UI (Ollama + llama.cpp)"; }; }
           { "Ollama" = { href = "http://butthead.netbird.cloud:11434"; description = "Local models API"; }; }
           { "ComfyUI" = { href = "http://butthead.netbird.cloud:8188"; description = "Image generation"; }; }
           { "OpenClaw" = { href = "http://hierro.netbird.cloud:3080"; description = "AI assistant gateway"; }; }
-          { "llama.cpp" = { href = "http://hierro.netbird.cloud:8079"; description = "Distributed inference API"; }; }
+          { "llama.cpp (butthead)" = { href = "http://butthead.netbird.cloud:8079"; description = "Inkling 2 Mini (CUDA)"; }; }
+          { "llama.cpp (hierro)" = { href = "http://hierro.netbird.cloud:8079"; description = "Inkling 2 Mini (CPU)"; }; }
         ];
       }
       {

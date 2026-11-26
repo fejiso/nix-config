@@ -114,6 +114,12 @@
   # System state version
   system.stateVersion = "25.05";
 
-  # llama.cpp RPC worker for hierro's distributed inference master (CPU only)
-  services.llama-rpc.worker.enable = true;
+  # Local llama.cpp inference server — Inkling 2 Mini (NVFP4 + mmproj + DSpark)
+  # RTX 3500 Ada 12GB (SM89) with loop-aware CPU-MoE offload + CUDA Unified Memory spillover
+  services.llama-cpp = {
+    enable = true;
+    gpuBackend = "cuda";
+    cudaArch = "89";
+    cudaUnifiedMemory = true;
+  };
 }

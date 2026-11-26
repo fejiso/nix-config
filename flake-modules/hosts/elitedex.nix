@@ -7,7 +7,6 @@ import ../../lib/mk-host.nix {
     config.flake.modules.nixos.desktop-services
     config.flake.modules.nixos.pentest
     config.flake.modules.nixos.emulation
-    config.flake.modules.nixos.llama-rpc
   ];
   homeModules = [
     config.flake.modules.homeManager.default

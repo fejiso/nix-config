@@ -26,6 +26,7 @@
       config.flake.modules.homeManager.nethack
       config.flake.modules.homeManager.ssh
       config.flake.modules.homeManager.wezterm
+      config.flake.modules.homeManager.yolo-agents
       config.flake.modules.homeManager.zellij
       config.flake.modules.homeManager.zsh
     ];

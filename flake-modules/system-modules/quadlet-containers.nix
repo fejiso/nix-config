@@ -356,6 +356,11 @@ in {
               ];
               environments = {
                 OLLAMA_BASE_URL = "http://host.containers.internal:11434";
+                ENABLE_OPENAI_API = "True";
+                OPENAI_API_BASE_URLS = "http://host.containers.internal:8079/v1;http://hierro.netbird.cloud:8079/v1;http://tungsten.netbird.cloud:8079/v1";
+                OPENAI_API_KEYS = "sk-no-key-required;sk-no-key-required;sk-no-key-required";
+                # Keep /api/models snappy when tungsten (laptop) is asleep/offline.
+                AIOHTTP_CLIENT_TIMEOUT_MODEL_LIST = "3";
               };
               labels = [ "io.containers.autoupdate=registry" ];
               logDriver = "journald";

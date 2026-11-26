@@ -149,16 +149,11 @@
     };
   };
 
-  # llama.cpp distributed inference master (module: system-modules/llama-rpc.nix)
-  # llama-server orchestrates RPC workers (desktops that come and go — the
-  # membership probe restarts the master when the reachable set changes).
-  # API only on the netbird mesh: http://hierro.netbird.cloud:8079
-  services.llama-rpc.master = {
+  # Local llama.cpp inference server — Inkling 2 Mini (Unsloth UD-Q4_K_XL + mmproj + DSpark)
+  # Pure CPU inference (Zen 2 AVX2 repacked GEMM/GEMV), API on wt0: http://hierro.netbird.cloud:8079
+  services.llama-cpp = {
     enable = true;
-    workers = [ "butthead" "elitedex" "blacktop" "tungsten" ];
-    # Public GGUF; change to whatever model you want (downloaded once to
-    # /var/lib/llama-models by llama-rpc-model-fetch).
-    modelUrl = "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf";
+    modelUrl = "https://huggingface.co/unsloth/Inkling-2-Mini-GGUF/resolve/main/Mainline_Support/Inkling-2-Mini-UD-Q4_K_XL.gguf_file";
   };
 
   # MeshCore OwlShack + Pinto(hispanas, *) <-> Dublin(lenovix, #ioi) selective bridge.
