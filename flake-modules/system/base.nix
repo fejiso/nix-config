@@ -9,9 +9,9 @@
 
     # Global snapshot exclusions — applied to every host's global kopia policy.
     # Patterns are globs relative to each snapshot source; `**/` matches at any
-    # depth. Extend or override per-host via services.backup.ignore (mkDefault
-    # here means a per-host assignment replaces, not appends).
-    services.backup.ignore = lib.mkDefault [
+    # depth. Defined without mkDefault so per-host `services.backup.ignore = [ ... ]`
+    # merges/appends via `types.listOf` instead of silently replacing this list.
+    services.backup.ignore = [
       "**/.stversions"
       "**/logs"
       "**/target"
@@ -19,6 +19,9 @@
       "**/*.h5"
       "**/Syncthing"
       "**/.local/share/containers"
+      "**/.local/share/Steam/steamapps/common"
+      "**/.local/share/Steam/steamapps/shadercache"
+      "**/ROMs/ROMS"
       "**/.venv"
       "**/.cache"
       "**/.wine*"
@@ -44,11 +47,15 @@
       "**/.cargo/git"
       "**/.rustup"
       "**/nix/store"
-      # Root-anchored /var/lib high-churn trees (leading '/' anchors to source root,
-      # so /home/<user>/dev/docker etc. are unaffected)
+      # Root-anchored /var/lib high-churn or bulk trees (leading '/' anchors to
+      # source root, so /home/<user>/dev/docker etc. are unaffected)
       "/containers/storage"
       "/docker"
       "/libvirt/images"
+      "/nixos-containers"
+      "/systemd/coredump"
+      "/ollama/models"
+      "/polystack*"
       "/ktest"
       "/kopia"
       "/llama-models"

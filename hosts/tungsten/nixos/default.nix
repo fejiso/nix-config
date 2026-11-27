@@ -106,6 +106,9 @@
   # Mount hispanas bcachefs pool at /mnt/hispanas over NetBird
   services.nfs-mounts.hispanas.enable = true;
 
+  # Firmware updates via LVFS (fwupdmgr)
+  services.fwupd.enable = true;
+
   # Tdarr worker node (native NixOS service)
   services.tdarr-worker = {
     enable = true;

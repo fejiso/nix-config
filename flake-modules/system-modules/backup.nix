@@ -149,6 +149,8 @@ in {
           RestartSec = "10";
           CacheDirectory = "kopia";
           StateDirectory = "kopia";
+          MemoryHigh = "12G";
+          MemoryMax = "16G";
         };
         environment = {
           HOME = "/var/lib/kopia";
@@ -194,12 +196,18 @@ in {
             --enable-quick=true \
             --enable-full=true
 
-          # Set repo-wide global policy (retention + ignores) via the direct
-          # repo connection. All clients inherit these automatically — they
-          # can't set global policies themselves via the server connection.
-          # Two steps: clear first, then add — avoids any flag-order ambiguity.
+          # Set repo-wide global policy (retention + ignores + mount boundary)
+          # via the direct repo connection. All clients inherit these
+          # automatically — they can't set global policies via the server.
+          # --one-file-system=true prevents crossing NFS/bind/FUSE submounts
+          # inside /home or /var/lib (e.g. elitedex ~/ROMs/ROMS -> 5.2T NFS,
+          # butthead /var/lib/polystack-main).
           ${kopia}/bin/kopia policy set --global --clear-ignore
-          ${kopia}/bin/kopia policy set --global ${retentionPolicy} ${ignoreArgs}
+          ${kopia}/bin/kopia policy set --global \
+            --one-file-system=true \
+            --ignore-cache-dirs=true \
+            --add-dot-ignore=.kopiaignore \
+            ${retentionPolicy} ${ignoreArgs}
 
           # Per-source override: /var/lib on every client gets 1-week retention
           # (kept in sync with the clients list; each snapshot of /var/lib
@@ -288,16 +296,38 @@ in {
           # whose old short pack is missing, while still failing on live contents.
           KOPIA_IGNORE_MAINTENANCE_REWRITE_ERROR = "true";
         };
-        path = [ kopia ];
+        path = [ kopia pkgs.curl ];
         serviceConfig = {
           Type = "oneshot";
           IOSchedulingClass = "idle";
           CPUSchedulingPolicy = "idle";
+          MemoryHigh = "12G";
+          MemoryMax = "16G";
         };
         script = ''
           set -euo pipefail
           export KOPIA_PASSWORD="$(cat ${config.sops.secrets.kopia_repo_password.path})"
           CFG="/var/lib/kopia/.config/kopia/repository.config"
+
+          notify_failure() {
+            local rc=$?
+            local step="''${1:-unknown}"
+            echo "kopia-maintenance FAILED at step '$step' (exit $rc)" >&2
+            if [ -r ${escapeShellArg config.sops.secrets.pushover-app-token.path} ] && \
+               [ -r ${escapeShellArg config.sops.secrets.pushover-user-key.path} ]; then
+              ${pkgs.curl}/bin/curl -fsS --max-time 15 \
+                --form-string "token=$(cat ${escapeShellArg config.sops.secrets.pushover-app-token.path})" \
+                --form-string "user=$(cat ${escapeShellArg config.sops.secrets.pushover-user-key.path})" \
+                --form-string "priority=1" \
+                --form-string "title=Kopia GC/Maintenance Failed (${hostname})" \
+                --form-string "message=kopia-maintenance.service failed during '$step' (exit $rc). Check: journalctl -u kopia-maintenance -n 80" \
+                https://api.pushover.net/1/messages.json >/dev/null || true
+            fi
+            exit "$rc"
+          }
+
+          CURRENT_STEP="maintenance-set"
+          trap 'notify_failure "$CURRENT_STEP"' ERR
 
           echo "Ensuring maintenance owner is root@${hostname}..."
           ${kopia}/bin/kopia --config-file "$CFG" maintenance set \
@@ -305,11 +335,25 @@ in {
             --enable-quick=true \
             --enable-full=true
 
+          CURRENT_STEP="snapshot-expire"
           echo "Expiring snapshots across all hosts against retention policies..."
           ${kopia}/bin/kopia --config-file "$CFG" snapshot expire --all --delete
 
+          CURRENT_STEP="maintenance-run-full"
           echo "Running Kopia full maintenance (snapshot GC + pack compaction + blob deletion)..."
           ${kopia}/bin/kopia --config-file "$CFG" maintenance run --full
+
+          CURRENT_STEP="snapshot-verify"
+          echo "Verifying all live snapshot trees & content index entries..."
+          ${kopia}/bin/kopia --config-file "$CFG" snapshot verify --parallel=8
+
+          CURRENT_STEP="index-bloat-check"
+          INDEX_COUNT="$(${kopia}/bin/kopia --config-file "$CFG" index list | wc -l)"
+          echo "Active index blobs after full maintenance: $INDEX_COUNT"
+          if [ "$INDEX_COUNT" -gt 500 ]; then
+            echo "ERROR: Index blob count ($INDEX_COUNT > 500) indicates epoch compaction is not converging!" >&2
+            false
+          fi
         '';
       };
 
