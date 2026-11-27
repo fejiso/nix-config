@@ -114,12 +114,15 @@
   # System state version
   system.stateVersion = "25.05";
 
-  # Local llama.cpp inference server — Inkling 2 Mini (NVFP4 + mmproj + DSpark)
-  # RTX 3500 Ada 12GB (SM89) with loop-aware CPU-MoE offload + CUDA Unified Memory spillover
+  # Local llama.cpp inference server — Inkling 2 Mini (UD-Q4_K_XL + mmproj)
+  # RTX 3500 Ada 12GB (SM89) + Core i7-13850HX (pinned to the 8 Raptor Lake
+  # P-cores, CPUs 0-15, so E-cores don't stall OpenMP barriers on CPU-spilled MoE).
   services.llama-cpp = {
     enable = true;
     gpuBackend = "cuda";
     cudaArch = "89";
-    cudaUnifiedMemory = true;
+    threads = 8;
+    threadsBatch = 16;
+    cpuAffinity = "0-15";
   };
 }

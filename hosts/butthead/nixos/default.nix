@@ -51,13 +51,15 @@
   # applied globally in overlays/default.nix on top of 1.39.7 — see bcachefs-patchz.md)
   hardware.bcachefs-support.enable = true;
 
-  # Local llama.cpp inference server — Inkling 2 Mini (NVFP4 + mmproj + DSpark)
-  # EVGA RTX 3060 12GB (Ampere SM86) with loop-aware CPU-MoE offload + CUDA Unified Memory spillover
+  # Local llama.cpp inference server — Inkling 2 Mini (UD-Q4_K_XL + mmproj)
+  # EVGA RTX 3060 12GB (Ampere SM86) + Ryzen 9 5950X (16 physical Zen 3 cores),
+  # native `--fit on` pins attention/KV + fitting MoE layers in GDDR6 VRAM and
+  # spills remaining MoE experts into repacked AVX2 system RAM.
   services.llama-cpp = {
     enable = true;
     gpuBackend = "cuda";
     cudaArch = "86";
-    cudaUnifiedMemory = true;
+    threads = 16;
   };
 
   # SANE scanner support

@@ -83,13 +83,20 @@
           "--alias" effectiveAlias
           "--host" "0.0.0.0"
           "--port" (toString cfg.port)
+          "--parallel" (toString cfg.parallel)
           "--ctx-size" (toString cfg.ctxSize)
+          "-ctk" cfg.cacheTypeK
+          "-ctv" cfg.cacheTypeV
           "--jinja"
           "-fa" "on"
           "--temp" "1.0"
           "--top-p" "1.0"
           "--top-k" "0"
           "--min-p" "0.0"
+        ]
+        ++ optionals (cfg.threads != null) [
+          "--threads" (toString cfg.threads)
+          "--threads-batch" (toString (if cfg.threadsBatch != null then cfg.threadsBatch else cfg.threads))
         ]
         ++ optionals (cfg.mmprojUrl != null) [
           "--mmproj" mmprojFile
@@ -101,8 +108,14 @@
           ++ optionals cfg.specProbabilistic [ "--spec-draft-sampling" "probabilistic" ]
         )
         ++ optionals (cfg.gpuBackend != "none") (
-          [ "-ngl" (toString cfg.nGpuLayers) ]
-          ++ optionals cfg.fit [ "--fit" "on" ]
+          optionals cfg.fit [ "--fit" "on" "--fit-target" (toString cfg.fitTargetMiB) ]
+          ++ optionals (!cfg.fit) [ "--fit" "off" ]
+          # Note: leave nGpuLayers = null and tensorOverrides = [ ] when fit = true!
+          # Passing explicit -ngl or -ot aborts common_params_fit_impl, which
+          # otherwise places 100% of dense attention/KV in dedicated GDDR6 VRAM,
+          # spills excess MoE expert tensors to system RAM, and promotes as many
+          # MoE layers into physical VRAM as fit within fitTargetMiB.
+          ++ optionals (cfg.nGpuLayers != null) [ "-ngl" (toString cfg.nGpuLayers) ]
           ++ concatMap (ov: [ "-ot" ov ]) cfg.tensorOverrides
         )
         ++ cfg.extraArgs;
@@ -134,7 +147,11 @@
 
         modelUrl = mkOption {
           type = types.str;
-          default = "https://huggingface.co/ggml-org/Inkling-2-Mini-GGUF/resolve/main/Inkling-2-Mini-NVFP4.gguf";
+          # Default to Unsloth Mainline_Support UD-Q4_K_XL on all hosts: CPU-spilled
+          # MoE expert layers get repacked into 8x8 AVX2 GEMM/GEMV kernels (NVFP4 has
+          # no CPU repack kernel and leaves layers 20..23 at 2x-larger Q8_0), while
+          # GPU-resident layers use native CUDA MMQ/MMVQ kernels.
+          default = "https://huggingface.co/unsloth/Inkling-2-Mini-GGUF/resolve/main/Mainline_Support/Inkling-2-Mini-UD-Q4_K_XL.gguf_file";
           description = "Hugging Face resolve URL for the primary GGUF model";
         };
 
@@ -146,7 +163,11 @@
 
         draftModelUrl = mkOption {
           type = types.nullOr types.str;
-          default = "https://huggingface.co/unsloth/Inkling-2-Mini-GGUF/resolve/main/Mainline_Support/dspark-Inkling-2-Mini-Q8_0.gguf_file";
+          # Disabled by default when MoE experts live in CPU RAM: verifying a 6-token
+          # draft batch activates ~5x as many distinct experts/layer in DDR4/DDR5
+          # (~40/128 vs 8/128) and adds 500 MB VRAM + 201k-vocab drafter overhead.
+          default = null;
+          example = "https://huggingface.co/unsloth/Inkling-2-Mini-GGUF/resolve/main/Mainline_Support/dspark-Inkling-2-Mini-Q8_0.gguf_file";
           description = "Optional Hugging Face resolve URL for the speculative decoding draft model";
         };
 
@@ -168,10 +189,47 @@
           description = "Enable --spec-draft-sampling probabilistic rejection sampling for positive temperatures";
         };
 
+        parallel = mkOption {
+          type = types.ints.positive;
+          default = 1;
+          description = "Number of concurrent server slots (--parallel); 1 avoids 4x 48-layer recurrent conv state overhead";
+        };
+
         ctxSize = mkOption {
           type = types.ints.positive;
           default = 65536;
           description = "Prompt context window size (--ctx-size)";
+        };
+
+        cacheTypeK = mkOption {
+          type = types.str;
+          default = "q8_0";
+          description = "KV cache K data type (-ctk); q8_0 halves 64k KV VRAM with negligible quality impact";
+        };
+
+        cacheTypeV = mkOption {
+          type = types.str;
+          default = "q8_0";
+          description = "KV cache V data type (-ctv); q8_0 halves 64k KV VRAM with negligible quality impact";
+        };
+
+        threads = mkOption {
+          type = types.nullOr types.ints.positive;
+          default = null;
+          description = "CPU thread count for generation (--threads); set to physical/P-core count";
+        };
+
+        threadsBatch = mkOption {
+          type = types.nullOr types.ints.positive;
+          default = null;
+          description = "CPU thread count for batch/prompt processing (--threads-batch); defaults to threads";
+        };
+
+        cpuAffinity = mkOption {
+          type = types.nullOr types.str;
+          default = null;
+          example = "0-15";
+          description = "Optional systemd CPUAffinity mask (e.g. '0-15' to pin hybrid Intel CPUs to P-cores)";
         };
 
         gpuBackend = mkOption {
@@ -189,44 +247,36 @@
 
         cudaUnifiedMemory = mkOption {
           type = types.bool;
+          # Keep OFF on discrete PCIe GPUs: cudaMallocManaged causes severe LRU
+          # PCIe page-fault thrashing (~1-3 tok/s) whenever working set > VRAM,
+          # and tricks --fit into reading /proc/meminfo instead of cudaMemGetInfo.
+          # Use --fit on (fit = true) for explicit CPU-RAM MoE spillover instead.
           default = false;
-          description = ''
-            Set GGML_CUDA_ENABLE_UNIFIED_MEMORY=1 so CUDA allocations spill into
-            system memory via cudaMallocManaged instead of failing with OOM when
-            VRAM is tight or shared with desktop/container workloads.
-          '';
+          description = "Set GGML_CUDA_ENABLE_UNIFIED_MEMORY=1 (only recommended on true UMA hardware)";
         };
 
         nGpuLayers = mkOption {
-          type = types.int;
-          default = 99;
-          description = "Number of layers offloaded to GPU (-ngl) when gpuBackend != 'none'";
+          type = types.nullOr types.int;
+          default = null;
+          description = "Explicit -ngl override (leave null when fit = true so llama.cpp auto-fits VRAM + CPU MoE spillover)";
         };
 
         fit = mkOption {
           type = types.bool;
           default = true;
-          description = "Pass --fit on to llama-server when gpuBackend != 'none'";
+          description = "Enable llama.cpp --fit on to pin dense/KV in VRAM and spill excess MoE experts to system RAM";
+        };
+
+        fitTargetMiB = mkOption {
+          type = types.ints.positive;
+          default = 1024;
+          description = "Free physical VRAM headroom in MiB (--fit-target) reserved for desktop/containers/mmproj";
         };
 
         tensorOverrides = mkOption {
           type = types.listOf types.str;
-          # Inkling 2 Mini has 24 physical layers: 0..5 and 18..23 run 1x/token,
-          # while loop-core layers 6..17 run 3x/token. On 12 GB GPUs, keeping
-          # loop-core MoE experts 10..17 + all 48 attention/KV passes + DSpark +
-          # mmproj on CUDA (~10 GB) and placing the 12 non-looped 1x layers
-          # (0..5, 18..23) + 4 loop layers (6..9) (~9.6 GB) in system RAM avoids
-          # PCIe page thrashing while leavingUnified Memory as the OOM backstop.
-          default =
-            if cfg.gpuBackend == "cuda"
-            then [ "^blk\\.([0-9]|1[89]|2[0-3])\\.ffn_(up|down|gate|gate_up)_(ch|)exps=CPU" ]
-            else [ ];
-          defaultText = literalExpression ''
-            if config.services.llama-cpp.gpuBackend == "cuda"
-            then [ "^blk\\.([0-9]|1[89]|2[0-3])\\.ffn_(up|down|gate|gate_up)_(ch|)exps=CPU" ]
-            else [ ]
-          '';
-          description = "Tensor buffer placement overrides (-ot) for hybrid GPU + CPU RAM execution";
+          default = [ ];
+          description = "Explicit tensor buffer placement overrides (-ot); leave empty when fit = true";
         };
 
         extraArgs = mkOption {
@@ -283,7 +333,7 @@
           serviceConfig = {
             # Wrap in writeShellScript rather than passing escapeShellArgs directly
             # to ExecStart: systemd's own command-line parser unescapes backslashes
-            # even inside single quotes, which would mangle `-ot` regex escapes.
+            # even inside single quotes, which would mangle regex escapes.
             ExecStart = pkgs.writeShellScript "llama-cpp-start" ''
               exec ${escapeShellArgs serverArgs}
             '';
@@ -291,6 +341,8 @@
             RestartSec = 10;
             NoNewPrivileges = true;
             # GPU backends require /dev/nvidia* or /dev/dri — no DynamicUser.
+          } // optionalAttrs (cfg.cpuAffinity != null) {
+            CPUAffinity = cfg.cpuAffinity;
           };
         };
 

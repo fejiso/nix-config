@@ -149,11 +149,12 @@
     };
   };
 
-  # Local llama.cpp inference server — Inkling 2 Mini (Unsloth UD-Q4_K_XL + mmproj + DSpark)
-  # Pure CPU inference (Zen 2 AVX2 repacked GEMM/GEMV), API on wt0: http://hierro.netbird.cloud:8079
+  # Local llama.cpp inference server — Inkling 2 Mini (Unsloth UD-Q4_K_XL + mmproj)
+  # Pure CPU inference (Ryzen 9 3900, 12 physical Zen 2 cores, AVX2 repacked GEMM/GEMV)
   services.llama-cpp = {
     enable = true;
-    modelUrl = "https://huggingface.co/unsloth/Inkling-2-Mini-GGUF/resolve/main/Mainline_Support/Inkling-2-Mini-UD-Q4_K_XL.gguf_file";
+    threads = 12;
+    threadsBatch = 24;
   };
 
   # MeshCore OwlShack + Pinto(hispanas, *) <-> Dublin(lenovix, #ioi) selective bridge.

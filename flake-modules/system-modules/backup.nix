@@ -152,6 +152,9 @@ in {
         };
         environment = {
           HOME = "/var/lib/kopia";
+          # Keep Go heap bounded during large index/manifest scans on busy hosts.
+          GOMEMLIMIT = "10GiB";
+          GOGC = "40";
           # Only ignores rewrite errors on already-deleted (ci.Deleted) tombstones
           # whose old short pack is missing, while still failing on live contents.
           KOPIA_IGNORE_MAINTENANCE_REWRITE_ERROR = "true";
@@ -278,6 +281,9 @@ in {
         wants = [ "kopia-server.service" ];
         environment = {
           HOME = "/var/lib/kopia";
+          # Keep Go heap bounded during large index/manifest scans on busy hosts.
+          GOMEMLIMIT = "10GiB";
+          GOGC = "40";
           # Only ignores rewrite errors on already-deleted (ci.Deleted) tombstones
           # whose old short pack is missing, while still failing on live contents.
           KOPIA_IGNORE_MAINTENANCE_REWRITE_ERROR = "true";
