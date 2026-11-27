@@ -293,37 +293,14 @@
       };
 
       config = mkIf cfg.enable {
-        systemd.services.llama-cpp-model-fetch = {
-          description = "Download GGUF weights for local llama.cpp server";
-          wantedBy = [ "llama-cpp.service" ];
-          before = [ "llama-cpp.service" ];
-          after = [ "network-online.target" ];
-          wants = [ "network-online.target" ];
-          serviceConfig = {
-            Type = "oneshot";
-            Restart = "on-failure";
-            RestartSec = 15;
-            ExecStart = pkgs.writeShellScript "llama-cpp-model-fetch" ''
-              set -euo pipefail
-              mkdir -p ${escapeShellArg cfg.modelsDir}
-              ${concatMapStringsSep "\n" (item: ''
-                if [ ! -s ${escapeShellArg item.dest} ]; then
-                  echo "Downloading ${item.url} -> ${item.dest}"
-                  ${pkgs.curl}/bin/curl -fL --retry 5 --retry-delay 5 -C - \
-                    -o ${escapeShellArg "${item.dest}.part"} \
-                    ${escapeShellArg item.url}
-                  mv ${escapeShellArg "${item.dest}.part"} ${escapeShellArg item.dest}
-                fi
-              '') fetchItems}
-            '';
-          };
-        };
-
+        # Fetch missing GGUF weights inside llama-cpp.service's Type=simple
+        # wrapper instead of a blocking Type=oneshot dependency: downloading
+        # ~18.5 GB over Wi-Fi (e.g. on laptops like tungsten) otherwise blocks
+        # `switch-to-configuration` / `colmena apply` and boot for 10-30 min.
         systemd.services.llama-cpp = {
           description = "llama.cpp local inference server (${effectiveAlias})";
           wantedBy = [ "multi-user.target" ];
-          requires = [ "llama-cpp-model-fetch.service" ];
-          after = [ "network-online.target" "netbird.service" "llama-cpp-model-fetch.service" ];
+          after = [ "network-online.target" "netbird.service" ];
           wants = [ "network-online.target" ];
           environment =
             optionalAttrs (cfg.gpuBackend == "cuda" && cfg.cudaUnifiedMemory) {
@@ -334,9 +311,48 @@
             # Wrap in writeShellScript rather than passing escapeShellArgs directly
             # to ExecStart: systemd's own command-line parser unescapes backslashes
             # even inside single quotes, which would mangle regex escapes.
-            ExecStart = pkgs.writeShellScript "llama-cpp-start" ''
+            ExecStart = pkgs.writeShellScript "llama-cpp-start" (''
+              set -euo pipefail
+              mkdir -p ${escapeShellArg cfg.modelsDir}
+              ${concatMapStringsSep "\n" (item: ''
+                if [ ! -s ${escapeShellArg item.dest} ]; then
+                  echo "Downloading ${item.url} -> ${item.dest}"
+                  ${pkgs.curl}/bin/curl -fL \
+                    --connect-timeout 20 --speed-limit 65536 --speed-time 30 \
+                    --retry 5 --retry-delay 5 -C - \
+                    -o ${escapeShellArg "${item.dest}.part"} \
+                    ${escapeShellArg item.url}
+                  mv ${escapeShellArg "${item.dest}.part"} ${escapeShellArg item.dest}
+                fi
+              '') fetchItems}
+            '' + optionalString (cfg.gpuBackend == "cuda") ''
+              # Survive live `colmena apply` across nvidia-x11 bumps before reboot:
+              # /run/opengl-driver points to the new driver while the kernel still
+              # has the booted nvidia.ko loaded, causing libcuda NVRM API mismatch
+              # and silent fallback to CPU. Prepend the booted driver's lib dir
+              # when versions differ.
+              kver="$(cat /sys/module/nvidia/version 2>/dev/null || true)"
+              if [ -n "$kver" ] && [ ! -e "/run/opengl-driver/lib/libcuda.so.$kver" ]; then
+                match_lib=""
+                booted_gfx="$(${pkgs.gawk}/bin/awk '/\/run\/opengl-driver\x27/ {print $NF}' /run/booted-system/etc/tmpfiles.d/graphics-driver.conf 2>/dev/null || true)"
+                if [ -n "$booted_gfx" ] && [ -e "$booted_gfx/lib/libcuda.so.$kver" ]; then
+                  match_lib="$booted_gfx/lib"
+                else
+                  for d in /nix/store/*-nvidia-x11-"$kver"/lib; do
+                    if [ -e "$d/libcuda.so.$kver" ]; then
+                      match_lib="$d"
+                      break
+                    fi
+                  done
+                fi
+                if [ -n "$match_lib" ]; then
+                  echo "nvidia.ko ($kver) differs from /run/opengl-driver; prepending $match_lib to LD_LIBRARY_PATH until reboot" >&2
+                  export LD_LIBRARY_PATH="$match_lib''${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+                fi
+              fi
+            '' + ''
               exec ${escapeShellArgs serverArgs}
-            '';
+            '');
             Restart = "on-failure";
             RestartSec = 10;
             NoNewPrivileges = true;

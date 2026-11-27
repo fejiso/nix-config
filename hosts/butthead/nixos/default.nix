@@ -193,13 +193,39 @@
   };
 
   # NVIDIA Container Toolkit (CDI) — GPU access in Docker & Podman containers.
-  # Don't restart the oneshot CDI generator during live `switch`: when nixpkgs
-  # bumps nvidia-x11, stopping the unit wipes /run/cdi and starting the new
-  # binary fails NVML init ("Driver/library version mismatch") against the
-  # still-loaded old nvidia.ko. Boot and the `KERNEL=="nvidia"` udev rule still
-  # regenerate /run/cdi whenever matching nvidia.ko loads.
+  # Guard against live `colmena apply` across nvidia-x11 bumps before reboot:
+  # `restartIfChanged = false` alone still fails `switch-to-configuration` (exit 4)
+  # when a `KERNEL=="nvidia"` udev event or prior start put the unit in `failed`
+  # state while old nvidia.ko is loaded. Wrap ExecStart via a drop-in (keeping
+  # the base unit's ExecStart intact and reaching `active (exited)` so Podman's
+  # `Requires=` stays satisfied) to run `/run/booted-system`'s matching CDI
+  # generator until reboot.
   hardware.nvidia-container-toolkit.enable = true;
   systemd.services.nvidia-container-toolkit-cdi-generator.restartIfChanged = false;
+  environment.etc."systemd/system/nvidia-container-toolkit-cdi-generator.service.d/live-switch-guard.conf".text =
+    let
+      wrapper = pkgs.writeShellScript "nvidia-cdi-live-switch-wrapper" ''
+        set -euo pipefail
+        expected=${lib.escapeShellArg config.hardware.nvidia.package.version}
+        loaded="$(cat /sys/module/nvidia/version 2>/dev/null || true)"
+        current_exec="$(sed -n 's/^ExecStart=//p' /etc/systemd/system/nvidia-container-toolkit-cdi-generator.service | head -n1)"
+        if [ -z "$loaded" ] || [ "$loaded" = "$expected" ]; then
+          exec "$current_exec"
+        fi
+        echo "nvidia.ko ($loaded) != userspace ($expected) (reboot pending); keeping/generating booted CDI spec" >&2
+        booted_exec="$(sed -n 's/^ExecStart=//p' /run/booted-system/etc/systemd/system/nvidia-container-toolkit-cdi-generator.service 2>/dev/null | head -n1)"
+        if [ -n "$booted_exec" ] && [ -x "$booted_exec" ]; then
+          "$booted_exec" || true
+        fi
+        exit 0
+      '';
+    in
+    ''
+      [Service]
+      RuntimeDirectoryPreserve=yes
+      ExecStart=
+      ExecStart=${wrapper}
+    '';
 
   # ROCm on pre-Vega: override GFX version to gfx803 and limit HW queues for stability
   environment.variables = {
